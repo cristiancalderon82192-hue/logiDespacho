@@ -1,0 +1,28 @@
+@import "tailwindcss";
+/* --- PERSONALIZACIÓN DEL SCROLLBAR (Adaptado a #47B3A8) --- */
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px; 
+}
+
+/* El fondo del carril = Mismo color del Sidebar */
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #47B3A8; 
+}
+
+/* La barra que se mueve = Un turquesa más oscuro */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3A958C; 
+  border-radius: 10px; 
+}
+
+/* Hover de la barra */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2D7A73; 
+}
+
+/* Soporte para Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3A958C #47B3A8;
+}

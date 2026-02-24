@@ -1,0 +1,126 @@
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { 
+  LayoutDashboard, Package, UserPlus, Truck, LogOut, 
+  Building2, UsersRound, Map, MapPin 
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import logoEmpresa from '../assets/rodeo.png';
+
+const Sidebar = ({ userRole = 'guest' }) => {
+  const location = useLocation();
+  const { logout } = useAuth();
+
+  const normalizeRole = (role) => {
+    const r = String(role);
+    if (r === '1' || r === 'admin') return 'admin';
+    if (r === '2' || r === 'lider_sala') return 'lider_sala';
+    if (r === '3' || r === 'logistica') return 'logistica';
+    if (r === '4' || r === 'conductor') return 'conductor';
+    return 'guest';
+  };
+
+  const currentRole = normalizeRole(userRole);
+
+  const mainItems = [
+    { path: currentRole === 'admin' ? '/dashboard-admin' : '/dashboard-lider', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'lider_sala'] },
+    { path: currentRole === 'admin' ? '/pedidos-admin' : '/pedidos-lider', icon: Package, label: 'Pedidos', roles: ['admin', 'lider_sala'] },
+    { path: '/clientes', icon: UsersRound, label: 'Clientes', roles: ['admin'] },
+    { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] }
+  ];
+
+  const configItems = [
+    { path: '/usuarios/nuevo', icon: UserPlus, label: 'Usuarios', roles: ['admin'] },
+    { path: '/bodegas', icon: Building2, label: 'Bodegas', roles: ['admin'] },
+    { path: '/zonas', icon: Map, label: 'Zonas', roles: ['admin'] },
+    { path: '/destinos', icon: MapPin, label: 'Destinos', roles: ['admin'] }
+  ];
+
+  const renderLinks = (items) => {
+    return items.map((item) => {
+      if (!item.roles.includes(currentRole)) return null;
+      
+      const Icon = item.icon;
+      
+      // 💡 AQUÍ ESTÁ LA SOLUCIÓN: Hacemos que el botón "Dashboard" sea inteligente
+      // Si la URL dice 'dashboard' o 'admin-home', forzamos a que se marque como activo
+      const isDashboardActive = item.label === 'Dashboard' && (
+        location.pathname.includes('dashboard') || 
+        location.pathname.includes('admin-home')
+      );
+      
+      // Compara la ruta exacta, o usa la regla inteligente del Dashboard
+      const isActive = location.pathname === item.path || isDashboardActive;
+
+      return (
+        <Link
+          key={item.path}
+          to={item.path}
+          className={`flex items-center space-x-3 p-3 rounded-lg transition-all mb-1 font-medium ${
+            isActive 
+              // ESTADO ACTIVO: Fondo oscuro con texto blanco
+              ? 'bg-slate-900 text-white shadow-lg' 
+              // ESTADO INACTIVO: Texto oscuro y hover
+              : 'text-slate-800 hover:bg-slate-900/10 hover:text-slate-900'
+          }`}
+        >
+          <Icon size={20} />
+          <span className="text-sm">{item.label}</span>
+        </Link>
+      );
+    });
+  };
+
+  return (
+    // Fondo turquesa que elegiste
+    <div className="h-screen w-64 bg-[#47B3A8] flex flex-col fixed left-0 top-0 z-50 shadow-2xl border-r border-slate-900/5">
+      
+      {/* HEADER */}
+      <div className="p-6 border-b border-slate-900/10 flex flex-col items-center">
+        
+        <img 
+          src={logoEmpresa} 
+          alt="Logo Empresa" 
+          className="h-16 w-auto object-contain drop-shadow-md" 
+        />
+        
+        {/* Etiqueta de Rol (Fondo oscuro, texto blanco) */}
+        <div className="flex items-center gap-2 mt-3 bg-slate-900 px-3 py-1 rounded-full shadow-md">
+          <div className={`w-2 h-2 rounded-full ${currentRole === 'admin' ? 'bg-green-400' : 'bg-orange-400'}`}></div>
+          <p className="text-[10px] text-slate-100 uppercase font-bold tracking-wider">
+            {currentRole.replace('_', ' ')}
+          </p>
+        </div>
+      </div>
+      
+      {/* MENÚ DE NAVEGACIÓN */}
+      <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+        <div className="space-y-1">
+          {/* Títulos de sección oscuros */}
+          <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Operaciones</p>
+          {renderLinks(mainItems)}
+        </div>
+
+        {currentRole === 'admin' && (
+          <div className="mt-8 space-y-1">
+            <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Sistema</p>
+            {renderLinks(configItems)}
+          </div>
+        )}
+      </nav>
+
+      {/* FOOTER / LOGOUT */}
+      <div className="p-4 border-t border-slate-900/10 bg-[#47B3A8]">
+        <button 
+          onClick={logout}
+          className="w-full flex items-center justify-center space-x-2 p-3 text-slate-900 hover:bg-red-500 hover:text-white rounded-lg transition-all duration-300 group shadow-sm font-bold"
+        >
+          <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm">Cerrar Sesión</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
