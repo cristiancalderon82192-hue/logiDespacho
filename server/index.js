@@ -11,6 +11,7 @@ const clientesRoutes = require('./routes/clientesRoutes');
 const usuariosRoutes = require('./routes/usuariosRoutes');
 const bodegasRoutes = require('./routes/bodegasRoutes');
 const vehiculosRoutes = require('./routes/vehiculosRoutes');
+const tiposDocumentoRoutes = require('./routes/tiposDocumentoRoutes');
 //importar archivos de rutas de lider
 //const liderRoutes = require('./routes/liderRoutes');
 const pedidosLiderRoutes = require('./routes/pedidosLiderRoutes');// <--- NUEVO
@@ -36,6 +37,7 @@ app.use('/api', clientesRoutes);
 app.use('/api', usuariosRoutes);
 app.use('/api', bodegasRoutes);
 app.use('/api', vehiculosRoutes);
+app.use('/api/tipos-documento', tiposDocumentoRoutes);
 
 // rutas lider
 //app.use('/api/lider', liderRoutes);

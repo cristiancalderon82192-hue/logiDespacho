@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, UserPlus, Truck, LogOut, 
-  Building2, UsersRound, Map, MapPin 
+  Building2, UsersRound, Map, MapPin, FileStack // <-- 1. IMPORTAMOS EL NUEVO ÍCONO AQUÍ
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
@@ -33,7 +33,9 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/usuarios/nuevo', icon: UserPlus, label: 'Usuarios', roles: ['admin'] },
     { path: '/bodegas', icon: Building2, label: 'Bodegas', roles: ['admin'] },
     { path: '/zonas', icon: Map, label: 'Zonas', roles: ['admin'] },
-    { path: '/destinos', icon: MapPin, label: 'Destinos', roles: ['admin'] }
+    { path: '/destinos', icon: MapPin, label: 'Destinos', roles: ['admin'] },
+    // 👇 2. AGREGAMOS EL NUEVO BOTÓN AQUÍ
+    { path: '/tipos-documento', icon: FileStack, label: 'Tipos Doc.', roles: ['admin'] } 
   ];
 
   const renderLinks = (items) => {
@@ -42,7 +44,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
       
       const Icon = item.icon;
       
-      // 💡 AQUÍ ESTÁ LA SOLUCIÓN: Hacemos que el botón "Dashboard" sea inteligente
+      // 💡 Hacemos que el botón "Dashboard" sea inteligente
       // Si la URL dice 'dashboard' o 'admin-home', forzamos a que se marque como activo
       const isDashboardActive = item.label === 'Dashboard' && (
         location.pathname.includes('dashboard') || 

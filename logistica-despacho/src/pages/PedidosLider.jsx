@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Save, Truck, FileText, Calendar, User, Weight, MapPin, Search, 
-  DollarSign, Phone, X, CheckCircle, Edit, RefreshCw, UserPlus 
+  DollarSign, Phone, X, CheckCircle, Edit, RefreshCw, UserPlus, CreditCard 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,10 +14,10 @@ const PedidosLider = () => {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  // --- NUEVOS ESTADOS PARA CREAR CLIENTE (SIMPLIFICADO) ---
+  // --- NUEVOS ESTADOS PARA CREAR CLIENTE (AHORA CON DOCUMENTO) ---
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientData, setNewClientData] = useState({
-    nombre: '', telefono: '', direccion_exacta: ''
+    nombre: '', documento: '', telefono: '', direccion_exacta: ''
   });
   const [savingClient, setSavingClient] = useState(false);
 
@@ -25,6 +25,7 @@ const PedidosLider = () => {
   const [listaClientes, setListaClientes] = useState([]);
   const [listaZonas, setListaZonas] = useState([]);
   const [listaDestinos, setListaDestinos] = useState([]);
+  const [listaTiposDoc, setListaTiposDoc] = useState([]); // <--- NUEVO ESTADO PARA TIPOS DE DOC
 
   // --- FORMULARIO ---
   const initialFormState = {
@@ -48,14 +49,24 @@ const PedidosLider = () => {
   // --- CARGA INICIAL (CATALOGOS) ---
   const fetchCatalogos = async () => {
     try {
-      const [resC, resZ, resD] = await Promise.all([
+      // Se agrega la petición a /api/tipos-documento
+      const [resC, resZ, resD, resT] = await Promise.all([
         fetch('http://localhost:3000/api/clientes'),
         fetch('http://localhost:3000/api/zonas'),
-        fetch('http://localhost:3000/api/destinos')
+        fetch('http://localhost:3000/api/destinos'),
+        fetch('http://localhost:3000/api/tipos-documento') // <--- NUEVA LLAMADA
       ]);
       setListaClientes(await resC.json());
       setListaZonas(await resZ.json());
       setListaDestinos(await resD.json());
+      
+      // Guardamos los tipos de documento y actualizamos el valor por defecto del formulario
+      const tipos = await resT.json();
+      setListaTiposDoc(tipos);
+      if (tipos.length > 0) {
+        setFormData(prev => ({ ...prev, tipo_documento: tipos[0].nombre }));
+      }
+
     } catch (error) { console.error("Error catalogos:", error); }
   };
 
@@ -137,6 +148,10 @@ const PedidosLider = () => {
   // --- CREAR NUEVO CLIENTE DESDE MODAL ---
   const handleCreateClient = async (e) => {
     e.preventDefault();
+    if (!newClientData.nombre || !newClientData.documento) {
+      return alert("El nombre y la Cédula/NIT son obligatorios");
+    }
+
     setSavingClient(true);
     try {
       const response = await fetch('http://localhost:3000/api/clientes', {
@@ -144,6 +159,8 @@ const PedidosLider = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newClientData)
       });
+
+      const resData = await response.json();
 
       if (response.ok) {
         alert("✅ Cliente creado exitosamente");
@@ -161,12 +178,11 @@ const PedidosLider = () => {
         }));
 
         // Limpiar y cerrar modal
-        setNewClientData({ nombre: '', telefono: '', direccion_exacta: '' });
+        setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
         setIsCreatingClient(false);
         setShowClientModal(false);
       } else {
-        const err = await response.json();
-        alert(`❌ Error al crear cliente: ${err.error || 'Verifica los datos'}`);
+        alert(`❌ Error: ${resData.error || 'Verifica los datos'}`);
       }
     } catch (error) {
       console.error("Error creando cliente:", error);
@@ -201,12 +217,18 @@ const PedidosLider = () => {
   };
 
   const resetForm = () => {
-    setFormData(initialFormState);
+    setFormData({
+      ...initialFormState,
+      tipo_documento: listaTiposDoc.length > 0 ? listaTiposDoc[0].nombre : 'Factura'
+    });
     setEditingId(null);
   };
 
+  // --- BÚSQUEDA INTELIGENTE (Nombre, Teléfono o Cédula) ---
   const clientesFiltrados = listaClientes.filter(c => 
-    c.nombre.toLowerCase().includes(clientSearchTerm.toLowerCase()) || (c.telefono && c.telefono.includes(clientSearchTerm))
+    c.nombre.toLowerCase().includes(clientSearchTerm.toLowerCase()) || 
+    (c.telefono && c.telefono.includes(clientSearchTerm)) ||
+    (c.documento && c.documento.includes(clientSearchTerm))
   );
 
   return (
@@ -230,12 +252,21 @@ const PedidosLider = () => {
               <h3 className="text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={18} className="text-blue-600"/> Datos del Documento</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
+                
+                {/* 👇 CAMBIO AQUÍ: Select dinámico leyendo de listaTiposDoc */}
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase">Tipo Doc</label>
                   <select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} className="w-full border p-2 rounded bg-white">
-                    <option>Factura</option><option>Remisión</option><option>Traslado</option><option>Nota Manual</option>
+                    {listaTiposDoc.length === 0 ? (
+                      <option>Cargando...</option>
+                    ) : (
+                      listaTiposDoc.map(t => (
+                        <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                      ))
+                    )}
                   </select>
                 </div>
+
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase">Prioridad</label>
                   <select name="prioridad" value={formData.prioridad} onChange={handleChange} className="w-full border p-2 rounded bg-white">
@@ -397,21 +428,32 @@ const PedidosLider = () => {
             <div className="flex-1 overflow-hidden flex flex-col">
               
               {isCreatingClient ? (
-                // --- VISTA 2: FORMULARIO DE CREACIÓN SIMPLIFICADO ---
+                // --- VISTA 2: FORMULARIO DE CREACIÓN (ACTUALIZADO CON CÉDULA/NIT) ---
                 <form onSubmit={handleCreateClient} className="p-6 space-y-4 overflow-y-auto bg-slate-50 flex-1">
-                  <div className="space-y-4">
-                    <div>
+                  
+                  {/* GRID PARA ORGANIZAR LOS CAMPOS MEJOR */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <div className="md:col-span-2">
                       <label className="text-xs font-bold text-slate-500 uppercase">Nombre Completo *</label>
                       <input type="text" value={newClientData.nombre} onChange={(e) => setNewClientData({...newClientData, nombre: e.target.value})} className="w-full border p-2 rounded outline-none focus:border-blue-500" required placeholder="Ej: Empresa S.A.S / Juan Pérez"/>
                     </div>
+                    
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Cédula / NIT *</label>
+                      <input type="text" value={newClientData.documento} onChange={(e) => setNewClientData({...newClientData, documento: e.target.value})} className="w-full border p-2 rounded outline-none focus:border-blue-500" required placeholder="Ej: 123456789"/>
+                    </div>
+                    
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase">Teléfono</label>
                       <input type="text" value={newClientData.telefono} onChange={(e) => setNewClientData({...newClientData, telefono: e.target.value})} className="w-full border p-2 rounded outline-none focus:border-blue-500" placeholder="Ej: 3001234567"/>
                     </div>
-                    <div>
+                    
+                    <div className="md:col-span-2">
                       <label className="text-xs font-bold text-slate-500 uppercase">Dirección Exacta</label>
                       <input type="text" value={newClientData.direccion_exacta} onChange={(e) => setNewClientData({...newClientData, direccion_exacta: e.target.value})} className="w-full border p-2 rounded outline-none focus:border-blue-500" placeholder="Ej: Calle 123 #45-67, Barrio Centro"/>
                     </div>
+
                   </div>
                   
                   <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
@@ -428,25 +470,38 @@ const PedidosLider = () => {
                 // --- VISTA 1: BÚSQUEDA NORMAL ---
                 <div className="p-4 space-y-4 flex-1 overflow-hidden flex flex-col">
                   <div className="flex gap-2">
-                    <input type="text" placeholder="Escribe el nombre o teléfono..." className="w-full border p-3 rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100" value={clientSearchTerm} onChange={(e) => setClientSearchTerm(e.target.value)} autoFocus />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar por nombre, cédula o teléfono..." 
+                      className="w-full border p-3 rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-blue-100" 
+                      value={clientSearchTerm} 
+                      onChange={(e) => setClientSearchTerm(e.target.value)} 
+                      autoFocus 
+                    />
                   </div>
                   
                   <div className="flex-1 overflow-y-auto border rounded-lg bg-white">
                     <table className="w-full text-left">
                       <thead className="bg-slate-100 text-xs text-slate-500 uppercase sticky top-0 shadow-sm">
                         <tr>
-                          <th className="p-3">Nombre</th>
+                          <th className="p-3">Nombre / Cédula</th>
                           <th className="p-3">Teléfono</th>
                           <th className="p-3 text-right">Acción</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-sm">
                         {clientesFiltrados.length === 0 ? (
-                          <tr><td colSpan="3" className="p-8 text-center text-slate-400">No se encontraron clientes con esa búsqueda.</td></tr>
+                          <tr><td colSpan="3" className="p-8 text-center text-slate-400">No se encontraron clientes.</td></tr>
                         ) : (
                           clientesFiltrados.map(c => (
                             <tr key={c.id} className="hover:bg-blue-50 transition-colors">
-                              <td className="p-3 font-medium text-slate-700">{c.nombre}</td>
+                              <td className="p-3">
+                                <span className="font-medium text-slate-700 block">{c.nombre}</span>
+                                <span className="text-[10px] text-slate-400 block flex items-center gap-1 mt-0.5">
+                                  <CreditCard size={12} className="text-slate-300" />
+                                  {c.documento || 'Sin registrar'}
+                                </span>
+                              </td>
                               <td className="p-3 text-slate-500">{c.telefono || '---'}</td>
                               <td className="p-3 text-right">
                                 <button onClick={() => handleSelectCliente(c)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 ml-auto">

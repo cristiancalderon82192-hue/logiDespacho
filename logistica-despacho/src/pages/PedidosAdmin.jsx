@@ -21,8 +21,9 @@ const PedidosAdmin = () => {
   const [listaClientes, setListaClientes] = useState([]);
   const [listaZonas, setListaZonas] = useState([]);
   const [listaDestinos, setListaDestinos] = useState([]);
+  const [listaTiposDoc, setListaTiposDoc] = useState([]); // <--- NUEVO ESTADO PARA TIPOS DE DOC
 
-  // --- FORMULARIO (ACTUALIZADO CON fecha_agendada) ---
+  // --- FORMULARIO ---
   const initialFormState = {
     id_factura: '', numero_documento: '', tipo_documento: 'Factura', prioridad: 'Media',
     valor_factura: '', fecha_facturacion: new Date().toISOString().split('T')[0], 
@@ -41,18 +42,28 @@ const PedidosAdmin = () => {
   const [fechaFin, setFechaFin] = useState(defaultFin);
   const [datosGrafica, setDatosGrafica] = useState([]);
 
-  // --- CARGA INICIAL ---
+  // --- CARGA INICIAL (ACTUALIZADA) ---
   useEffect(() => {
     const fetchCatalogos = async () => {
       try {
-        const [resC, resZ, resD] = await Promise.all([
+        // Se agrega la petición a /api/tipos-documento
+        const [resC, resZ, resD, resT] = await Promise.all([
           fetch('http://localhost:3000/api/clientes'),
           fetch('http://localhost:3000/api/zonas'),
-          fetch('http://localhost:3000/api/destinos')
+          fetch('http://localhost:3000/api/destinos'),
+          fetch('http://localhost:3000/api/tipos-documento') // <--- NUEVA LLAMADA
         ]);
         setListaClientes(await resC.json());
         setListaZonas(await resZ.json());
         setListaDestinos(await resD.json());
+        
+        // Guardamos los tipos de documento y actualizamos el valor por defecto del formulario
+        const tipos = await resT.json();
+        setListaTiposDoc(tipos);
+        if (tipos.length > 0) {
+          setFormData(prev => ({ ...prev, tipo_documento: tipos[0].nombre }));
+        }
+
       } catch (error) { console.error("Error catalogos:", error); }
     };
     fetchCatalogos();
@@ -128,7 +139,7 @@ const PedidosAdmin = () => {
     } catch (error) { console.error(error); }
   };
 
-  // --- EDICIÓN Y ELIMINACIÓN (ACTUALIZADO CON fecha_agendada) ---
+  // --- EDICIÓN Y ELIMINACIÓN ---
   const handleEdit = async (pedidoId) => {
     try {
       const res = await fetch(`http://localhost:3000/api/pedidos/${pedidoId}`);
@@ -142,7 +153,7 @@ const PedidosAdmin = () => {
         ...data,
         fecha_facturacion: formatearFecha(data.fecha_facturacion),
         fecha_promesa: formatearFecha(data.fecha_promesa),
-        fecha_agendada: formatearFecha(data.fecha_agendada), // <--- SE CARGA AQUÍ
+        fecha_agendada: formatearFecha(data.fecha_agendada),
         telefono: data.telefono || '', 
         destino_id: data.destino_id || '' 
       });
@@ -172,7 +183,10 @@ const PedidosAdmin = () => {
   };
 
   const resetForm = () => {
-    setFormData(initialFormState);
+    setFormData({
+      ...initialFormState,
+      tipo_documento: listaTiposDoc.length > 0 ? listaTiposDoc[0].nombre : 'Factura'
+    });
     setEditingId(null);
     setShowForm(false);
   };
@@ -210,12 +224,21 @@ const PedidosAdmin = () => {
                 <h3 className="text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={18} className="text-blue-600"/> Datos del Documento</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
+                  
+                  {/* 👇 CAMBIO AQUÍ: Select dinámico leyendo de listaTiposDoc */}
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Tipo Doc</label>
                     <select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} className="w-full border p-2 rounded bg-white">
-                      <option>Factura</option><option>Remisión</option><option>Traslado</option><option>Nota Manual</option>
+                      {listaTiposDoc.length === 0 ? (
+                        <option>Cargando...</option>
+                      ) : (
+                        listaTiposDoc.map(t => (
+                          <option key={t.id} value={t.nombre}>{t.nombre}</option>
+                        ))
+                      )}
                     </select>
                   </div>
+
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Prioridad</label>
                     <select name="prioridad" value={formData.prioridad} onChange={handleChange} className="w-full border p-2 rounded bg-white">
@@ -226,7 +249,6 @@ const PedidosAdmin = () => {
                   <div><label className="text-xs font-bold text-slate-500 uppercase">Fecha Fac.</label><input type="date" name="fecha_facturacion" value={formData.fecha_facturacion} onChange={handleChange} className="w-full border p-2 rounded" /></div>
                   <div><label className="text-xs font-bold text-slate-500 uppercase">Hora Registro</label><input type="time" name="hora_registro" value={formData.hora_registro} onChange={handleChange} className="w-full border p-2 rounded" /></div>
                   
-                  {/* AQUÍ SE DIVIDIÓ LA FILA PARA PROMESAS Y AGENDADO */}
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Fecha Promesa</label>
                     <input type="date" name="fecha_promesa" value={formData.fecha_promesa} onChange={handleChange} className="w-full border p-2 rounded" />

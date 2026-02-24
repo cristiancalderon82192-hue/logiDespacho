@@ -36,13 +36,20 @@ const crearPedido = async (req, res) => {
       cliente_id = resC.insertId;
     }
 
-    // C. INSERTAR PEDIDO
+    // C. OBTENER ID DEL TIPO DE DOCUMENTO (NUEVO PASO DE NORMALIZACIÓN)
+    let tipoDocId = 1; // Por defecto 1 (Factura) por si algo falla
+    if (data.tipo_documento) {
+      const [tipos] = await db.query("SELECT id FROM tipos_documento WHERE nombre = ?", [data.tipo_documento]);
+      if (tipos.length > 0) tipoDocId = tipos[0].id;
+    }
+
+    // D. INSERTAR PEDIDO (Se elimina direccion_entrega y se cambia tipo_documento por tipo_documento_id)
     const sql = `
       INSERT INTO pedidos (
-        usuario_id, cliente_id, destino_id, id_factura, tipo_documento, 
+        usuario_id, cliente_id, destino_id, id_factura, tipo_documento_id, 
         prioridad, valor_factura, fecha_facturacion, fecha_promesa, fecha_agendada, hora_registro, 
-        nota_manual, direccion_entrega, estado_entrega
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+        nota_manual, estado_entrega
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
     `;
 
     const values = [
@@ -50,21 +57,21 @@ const crearPedido = async (req, res) => {
       cliente_id,
       destinoId,
       data.id_factura,
-      data.tipo_documento,
+      tipoDocId, // Usamos el ID buscado arriba
       data.prioridad,
       data.valor_factura || 0, 
       data.fecha_facturacion,
       data.fecha_promesa,
       data.fecha_agendada || null,
       data.hora_registro,
-      data.nota_manual,
-      data.direccion_entrega || data.destino 
+      data.nota_manual
+      // Borramos direccion_entrega de aquí
     ];
 
     const [result] = await db.query(sql, values);
     const pedido_id = result.insertId;
 
-    // D. INSERTAR DETALLE DE PESOS
+    // E. INSERTAR DETALLE DE PESOS
     for (let i = 1; i <= 8; i++) {
       const pesoKey = `peso_b${i}`;
       const peso = Number(data[pesoKey]);
@@ -92,24 +99,26 @@ const listarPedidosRango = async (req, res) => {
   if (fin) fin = `${fin} 23:59:59`;
 
   try {
+    // ACTUALIZADO: Traer nombre del documento con JOIN y remover direccion_entrega
     const sql = `
       SELECT 
-        p.id, p.id_factura, p.tipo_documento, p.prioridad, p.estado_entrega,
+        p.id, p.id_factura, p.prioridad, p.estado_entrega,
+        td.nombre as tipo_documento,
         DATE_FORMAT(p.fecha_facturacion, '%Y-%m-%d') as fecha_facturacion,
         DATE_FORMAT(p.fecha_agendada, '%Y-%m-%d') as fecha_agendada,
         c.nombre as nombre_cliente, 
         d.nombre as destino,  
-        z.nombre as zona_envio, -- <-- Agregado para que React muestre la zona
-        p.direccion_entrega,
+        z.nombre as zona_envio, 
         COALESCE(SUM(pd.peso), 0) as total_peso
       FROM pedidos p
       JOIN clientes c ON p.cliente_id = c.id
       JOIN destinos d ON p.destino_id = d.id  
-      LEFT JOIN zonas z ON d.zona_id = z.id -- <-- Agregado para conectar con la zona
+      LEFT JOIN zonas z ON d.zona_id = z.id 
+      LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
       LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
-      WHERE p.fecha_agendada BETWEEN ? AND ? -- <-- CAMBIO A FECHA AGENDADA
+      WHERE p.fecha_agendada BETWEEN ? AND ? 
       GROUP BY p.id 
-      ORDER BY p.fecha_agendada DESC -- <-- ORDENA POR LA FECHA AGENDADA
+      ORDER BY p.fecha_agendada DESC 
     `;
 
     const [rows] = await db.query(sql, [inicio, fin]);
@@ -206,13 +215,14 @@ const obtenerDashboard = async (req, res) => {
 const obtenerPedidoPorId = async (req, res) => {
   const { id } = req.params;
   try {
-    // 1. Datos generales
+    // ACTUALIZADO: Traer el texto del tipo_documento para que React lo entienda
     const sqlHeader = `
-      SELECT p.*, c.nombre as nombre_cliente, c.telefono, d.nombre as destino_nombre, z.nombre as zona_nombre
+      SELECT p.*, td.nombre as tipo_documento, c.nombre as nombre_cliente, c.telefono, d.nombre as destino_nombre, z.nombre as zona_nombre
       FROM pedidos p
       JOIN clientes c ON p.cliente_id = c.id
       JOIN destinos d ON p.destino_id = d.id
       JOIN zonas z ON d.zona_id = z.id
+      LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
       WHERE p.id = ?
     `;
     const [header] = await db.query(sqlHeader, [id]);
@@ -239,7 +249,6 @@ const obtenerPedidoPorId = async (req, res) => {
 };
 
 // --- 5. ACTUALIZAR PEDIDO (PUT) ---
-// --- 5. ACTUALIZAR PEDIDO (PUT) ---
 const actualizarPedido = async (req, res) => {
   const { id } = req.params;
   const data = req.body;
@@ -252,18 +261,15 @@ const actualizarPedido = async (req, res) => {
       if (destinos.length > 0) destinoId = destinos[0].id;
     }
 
-    // 2. GESTIÓN DEL CLIENTE (AQUÍ ESTÁ LA MAGIA QUE FALTABA)
+    // 2. GESTIÓN DEL CLIENTE
     let cliente_id = data.cliente_id; 
     
-    // Si el front manda un nombre de cliente, buscamos su ID o lo creamos
     if (data.nombre_cliente) {
       let [clientes] = await db.query("SELECT id FROM clientes WHERE nombre = ?", [data.nombre_cliente]);
       
       if (clientes.length > 0) {
-        // Si el cliente ya existe en la BD, tomamos su ID
         cliente_id = clientes[0].id;
       } else {
-        // Si escribieron un cliente nuevo, lo creamos
         const [resC] = await db.query(
           "INSERT INTO clientes (nombre, telefono) VALUES (?, ?)",
           [data.nombre_cliente, data.telefono || 'Sin telefono']
@@ -272,25 +278,31 @@ const actualizarPedido = async (req, res) => {
       }
     }
 
-    // 3. ACTUALIZAR EL PEDIDO (AGREGANDO cliente_id=?)
+    // 3. OBTENER ID DEL TIPO DE DOCUMENTO (NUEVO)
+    let tipoDocId = 1; 
+    if (data.tipo_documento) {
+      const [tipos] = await db.query("SELECT id FROM tipos_documento WHERE nombre = ?", [data.tipo_documento]);
+      if (tipos.length > 0) tipoDocId = tipos[0].id;
+    }
+
+    // 4. ACTUALIZAR EL PEDIDO (Cambios en columnas)
     const sql = `
       UPDATE pedidos SET 
-        id_factura=?, tipo_documento=?, prioridad=?, 
+        id_factura=?, tipo_documento_id=?, prioridad=?, 
         valor_factura=?, fecha_facturacion=?, fecha_promesa=?, fecha_agendada=?, hora_registro=?, 
-        nota_manual=?, direccion_entrega=?, destino_id=?, cliente_id=?
+        nota_manual=?, destino_id=?, cliente_id=?
       WHERE id=?
     `;
     
-    // Se añade cliente_id al array de valores, justo antes de 'id'
     await db.query(sql, [
-      data.id_factura, data.tipo_documento, data.prioridad,
+      data.id_factura, tipoDocId, data.prioridad,
       data.valor_factura || 0, data.fecha_facturacion, data.fecha_promesa, 
       data.fecha_agendada || null, 
-      data.hora_registro, data.nota_manual, data.direccion_entrega || data.destino, 
+      data.hora_registro, data.nota_manual, 
       destinoId, cliente_id, id
     ]);
 
-    // 4. Actualizar Pesos: Borrar viejos e insertar nuevos
+    // 5. Actualizar Pesos: Borrar viejos e insertar nuevos
     await db.query("DELETE FROM pedidos_detalle WHERE pedido_id = ?", [id]);
 
     for (let i = 1; i <= 8; i++) {

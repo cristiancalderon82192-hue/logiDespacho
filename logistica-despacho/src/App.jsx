@@ -11,9 +11,11 @@ import PedidosAdmin from './pages/PedidosAdmin';
 import RegisterUser from './pages/RegisterUser';
 import Bodegas from './pages/Bodegas';
 import Clientes from './pages/Clientes';
-import Zonas from './pages/Zonas';       // <--- Importado
+import Zonas from './pages/Zonas';       
 import Destinos from './pages/Destinos'; 
-import Flota from './pages/Flota';// <--- Importado
+import Flota from './pages/Flota';
+// 👇 1. IMPORTAMOS LA NUEVA VISTA AQUÍ
+import TiposDocumento from './pages/TiposDocumentos'; 
 
 // Importamos componentes auxiliares
 import ProtectedRoute from './components/ProtectedRoute';
@@ -113,10 +115,22 @@ export default function App() {
             } 
           />
 
+          {/* 👇 2. NUEVA RUTA: TIPOS DE DOCUMENTO */}
+          <Route 
+            path="/tipos-documento" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <MainLayout role="admin">
+                  <TiposDocumento />
+                </MainLayout>
+              </ProtectedRoute>
+            } 
+          />
+
           {/* --- FIN SECCIÓN CONFIGURACIÓN --- */}
 
 
-          {/* Gestión de Usuarios (Nota: Si RegisterUser tiene sidebar propio, déjalo sin MainLayout) */}
+          {/* Gestión de Usuarios */}
           <Route 
             path="/usuarios/nuevo" 
             element={
@@ -143,7 +157,7 @@ export default function App() {
             path="/clientes" 
             element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin"> {/* Ahora usamos MainLayout para que herede el Sidebar global */}
+                <MainLayout role="admin">
                   <Clientes />
                 </MainLayout>
               </ProtectedRoute>
@@ -177,9 +191,6 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-
-          {/* Rutas Temporales */}
-          <Route path="/flota" element={<ProtectedRoute allowedRoles={['admin']}><MainLayout role="admin"><h1>Gestión de Flota</h1></MainLayout></ProtectedRoute>} />
           
           {/* Ruta 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />

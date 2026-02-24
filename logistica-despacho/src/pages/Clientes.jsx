@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { UsersRound, Save, Edit, Trash2, MapPin, Phone, RefreshCw } from 'lucide-react';
+import { UsersRound, Save, Edit, Trash2, MapPin, Phone, RefreshCw, CreditCard } from 'lucide-react';
 
 const Clientes = () => {
   const [clientes, setClientes] = useState([]);
   
-  // ESTADO DEL FORMULARIO
+  // 1. ESTADO DEL FORMULARIO (Agregamos documento)
   const [formData, setFormData] = useState({ 
     nombre: '', 
+    documento: '', 
     telefono: '', 
     direccion_exacta: '' 
   });
   
   const [editingId, setEditingId] = useState(null);
 
-  // 1. CARGAR CLIENTES
+  // CARGAR CLIENTES
   const fetchClientes = async () => {
     try {
       const res = await fetch('http://localhost:3000/api/clientes');
@@ -24,10 +25,13 @@ const Clientes = () => {
 
   useEffect(() => { fetchClientes(); }, []);
 
-  // 2. GUARDAR
+  // GUARDAR O ACTUALIZAR
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validación extra en el frontend
     if (!formData.nombre) return alert("El nombre es obligatorio");
+    if (!formData.documento) return alert("La Cédula/NIT es obligatoria");
     
     const url = editingId 
       ? `http://localhost:3000/api/clientes/${editingId}` 
@@ -42,36 +46,46 @@ const Clientes = () => {
         body: JSON.stringify(formData)
       });
 
+      const data = await res.json(); // Leemos la respuesta del backend
+
       if (res.ok) {
-        alert(editingId ? "Cliente Actualizado" : "Cliente Creado");
-        setFormData({ nombre: '', telefono: '', direccion_exacta: '' });
+        alert(editingId ? "✅ Cliente Actualizado" : "✅ Cliente Creado");
+        setFormData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
         setEditingId(null);
         fetchClientes();
       } else {
-        alert("Error al guardar");
+        // Mostramos el error exacto (ej: "Este número de documento ya está registrado")
+        alert(`❌ Error: ${data.error || 'No se pudo guardar'}`);
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { 
+      alert("Error de conexión con el servidor"); 
+    }
   };
 
-  // 3. EDITAR
+  // EDITAR (Cargar datos al formulario)
   const handleEdit = (c) => {
     setEditingId(c.id);
     setFormData({ 
       nombre: c.nombre, 
+      documento: c.documento || '', // Cargamos el documento
       telefono: c.telefono || '', 
       direccion_exacta: c.direccion_exacta || '' 
     });
-    // Scroll arriba para ver el formulario
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 4. ELIMINAR
+  // ELIMINAR
   const handleDelete = async (id) => {
-    if(!window.confirm("¿Eliminar cliente?")) return;
+    if(!window.confirm("¿Estás seguro de eliminar este cliente?")) return;
     try {
       const res = await fetch(`http://localhost:3000/api/clientes/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchClientes();
-      else alert("No se puede eliminar (tiene pedidos asociados)");
+      const data = await res.json();
+      
+      if (res.ok) {
+        fetchClientes();
+      } else {
+        alert(`❌ Error: ${data.error}`); // Muestra si tiene pedidos asociados
+      }
     } catch (e) { alert("Error de conexión"); }
   };
 
@@ -89,14 +103,25 @@ const Clientes = () => {
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
         <div className={`px-8 py-4 border-b font-bold uppercase tracking-wider ${editingId ? 'bg-orange-100 text-orange-800' : 'bg-slate-900 text-white'}`}>
           {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
-          {editingId && <button onClick={() => {setEditingId(null); setFormData({ nombre: '', telefono: '', direccion_exacta: '' })}} className="ml-4 text-xs underline">Cancelar</button>}
+          {editingId && (
+            <button 
+              onClick={() => {
+                setEditingId(null); 
+                setFormData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' })
+              }} 
+              className="ml-4 text-xs underline hover:text-orange-900"
+            >
+              Cancelar Edición
+            </button>
+          )}
         </div>
         
-        <form onSubmit={handleSubmit} className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+        {/* Cambiamos a 2 columnas en tablet y 4 en PC para acomodar el nuevo campo */}
+        <form onSubmit={handleSubmit} className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-end">
           
           {/* CAMPO 1: NOMBRE */}
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Nombre Cliente</label>
+            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Nombre Cliente *</label>
             <input 
               type="text" 
               value={formData.nombre} 
@@ -107,7 +132,23 @@ const Clientes = () => {
             />
           </div>
 
-          {/* CAMPO 2: TELÉFONO */}
+          {/* CAMPO NUEVO: DOCUMENTO */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Cédula / NIT *</label>
+            <div className="relative">
+              <CreditCard className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+              <input 
+                type="text" 
+                value={formData.documento} 
+                onChange={(e) => setFormData({...formData, documento: e.target.value})} 
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" 
+                placeholder="123456789"
+                required
+              />
+            </div>
+          </div>
+
+          {/* CAMPO 3: TELÉFONO */}
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase ml-1">Teléfono</label>
             <div className="relative">
@@ -122,7 +163,7 @@ const Clientes = () => {
             </div>
           </div>
 
-          {/* CAMPO 3: DIRECCIÓN EXACTA */}
+          {/* CAMPO 4: DIRECCIÓN EXACTA */}
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase ml-1">Dirección Exacta</label>
             <div className="relative">
@@ -137,26 +178,25 @@ const Clientes = () => {
             </div>
           </div>
 
-          {/* BOTÓN */}
-          <div className="md:col-span-3">
+          {/* BOTÓN (Ocupa todo el ancho disponible) */}
+          <div className="md:col-span-2 xl:col-span-4 mt-2">
             <button 
               type="submit" 
-              className={`w-full py-3 rounded-lg font-bold text-white flex justify-center items-center gap-2 ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className={`w-full py-3 rounded-lg font-bold text-white flex justify-center items-center gap-2 transition-transform active:scale-95 shadow-md ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {editingId ? <RefreshCw size={20}/> : <Save size={20}/>} 
-              {editingId ? 'Actualizar' : 'Guardar'}
+              {editingId ? 'Actualizar Cliente' : 'Guardar Nuevo Cliente'}
             </button>
           </div>
         </form>
       </div>
 
-      {/* TABLA CORREGIDA */}
+      {/* TABLA */}
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-        <table className="w-full text-left table-fixed"> {/* table-fixed para respetar anchos */}
+        <table className="w-full text-left table-fixed">
           <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs uppercase">
             <tr>
-              {/* Definimos anchos explícitos */}
-              <th className="p-5 font-bold w-1/3">Cliente</th>
+              <th className="p-5 font-bold w-1/3">Cliente / Documento</th>
               <th className="p-5 font-bold w-1/4">Teléfono</th>
               <th className="p-5 font-bold w-1/3">Dirección Exacta</th>
               <th className="p-5 font-bold text-center w-[120px]">Acciones</th>
@@ -169,9 +209,14 @@ const Clientes = () => {
               clientes.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                   
-                  {/* COL 1: NOMBRE */}
-                  <td className="p-5 align-middle font-bold text-slate-800 break-words">
-                    {c.nombre}
+                  {/* COL 1: NOMBRE Y DOCUMENTO */}
+                  <td className="p-5 align-middle">
+                    <div className="font-bold text-slate-800 break-words">{c.nombre}</div>
+                    {/* Aquí mostramos la cédula pequeñita debajo del nombre */}
+                    <div className="text-[11px] font-mono text-slate-500 mt-1 flex items-center gap-1">
+                      <CreditCard size={12} className="text-slate-400" /> 
+                      {c.documento || 'Sin registrar'}
+                    </div>
                   </td>
                   
                   {/* COL 2: TELÉFONO */}
