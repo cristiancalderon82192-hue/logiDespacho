@@ -14,7 +14,9 @@ const vehiculosRoutes = require('./routes/vehiculosRoutes');
 const tiposDocumentoRoutes = require('./routes/tiposDocumentoRoutes');
 //importar archivos de rutas de lider
 //const liderRoutes = require('./routes/liderRoutes');
-const pedidosLiderRoutes = require('./routes/pedidosLiderRoutes');// <--- NUEVO
+const pedidosLiderRoutes = require('./routes/pedidosLiderRoutes');
+//const logisitca
+const logisticaRoutes = require('./routes/logisticaRoutes');// <--- NUEVO
 
 
 const app = express();
@@ -42,6 +44,8 @@ app.use('/api/tipos-documento', tiposDocumentoRoutes);
 // rutas lider
 //app.use('/api/lider', liderRoutes);
 app.use('/api/lider', pedidosLiderRoutes);
+
+app.use('/api/logistica', logisticaRoutes);
 
 const PORT = 3000;
 app.listen(PORT, () => {

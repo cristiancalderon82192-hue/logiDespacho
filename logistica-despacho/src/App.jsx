@@ -14,18 +14,26 @@ import Clientes from './pages/Clientes';
 import Zonas from './pages/Zonas';       
 import Destinos from './pages/Destinos'; 
 import Flota from './pages/Flota';
-// 👇 1. IMPORTAMOS LA NUEVA VISTA AQUÍ
 import TiposDocumento from './pages/TiposDocumentos'; 
 
-// Importamos componentes auxiliares
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar'; 
+import DashboardLogistica from './pages/DashboardLogistica';
+import AsignacionLogistica from './pages/AsignacionLogistica';
 
-// --- REDIRECCIÓN INTELIGENTE ---
+// 1. REDIRECT INTELIGENTE MEJORADO (Convierte todo a texto para que no falle)
 const RootRedirect = () => {
   const { user } = useAuth();
+  
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'admin') return <Navigate to="/admin-home" replace />;
+  
+  // Forzamos que el rol sea un texto para evitar el error del número 3
+  const rol = String(user.role).toLowerCase().trim();
+  
+  if (rol === 'admin' || rol === '1') return <Navigate to="/admin-home" replace />;
+  if (rol === 'logistica' || rol === '3') return <Navigate to="/dashboard-logistica" replace />;
+  
+  // Por defecto (Líder de Sala)
   return <Navigate to="/dashboard-lider" replace />;
 };
 
@@ -47,150 +55,33 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           
-          {/* 1. Ruta Raíz y Login */}
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
 
           {/* =======================================================
-              RUTAS DEL ADMINISTRADOR (Role: 'admin')
+              RUTAS DEL ADMINISTRADOR (Roles: 'admin', '1', 1)
              ======================================================= */}
-          
-          {/* Dashboard Admin */}
-          <Route 
-            path="/admin-home" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <AdminDashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Historial de Pedidos Admin */}
-          <Route 
-            path="/pedidos-admin" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <PedidosAdmin />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/flota" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <Flota />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* --- NUEVA SECCIÓN: CONFIGURACIÓN (ZONAS Y DESTINOS) --- */}
-          
-          {/* Gestión de Zonas */}
-          <Route 
-            path="/zonas" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <Zonas />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Gestión de Destinos */}
-          <Route 
-            path="/destinos" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <Destinos />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* 👇 2. NUEVA RUTA: TIPOS DE DOCUMENTO */}
-          <Route 
-            path="/tipos-documento" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <TiposDocumento />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* --- FIN SECCIÓN CONFIGURACIÓN --- */}
-
-
-          {/* Gestión de Usuarios */}
-          <Route 
-            path="/usuarios/nuevo" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <RegisterUser />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Gestión de Bodegas */}
-          <Route 
-            path="/bodegas" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-               <MainLayout role="admin">
-                 <Bodegas />
-               </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Gestión de Clientes */}
-          <Route 
-            path="/clientes" 
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <MainLayout role="admin">
-                  <Clientes />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/admin-home" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><AdminDashboard /></MainLayout></ProtectedRoute>} />
+          <Route path="/pedidos-admin" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><PedidosAdmin /></MainLayout></ProtectedRoute>} />
+          <Route path="/flota" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><Flota /></MainLayout></ProtectedRoute>} />
+          <Route path="/zonas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><Zonas /></MainLayout></ProtectedRoute>} />
+          <Route path="/destinos" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><Destinos /></MainLayout></ProtectedRoute>} />
+          <Route path="/tipos-documento" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><TiposDocumento /></MainLayout></ProtectedRoute>} />
+          <Route path="/usuarios/nuevo" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><RegisterUser /></ProtectedRoute>} />
+          <Route path="/bodegas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><Bodegas /></MainLayout></ProtectedRoute>} />
+          <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout role="admin"><Clientes /></MainLayout></ProtectedRoute>} />
 
           {/* =======================================================
-              RUTAS DEL LÍDER (Role: 'lider_sala')
+              RUTAS DEL LÍDER DE SALA (Roles: 'lider_sala', '2', 2)
              ======================================================= */}
-
-          {/* Dashboard Líder */}
-          <Route 
-            path="/dashboard-lider" 
-            element={
-              <ProtectedRoute allowedRoles={['lider_sala']}>
-                <MainLayout role="lider_sala">
-                  <DashboardLider />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Formulario de Pedidos Líder */}
-          <Route 
-            path="/pedidos-lider" 
-            element={
-              <ProtectedRoute allowedRoles={['lider_sala']}>
-                <MainLayout role="lider_sala">
-                  <PedidosLider />
-                </MainLayout>
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/dashboard-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2]}><MainLayout role="lider_sala"><DashboardLider /></MainLayout></ProtectedRoute>} />
+          <Route path="/pedidos-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2]}><MainLayout role="lider_sala"><PedidosLider /></MainLayout></ProtectedRoute>} />
+          
+          {/* =======================================================
+              RUTAS DE LOGÍSTICA (Roles: 'logistica', '3', 3, y admin)
+             ======================================================= */}
+          <Route path="/dashboard-logistica" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout role="logistica"><DashboardLogistica /></MainLayout></ProtectedRoute>} />
+          <Route path="/logistica-asignacion" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout role="logistica"><AsignacionLogistica /></MainLayout></ProtectedRoute>} />
           
           {/* Ruta 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />

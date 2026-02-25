@@ -26,7 +26,9 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: currentRole === 'admin' ? '/dashboard-admin' : '/dashboard-lider', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'lider_sala'] },
     { path: currentRole === 'admin' ? '/pedidos-admin' : '/pedidos-lider', icon: Package, label: 'Pedidos', roles: ['admin', 'lider_sala'] },
     { path: '/clientes', icon: UsersRound, label: 'Clientes', roles: ['admin'] },
-    { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] }
+    { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] },
+    { path: '/dashboard-logistica', icon: LayoutDashboard, label: 'Dashboard', roles: ['logistica'] },
+    { path: '/logistica-asignacion', icon: Truck, label: 'Asignar Rutas', roles: ['logistica'] }
   ];
 
   const configItems = [
