@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { FileSpreadsheet } from 'lucide-react';
 import { 
   LayoutDashboard, Package, UserPlus, Truck, LogOut, 
   Building2, UsersRound, Map, MapPin, FileStack, AlertCircle, Menu, X 
@@ -32,7 +33,9 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] },
     { path: '/dashboard-logistica', icon: LayoutDashboard, label: 'Dashboard', roles: ['logistica'] },
     { path: '/logistica-asignacion', icon: Truck, label: 'Asignar Rutas', roles: ['logistica'] },
-    { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'] }
+    { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'] },
+    // 👇 NUEVO ÍTEM DE REPORTES AGREGADO AQUÍ 👇
+    { path: '/reportes', icon: FileSpreadsheet, label: 'Reportes', roles: ['admin'] } 
   ];
 
   const configItems = [
@@ -48,7 +51,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
       if (!item.roles.includes(currentRole)) return null;
       
       const Icon = item.icon;
-      const isActive = location.pathname === item.path;
+      const isActive = location.pathname.startsWith(item.path); // Cambiado a startsWith para que siga activo si entras a un sub-reporte
 
       return (
         <Link
@@ -113,7 +116,6 @@ const Sidebar = ({ userRole = 'guest' }) => {
             <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Operaciones</p>
             {renderLinks(mainItems)}
           </div>
-
           {currentRole === 'admin' && (
             <div className="mt-8 space-y-1">
               <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Sistema</p>
