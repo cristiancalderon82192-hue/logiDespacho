@@ -27,24 +27,27 @@ const Login = () => {
 
       if (response.ok) {
         
-        // 1. EXTRAER EL ROL (Soporta si el backend lo manda suelto o dentro de un objeto 'user')
         const objUsuario = data.user || data.usuario || data;
+        
+        // 👇 1. VALIDACIÓN DE USUARIO INACTIVO 👇
+        // En tu BD, el estado activo es 1 y el inactivo es 0.
+        if (String(objUsuario.estado) === '0' || objUsuario.estado === false) {
+          alert("❌ ACCESO DENEGADO: Tu cuenta de usuario se encuentra INACTIVA. Por favor, comunícate con el administrador del sistema.");
+          setLoading(false);
+          return; // Detenemos el proceso aquí mismo
+        }
+
         const rolOriginal = String(objUsuario.role || objUsuario.rol || objUsuario.id_rol || '');
 
-        // 🚨 ALERTA VISUAL PARA TI (Te dirá exactamente qué llega de la BD)
-        alert(`🔍 DEBUG: Tu Base de Datos dice que este usuario es: [ ${rolOriginal} ]`);
-
-        // 2. LIMPIAR EL TEXTO (Quitar tildes, mayúsculas y espacios extra)
-        // Ejemplo: "Logística" se convierte en "logistica"
+        // 2. LIMPIAR EL TEXTO DEL ROL
         const rolLimpio = rolOriginal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
         // 3. ASIGNAR EL ROL CORRECTAMENTE
-        let rolNormalizado = 'lider_sala'; // Por defecto
+        let rolNormalizado = 'lider_sala'; 
         
         if (rolLimpio.includes('admin') || rolLimpio === '1') {
           rolNormalizado = 'admin';
         } 
-        // 👇 AQUÍ ESTÁ LA MAGIA: Atrapa "logistica", "logistico", "lider logistica", etc.
         else if (rolLimpio.includes('logistic') || rolLimpio === '3') {
           rolNormalizado = 'logistica'; 
         } 
@@ -55,7 +58,6 @@ const Login = () => {
         // 4. GUARDAR DATOS EN EL NAVEGADOR
         const usuarioCorregido = { ...data, role: rolNormalizado };
         
-        // Por si tu AuthContext usa el objeto anidado:
         if (usuarioCorregido.user) usuarioCorregido.user.role = rolNormalizado;
         if (usuarioCorregido.usuario) usuarioCorregido.usuario.role = rolNormalizado;
 
@@ -64,7 +66,7 @@ const Login = () => {
         // 5. REDIRIGIR AL DASHBOARD CORRECTO
         if (rolNormalizado === 'admin') navigate('/admin-home'); 
         else if (rolNormalizado === 'logistica') navigate('/dashboard-logistica'); 
-        else if (rolNormalizado === 'conductor') navigate('/mis-rutas'); 
+        else if (rolNormalizado === 'conductor') navigate('/conductor-home'); 
         else navigate('/dashboard-lider'); 
         
       } else {

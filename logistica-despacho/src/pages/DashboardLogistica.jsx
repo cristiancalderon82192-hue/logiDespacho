@@ -3,9 +3,19 @@ import { Calendar, Package, Weight, MapPin, Truck, TrendingUp } from 'lucide-rea
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const DashboardLogistica = () => {
-  // Por defecto, vemos los despachos agendados para HOY
-  const hoy = new Date().toISOString().split('T')[0];
-  const [fechaFiltro, setFechaFiltro] = useState(hoy);
+  // --- FUNCIÓN PARA OBTENER FECHA LOCAL EXACTA DEL PC ---
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+
+  const hoyLocal = obtenerFechaLocal();
+  
+  // Por defecto, vemos los despachos agendados para HOY (hora local)
+  const [fechaFiltro, setFechaFiltro] = useState(hoyLocal);
   
   const [loading, setLoading] = useState(false);
   const [kpis, setKpis] = useState({ total_pedidos: 0, total_peso: 0 });

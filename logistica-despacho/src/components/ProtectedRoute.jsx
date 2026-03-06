@@ -10,6 +10,12 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // 👇 NUEVO: Si el usuario guardado en memoria está inactivo, lo sacamos
+  const usuarioDatos = user.user || user.usuario || user;
+  if (String(usuarioDatos.estado) === '0' || usuarioDatos.estado === false) {
+    return <Navigate to="/login" replace />;
+  }
+
   // 2. Si hay usuario, pero su rol NO está en la lista de permitidos
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // Lo mandamos al inicio o mostramos alerta (aquí redirigimos al home)
