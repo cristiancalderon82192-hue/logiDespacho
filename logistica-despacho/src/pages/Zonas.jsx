@@ -9,7 +9,8 @@ const Zonas = () => {
 
   const fetchZonas = async () => {
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}/api/zonas');
+      // CORREGIDO: Uso de backticks (``)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/zonas`);
       setZonas(await res.json());
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
@@ -21,9 +22,10 @@ const Zonas = () => {
     e.preventDefault();
     if (!nombre.trim()) return;
 
+    // CORREGIDO: Uso de backticks (``) en ambas opciones
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/zonas/${editingId}` 
-      : '${import.meta.env.VITE_API_URL}/api/zonas';
+      : `${import.meta.env.VITE_API_URL}/api/zonas`;
     
     const method = editingId ? 'PUT' : 'POST';
 

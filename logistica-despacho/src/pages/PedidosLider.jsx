@@ -53,10 +53,10 @@ const PedidosLider = () => {
   const fetchCatalogos = async () => {
     try {
       const [resC, resZ, resD, resT] = await Promise.all([
-        fetch('${import.meta.env.VITE_API_URL}/api/clientes'),
-        fetch('${import.meta.env.VITE_API_URL}/api/zonas'),
-        fetch('${import.meta.env.VITE_API_URL}/api/destinos'),
-        fetch('${import.meta.env.VITE_API_URL}/api/tipos-documento')
+        fetch(`${import.meta.env.VITE_API_URL}/api/clientes`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/zonas`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/destinos`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento`)
       ]);
       setListaClientes(await resC.json());
       setListaZonas(await resZ.json());
@@ -127,7 +127,7 @@ const PedidosLider = () => {
     e.preventDefault();
     if (isReadOnly) return;
 
-    const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : 'http://localhost:3000/api/pedidos';
+    const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
     const method = editingId ? 'PUT' : 'POST';
 
     try {
@@ -156,7 +156,7 @@ const PedidosLider = () => {
     
     setSavingClient(true);
     try {
-      const response = await fetch('${import.meta.env.VITE_API_URL}/api/clientes', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newClientData)
@@ -165,7 +165,7 @@ const PedidosLider = () => {
       
       if (response.ok) {
         alert("✅ Cliente creado exitosamente");
-        const resC = await fetch('${import.meta.env.VITE_API_URL}/api/clientes');
+        const resC = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
         setListaClientes(await resC.json());
         setFormData(prev => ({ ...prev, nombre_cliente: newClientData.nombre, telefono: newClientData.telefono }));
         setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
@@ -247,7 +247,7 @@ const PedidosLider = () => {
             <div className="space-y-3 md:space-y-4">
               <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                {/* CORRECCIÓN PADDING (py-2.5 px-3 en lugar de p-2.5) */}
+                {/* AJUSTE DE PADDING: py-2.5 md:py-2 px-3 para inputs normales sin icono */}
                 <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" required /></div>
                 <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
                 <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
@@ -267,7 +267,7 @@ const PedidosLider = () => {
                   <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Cliente</label>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
-                      {/* CORRECCIÓN PADDING CON ICONO: py-2.5 pr-3 pl-8 */}
+                      {/* ARREGLO DEL DISEÑO: pr-3 pl-8 garantiza que el texto respete el espacio del icono */}
                       <input type="text" name="nombre_cliente" value={formData.nombre_cliente} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded disabled:bg-slate-100 bg-white" placeholder="Buscar o crear..." required />
                       <User size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                     </div>
@@ -277,7 +277,7 @@ const PedidosLider = () => {
                 <div>
                   <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Teléfono</label>
                   <div className="relative">
-                    {/* CORRECCIÓN PADDING CON ICONO */}
+                    {/* ARREGLO DEL DISEÑO: pr-3 pl-8 */}
                     <input type="text" name="telefono" value={formData.telefono} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded disabled:bg-slate-100 bg-white"/>
                     <Phone size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                   </div>
@@ -286,7 +286,7 @@ const PedidosLider = () => {
                 <div className="sm:col-span-2">
                   <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Destino</label>
                   <div className="relative">
-                    {/* CORRECCIÓN PADDING CON ICONO */}
+                    {/* ARREGLO DEL DISEÑO: pr-3 pl-8 */}
                     <select name="destino_id" value={formData.destino_id} onChange={handleDestinoChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded bg-white disabled:bg-slate-100" required>
                       <option value="">-- Seleccione --</option>
                       {listaDestinos.map(d => (<option key={d.id} value={d.id}>{d.nombre} {d.zona_nombre ? `(${d.zona_nombre})` : ''}</option>))}
@@ -307,8 +307,14 @@ const PedidosLider = () => {
                 ))}
               </div>
               <div className="mt-4 flex flex-col sm:flex-row justify-end gap-2 md:gap-3">
-                <button type="button" onClick={resetForm} className="w-full sm:w-auto text-slate-500 hover:bg-slate-200 bg-slate-100 sm:bg-transparent px-4 py-2.5 md:py-2 rounded font-bold text-sm text-center border sm:border-none">{isReadOnly ? 'CERRAR VISTA' : 'LIMPIAR'}</button>
-                {!isReadOnly && <button type="submit" className={`w-full sm:w-auto text-white px-6 py-2.5 md:py-2 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{editingId ? <RefreshCw size={16}/> : <Save size={16}/>} {editingId ? 'ACTUALIZAR PEDIDO' : 'GUARDAR PEDIDO'}</button>}
+                <button type="button" onClick={resetForm} className="w-full sm:w-auto text-slate-500 hover:bg-slate-200 bg-slate-100 sm:bg-transparent px-4 py-2.5 md:py-2 rounded font-bold text-sm text-center border sm:border-none">
+                  {isReadOnly ? 'CERRAR VISTA' : 'LIMPIAR'}
+                </button>
+                {!isReadOnly && (
+                  <button type="submit" className={`w-full sm:w-auto text-white px-6 py-2.5 md:py-2 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+                    {editingId ? <RefreshCw size={16}/> : <Save size={16}/>} {editingId ? 'ACTUALIZAR PEDIDO' : 'GUARDAR PEDIDO'}
+                  </button>
+                )}
               </div>
             </div>
           </form>
@@ -425,19 +431,19 @@ const PedidosLider = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Nombre Completo *</label>
-                      <input type="text" value={newClientData.nombre} onChange={(e) => setNewClientData({...newClientData, nombre: e.target.value})} className="w-full border p-2.5 rounded text-sm bg-white" required placeholder="Ej: Empresa S.A.S"/>
+                      <input type="text" value={newClientData.nombre} onChange={(e) => setNewClientData({...newClientData, nombre: e.target.value})} className="w-full border py-2.5 px-3 rounded text-sm bg-white" required placeholder="Ej: Empresa S.A.S"/>
                     </div>
                     <div>
                       <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Cédula / NIT *</label>
-                      <input type="text" value={newClientData.documento} onChange={(e) => setNewClientData({...newClientData, documento: e.target.value})} className="w-full border p-2.5 rounded text-sm bg-white" required placeholder="Ej: 123456789"/>
+                      <input type="text" value={newClientData.documento} onChange={(e) => setNewClientData({...newClientData, documento: e.target.value})} className="w-full border py-2.5 px-3 rounded text-sm bg-white" required placeholder="Ej: 123456789"/>
                     </div>
                     <div>
                       <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Teléfono</label>
-                      <input type="text" value={newClientData.telefono} onChange={(e) => setNewClientData({...newClientData, telefono: e.target.value})} className="w-full border p-2.5 rounded text-sm bg-white" placeholder="Ej: 3001234567"/>
+                      <input type="text" value={newClientData.telefono} onChange={(e) => setNewClientData({...newClientData, telefono: e.target.value})} className="w-full border py-2.5 px-3 rounded text-sm bg-white" placeholder="Ej: 3001234567"/>
                     </div>
                     <div className="md:col-span-2">
                       <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Dirección Exacta</label>
-                      <input type="text" value={newClientData.direccion_exacta} onChange={(e) => setNewClientData({...newClientData, direccion_exacta: e.target.value})} className="w-full border p-2.5 rounded text-sm bg-white" placeholder="Ej: Calle 123..."/>
+                      <input type="text" value={newClientData.direccion_exacta} onChange={(e) => setNewClientData({...newClientData, direccion_exacta: e.target.value})} className="w-full border py-2.5 px-3 rounded text-sm bg-white" placeholder="Ej: Calle 123..."/>
                     </div>
                   </div>
                   

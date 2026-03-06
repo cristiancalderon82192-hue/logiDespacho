@@ -22,7 +22,8 @@ const DashboardLider = () => {
     
     setLoading(true);
     try {
-      const response = await fetch('${import.meta.env.VITE_API_URL}/api/lider/dashboard?inicio=${fechaInicio}&fin=${fechaFin}&usuario_id=${user.id}');
+      // CORREGIDO: Uso de backticks (``) en lugar de comillas simples
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/lider/dashboard?inicio=${fechaInicio}&fin=${fechaFin}&usuario_id=${user.id}`);
       
       if (!response.ok) throw new Error("Error en la respuesta del servidor");
       

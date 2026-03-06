@@ -15,7 +15,8 @@ const Clientes = () => {
 
   const fetchClientes = async () => {
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}/api/clientes');
+      // CORREGIDO: Uso de backticks (``)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
       const data = await res.json();
       setClientes(data);
     } catch (error) { console.error("Error:", error); }
@@ -29,9 +30,10 @@ const Clientes = () => {
     if (!formData.nombre) return alert("El nombre es obligatorio");
     if (!formData.documento) return alert("La Cédula/NIT es obligatoria");
     
+    // CORREGIDO: Uso de backticks (``)
     const url = editingId 
-      ? '${import.meta.env.VITE_API_URL}/api/clientes/${editingId}' 
-      : '${import.meta.env.VITE_API_URL}/api/clientes';
+      ? `${import.meta.env.VITE_API_URL}/api/clientes/${editingId}` 
+      : `${import.meta.env.VITE_API_URL}/api/clientes`;
     
     const method = editingId ? 'PUT' : 'POST';
     
@@ -71,7 +73,8 @@ const Clientes = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("¿Estás seguro de eliminar este cliente?")) return;
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}/api/clientes/${id}', { method: 'DELETE' });
+      // CORREGIDO: Uso de backticks (``)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes/${id}`, { method: 'DELETE' });
       const data = await res.json();
       
       if (res.ok) {

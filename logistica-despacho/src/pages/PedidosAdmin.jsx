@@ -47,10 +47,10 @@ const PedidosAdmin = () => {
     const fetchCatalogos = async () => {
       try {
         const [resC, resZ, resD, resT] = await Promise.all([
-          fetch('${import.meta.env.VITE_API_URL}/api/clientes'),
-          fetch('${import.meta.env.VITE_API_URL}/api/zonas'),
-          fetch('${import.meta.env.VITE_API_URL}/api/destinos'),
-          fetch('${import.meta.env.VITE_API_URL}/api/tipos-documento') 
+          fetch(`${import.meta.env.VITE_API_URL}/api/clientes`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/zonas`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/destinos`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento`) 
         ]);
         setListaClientes(await resC.json());
         setListaZonas(await resZ.json());
@@ -99,7 +99,7 @@ const PedidosAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isReadOnly) return;
-    const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : 'http://localhost:3000/api/pedidos';
+    const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
     const method = editingId ? 'PUT' : 'POST';
     try {
       const response = await fetch(url, {
@@ -121,12 +121,12 @@ const PedidosAdmin = () => {
     if (!newClientData.nombre || !newClientData.documento) return alert("Nombre y Cédula obligatorios");
     setSavingClient(true);
     try {
-      const response = await fetch('${import.meta.env.VITE_API_URL}/api/clientes', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClientData)
       });
       if (response.ok) {
         alert("✅ Cliente creado");
-        const resC = await fetch('${import.meta.env.VITE_API_URL}/api/clientes');
+        const resC = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
         setListaClientes(await resC.json());
         setFormData(prev => ({ ...prev, nombre_cliente: newClientData.nombre, telefono: newClientData.telefono }));
         setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
@@ -211,7 +211,7 @@ const PedidosAdmin = () => {
               <div className="space-y-3 md:space-y-4">
                 <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                  {/* Reemplacé todos los p-2.5 md:p-2 por py-2.5 md:py-2 px-3 para que no borre el espacio en PC */}
+                  {/* AJUSTE DE PADDING: py-2.5 md:py-2 px-3 para inputs normales sin icono */}
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" required /></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
@@ -231,7 +231,7 @@ const PedidosAdmin = () => {
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Cliente</label>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <div className="relative flex-1">
-                        {/* AQUÍ ESTÁ EL ARREGLO DEL PADDING IZQUIERDO: pl-8 protegido */}
+                        {/* ARREGLO DEL DISEÑO: pr-3 pl-8 garantiza que el texto respete el espacio del icono */}
                         <input type="text" name="nombre_cliente" value={formData.nombre_cliente} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" placeholder="Buscar o crear..." required />
                         <User size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                       </div>
@@ -241,7 +241,7 @@ const PedidosAdmin = () => {
                   <div>
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Teléfono</label>
                     <div className="relative">
-                      {/* ARREGLO PADDING IZQUIERDO */}
+                      {/* ARREGLO DEL DISEÑO: pr-3 pl-8 */}
                       <input type="text" name="telefono" value={formData.telefono} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white"/>
                       <Phone size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                     </div>
@@ -250,7 +250,7 @@ const PedidosAdmin = () => {
                   <div className="sm:col-span-2">
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Destino</label>
                     <div className="relative">
-                      {/* ARREGLO PADDING IZQUIERDO */}
+                      {/* ARREGLO DEL DISEÑO: pr-3 pl-8 */}
                       <select name="destino_id" value={formData.destino_id} onChange={handleDestinoChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100" required><option value="">-- Seleccione --</option>{listaDestinos.map(d => (<option key={d.id} value={d.id}>{d.nombre} {d.zona_nombre ? `(${d.zona_nombre})` : ''}</option>))}</select>
                       <MapPin size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                     </div>

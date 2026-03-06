@@ -17,7 +17,8 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('${import.meta.env.VITE_API_URL}/api/login', {
+      // CORREGIDO: Uso de backticks (``) para que lea la variable de Vercel
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

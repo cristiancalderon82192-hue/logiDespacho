@@ -11,7 +11,8 @@ const TiposDocumento = () => {
   const fetchTipos = async () => {
     setLoading(true);
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}/api/tipos-documento');
+      // CORREGIDO: Uso de backticks (``)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento`);
       if (res.ok) setTipos(await res.json());
     } catch (error) { console.error(error); }
     finally { setLoading(false); }
@@ -24,9 +25,10 @@ const TiposDocumento = () => {
     e.preventDefault();
     if (!nombre.trim()) return alert("El nombre es obligatorio");
 
+    // CORREGIDO: Uso de backticks (``) en ambas rutas
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/tipos-documento/${editingId}` 
-      : '${import.meta.env.VITE_API_URL}/api/tipos-documento';
+      : `${import.meta.env.VITE_API_URL}/api/tipos-documento`;
     const method = editingId ? 'PUT' : 'POST';
 
     try {

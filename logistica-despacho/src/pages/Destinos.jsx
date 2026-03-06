@@ -11,8 +11,9 @@ const Destinos = () => {
   const loadData = async () => {
     try {
       const [resDest, resZonas] = await Promise.all([
-        fetch('${import.meta.env.VITE_API_URL}/api/destinos'),
-        fetch('${import.meta.env.VITE_API_URL}/api/zonas')
+        // CORREGIDO: Uso de backticks (``)
+        fetch(`${import.meta.env.VITE_API_URL}/api/destinos`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/zonas`)
       ]);
       setDestinos(await resDest.json());
       setZonas(await resZonas.json());
@@ -26,9 +27,11 @@ const Destinos = () => {
     e.preventDefault();
     if (!form.nombre || !form.zona_id) return alert("Complete los campos");
 
+    // CORREGIDO: Uso de backticks (``) también en la segunda opción
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/destinos/${editingId}` 
-      : '${import.meta.env.VITE_API_URL}/api/destinos';
+      : `${import.meta.env.VITE_API_URL}/api/destinos`;
+      
     const method = editingId ? 'PUT' : 'POST';
 
     try {

@@ -22,8 +22,9 @@ const RegisterUser = () => {
   const fetchData = async () => {
     try {
       const [resU, resB] = await Promise.all([
-        fetch('${import.meta.env.VITE_API_URL}/api/usuarios'),
-        fetch('${import.meta.env.VITE_API_URL}/api/bodegas') 
+        // CORREGIDO: Uso de backticks (``)
+        fetch(`${import.meta.env.VITE_API_URL}/api/usuarios`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/bodegas`) 
       ]);
       
       if(resU.ok) setUsuarios(await resU.json());
@@ -50,9 +51,10 @@ const RegisterUser = () => {
       return alert("La contraseña es obligatoria para nuevos usuarios");
     }
 
+    // CORREGIDO: Uso de backticks (``)
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/usuarios/${editingId}` 
-      : '${import.meta.env.VITE_API_URL}/api/usuarios';
+      : `${import.meta.env.VITE_API_URL}/api/usuarios`;
     
     const method = editingId ? 'PUT' : 'POST';
 

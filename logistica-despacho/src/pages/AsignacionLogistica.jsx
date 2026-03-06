@@ -33,9 +33,10 @@ const AsignacionLogistica = () => {
     if (mostrarPantallaCarga) setLoading(true);
     try {
       const [resP, resC, resV] = await Promise.all([
-        fetch('${import.meta.env.VITE_API_URL}/api/logistica/pedidos-dia?fecha=${fechaFiltro}'),
-        fetch('${import.meta.env.VITE_API_URL}/api/logistica/conductores'), 
-        fetch('${import.meta.env.VITE_API_URL}/api/logistica/vehiculos')
+        // CORREGIDO: Uso de backticks (``)
+        fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-dia?fecha=${fechaFiltro}`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/logistica/conductores`), 
+        fetch(`${import.meta.env.VITE_API_URL}/api/logistica/vehiculos`)
       ]);
       
       if(resP.ok) setPedidos(await resP.json());
@@ -76,7 +77,8 @@ const AsignacionLogistica = () => {
     }
 
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}api/logistica/pedidos/${pedidoSeleccionado.id}/asignar', {
+      // CORREGIDO: Uso de backticks y agregado el "/" antes de "api"
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/asignar`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(asignacion)
@@ -92,7 +94,8 @@ const AsignacionLogistica = () => {
   const handleQuitarAsignacion = async () => {
     if (!window.confirm("¿Estás seguro de quitar la asignación?")) return;
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/desasignar', {
+      // CORREGIDO: Uso de backticks
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/desasignar`, {
         method: 'PUT'
       });
       if (res.ok) {

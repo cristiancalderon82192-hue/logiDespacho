@@ -31,7 +31,8 @@ const ReporteParciales = () => {
   const fetchParciales = async () => {
     setLoading(true);
     try {
-      const response = await fetch('${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales');
+      // CORREGIDO: Uso de backticks
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales`);
       if (response.ok) setPedidos(await response.json());
     } catch (error) { console.error("Error:", error); } 
     finally { setLoading(false); }
@@ -40,9 +41,10 @@ const ReporteParciales = () => {
   const fetchCatalogos = async () => {
     try {
       const [resC, resV, resB] = await Promise.all([
-        fetch('${import.meta.env.VITE_API_URL}/api/logistica/conductores'), 
-        fetch('${import.meta.env.VITE_API_URL}/api/logistica/vehiculos'),
-        fetch('${import.meta.env.VITE_API_URL}/api/logistica/bodegas') 
+        // CORREGIDOS: Uso de backticks en todos los catálogos
+        fetch(`${import.meta.env.VITE_API_URL}/api/logistica/conductores`), 
+        fetch(`${import.meta.env.VITE_API_URL}/api/logistica/vehiculos`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/logistica/bodegas`) 
       ]);
       if(resC.ok) setConductores(await resC.json());
       if(resV.ok) setVehiculos(await resV.json());
@@ -53,6 +55,7 @@ const ReporteParciales = () => {
   useEffect(() => {
     fetchParciales();
     fetchCatalogos();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formatFecha = (fechaStr) => {

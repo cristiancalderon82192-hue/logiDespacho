@@ -9,7 +9,8 @@ const Bodegas = () => {
   // CARGAR DATOS
   const fetchBodegas = async () => {
     try {
-      const res = await fetch('${import.meta.env.VITE_API_URL}/api/bodegas');
+      // CORREGIDO: Uso de backticks (``)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodegas`);
       setBodegas(await res.json());
     } catch (error) { console.error(error); }
   };
@@ -21,9 +22,10 @@ const Bodegas = () => {
     e.preventDefault();
     if (!formData.nombre.trim()) return alert("El nombre es obligatorio");
 
+    // CORREGIDO: Uso de backticks (``)
     const url = editingId 
-      ? '${import.meta.env.VITE_API_URL}/api/bodegas/${editingId}' 
-      : '${import.meta.env.VITE_API_URL}/api/bodegas';
+      ? `${import.meta.env.VITE_API_URL}/api/bodegas/${editingId}` 
+      : `${import.meta.env.VITE_API_URL}/api/bodegas`;
     
     const method = editingId ? 'PUT' : 'POST';
     
@@ -55,7 +57,8 @@ const Bodegas = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("¿Eliminar esta bodega?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/bodegas/${id}`, { method: 'DELETE' });
+      // CORREGIDO: Se eliminó localhost y se usó la variable de entorno con backticks
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodegas/${id}`, { method: 'DELETE' });
       const data = await res.json();
       
       if (res.ok) fetchBodegas();
