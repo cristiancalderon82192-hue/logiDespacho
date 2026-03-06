@@ -1,12 +1,17 @@
 // UBICACIÓN: server/controllers/usuariosController.js
 const db = require('../db');
-// Eliminamos la importación de bcryptjs
 
 // --- 1. LISTAR USUARIOS ---
 const getUsuarios = async (req, res) => {
   try {
-    // No devolvemos la contraseña por seguridad
-    const [rows] = await db.query("SELECT id, nombre_completo, email, rol_id, estado FROM usuarios ORDER BY nombre_completo ASC");
+    // Agregamos un LEFT JOIN para traer el nombre de la bodega asignada
+    const sql = `
+      SELECT u.id, u.nombre_completo, u.email, u.rol_id, u.estado, u.bodega_id, b.nombre as bodega_nombre 
+      FROM usuarios u
+      LEFT JOIN bodegas b ON u.bodega_id = b.id
+      ORDER BY u.nombre_completo ASC
+    `;
+    const [rows] = await db.query(sql);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: "Error al cargar usuarios" });
@@ -15,19 +20,20 @@ const getUsuarios = async (req, res) => {
 
 // --- 2. CREAR USUARIO ---
 const createUsuario = async (req, res) => {
-  const { nombre_completo, email, password, rol_id, estado } = req.body;
+  const { nombre_completo, email, password, rol_id, estado, bodega_id } = req.body;
   
   try {
-    // A. Validar si el email ya existe
     const [existe] = await db.query("SELECT id FROM usuarios WHERE email = ?", [email]);
     if (existe.length > 0) {
       return res.status(400).json({ error: "El correo ya está registrado." });
     }
 
-    // B. Insertar usuario con la CONTRASEÑA EN TEXTO PLANO
+    // Convertimos un string vacío en NULL para la base de datos
+    const b_id = bodega_id || null;
+
     await db.query(
-      "INSERT INTO usuarios (nombre_completo, email, password_hash, rol_id, estado) VALUES (?, ?, ?, ?, ?)",
-      [nombre_completo, email, password, rol_id, estado || 1]
+      "INSERT INTO usuarios (nombre_completo, email, password_hash, rol_id, estado, bodega_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [nombre_completo, email, password, rol_id, estado || 1, b_id]
     );
 
     res.json({ message: "Usuario creado exitosamente" });
@@ -41,29 +47,26 @@ const createUsuario = async (req, res) => {
 // --- 3. ACTUALIZAR USUARIO ---
 const updateUsuario = async (req, res) => {
   const { id } = req.params;
-  const { nombre_completo, email, password, rol_id, estado } = req.body;
+  const { nombre_completo, email, password, rol_id, estado, bodega_id } = req.body;
 
   try {
-    // A. Validar si existe (y si cambia el email, que no choque con otro)
     const [usuarioActual] = await db.query("SELECT * FROM usuarios WHERE id = ?", [id]);
     if (usuarioActual.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
 
-    // Si cambió el email, verificar duplicados
     if (email !== usuarioActual[0].email) {
       const [existe] = await db.query("SELECT id FROM usuarios WHERE email = ?", [email]);
       if (existe.length > 0) return res.status(400).json({ error: "El correo ya está en uso por otro usuario." });
     }
 
-    // B. Preparar Query Dinámico (Solo actualizar password si se envía uno nuevo)
+    const b_id = bodega_id || null;
     let sql, params;
     
     if (password && password.trim() !== "") {
-      // ACTUALIZAMOS CON LA CONTRASEÑA EN TEXTO PLANO
-      sql = "UPDATE usuarios SET nombre_completo=?, email=?, password_hash=?, rol_id=?, estado=? WHERE id=?";
-      params = [nombre_completo, email, password, rol_id, estado, id];
+      sql = "UPDATE usuarios SET nombre_completo=?, email=?, password_hash=?, rol_id=?, estado=?, bodega_id=? WHERE id=?";
+      params = [nombre_completo, email, password, rol_id, estado, b_id, id];
     } else {
-      sql = "UPDATE usuarios SET nombre_completo=?, email=?, rol_id=?, estado=? WHERE id=?";
-      params = [nombre_completo, email, rol_id, estado, id];
+      sql = "UPDATE usuarios SET nombre_completo=?, email=?, rol_id=?, estado=?, bodega_id=? WHERE id=?";
+      params = [nombre_completo, email, rol_id, estado, b_id, id];
     }
 
     await db.query(sql, params);
@@ -82,7 +85,6 @@ const deleteUsuario = async (req, res) => {
     await db.query("DELETE FROM usuarios WHERE id = ?", [id]);
     res.json({ message: "Usuario eliminado" });
   } catch (error) {
-    // Si tiene pedidos asociados, no dejar borrar
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
       return res.status(400).json({ error: "No se puede eliminar: El usuario tiene registros en el historial." });
     }

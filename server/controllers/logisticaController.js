@@ -2,42 +2,54 @@ const db = require('../db');
 
 // 1. Obtener TODOS los pedidos agendados para una fecha específica
 const getPedidosPorFecha = async (req, res) => {
-  const { fecha } = req.query; // Recibimos la fecha desde React
+  const { fecha } = req.query; 
 
   try {
-    // 🔴 CAMBIO AQUÍ: Simplificamos el JOIN de las zonas usando solo zona_id
     const sql = `
       SELECT p.*, 
+             COALESCE(SUM(pd.peso), 0) AS total_peso,
+             td.nombre as tipo_documento,
              c.nombre as nombre_cliente, c.telefono, 
              d.nombre as destino, z.nombre as zona_envio,
              u.nombre_completo as conductor_nombre,
-             v.placa as vehiculo_placa
+             v.placa as vehiculo_placa,
+             b.nombre as bodega
       FROM pedidos p
       JOIN clientes c ON p.cliente_id = c.id
       JOIN destinos d ON p.destino_id = d.id
       LEFT JOIN zonas z ON d.zona_id = z.id
       LEFT JOIN usuarios u ON p.conductor_id = u.id
       LEFT JOIN vehiculos v ON p.vehiculo_id = v.id
+      LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+      LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
+      LEFT JOIN usuarios uc ON p.usuario_id = uc.id 
+      LEFT JOIN bodegas b ON uc.bodega_id = b.id 
       WHERE p.fecha_agendada = ?
-      ORDER BY p.estado_entrega DESC, p.id_factura ASC
+      GROUP BY p.id
+      ORDER BY 
+        CASE 
+          WHEN p.estado_entrega = 'Pendiente' THEN 1
+          WHEN p.estado_entrega = 'Asignado' THEN 2
+          WHEN p.estado_entrega = 'En Ruta' THEN 3
+          ELSE 4 
+        END,
+        p.id_factura ASC
     `;
     const [pedidos] = await db.query(sql, [fecha]);
     res.json(pedidos);
   } catch (error) {
-    console.error("Error al obtener pedidos por fecha:", error);
+    console.error("Error al obtener pedidos:", error);
     res.status(500).json({ error: "Error al cargar pedidos" });
   }
 };
 
-// 2. Obtener lista de conductores disponibles (¡CORREGIDO!)
+// 2. Obtener lista de conductores disponibles
 const getConductores = async (req, res) => {
   try {
-    // Usamos 'nombre_completo' y 'rol_id = 4' tal como está en tu base de datos
     const sql = "SELECT id, nombre_completo as nombre, email FROM usuarios WHERE rol_id = 4";
     const [conductores] = await db.query(sql);
     res.json(conductores);
   } catch (error) {
-    console.error("Error al obtener conductores:", error);
     res.status(500).json({ error: "Error al cargar conductores" });
   }
 };
@@ -49,32 +61,187 @@ const getVehiculos = async (req, res) => {
     const [vehiculos] = await db.query(sql);
     res.json(vehiculos);
   } catch (error) {
-    console.error("Error al obtener vehículos:", error);
     res.status(500).json({ error: "Error al cargar vehículos" });
   }
 };
 
-// 4. Asignar Vehículo y Conductor al Pedido
+// 4. Asignar Vehículo, Conductor, Valores y Nota de Parcial
 const asignarRuta = async (req, res) => {
   const { id } = req.params; 
-  const { conductor_id, vehiculo_id } = req.body;
+  const { conductor_id, vehiculo_id, total_despachado, observaciones_entrega } = req.body;
 
-  if (!conductor_id || !vehiculo_id) {
-    return res.status(400).json({ error: "Faltan datos de asignación" });
+  if (!conductor_id || !vehiculo_id || total_despachado === undefined) {
+    return res.status(400).json({ error: "Faltan datos de asignación o valor despachado" });
   }
 
   try {
+    const [pedido] = await db.query('SELECT valor_factura FROM pedidos WHERE id = ?', [id]);
+    if (pedido.length === 0) return res.status(404).json({ error: "Pedido no encontrado" });
+
+    const valorFactura = parseFloat(pedido[0].valor_factura) || 0;
+    const despachado = parseFloat(total_despachado) || 0;
+    const valorFacturaPendiente = valorFactura - despachado;
+
     const sql = `
       UPDATE pedidos 
-      SET conductor_id = ?, vehiculo_id = ?, estado_entrega = 'Asignado' 
+      SET conductor_id = ?, 
+          vehiculo_id = ?, 
+          total_despachado = ?, 
+          valor_factura_pendiente = ?,
+          observaciones_entrega = ?,
+          estado_entrega = 'Asignado' 
       WHERE id = ?
     `;
-    await db.query(sql, [conductor_id, vehiculo_id, id]);
-    res.json({ message: "Ruta asignada exitosamente" });
+    await db.query(sql, [conductor_id, vehiculo_id, despachado, valorFacturaPendiente, observaciones_entrega || null, id]);
+    
+    res.json({ message: "Ruta y valores asignados exitosamente" });
   } catch (error) {
     console.error("Error al asignar ruta:", error);
     res.status(500).json({ error: "No se pudo asignar la ruta" });
   }
 };
 
-module.exports = { getPedidosPorFecha, getConductores, getVehiculos, asignarRuta };
+// 5. Quitar la asignación
+const quitarAsignacion = async (req, res) => {
+  const { id } = req.params; 
+
+  try {
+    const sql = `
+      UPDATE pedidos 
+      SET conductor_id = NULL, 
+          vehiculo_id = NULL, 
+          total_despachado = 0,
+          valor_factura_pendiente = 0,
+          observaciones_entrega = NULL,
+          estado_entrega = 'Pendiente' 
+      WHERE id = ?
+    `;
+    await db.query(sql, [id]);
+    res.json({ message: "Asignación removida exitosamente" });
+  } catch (error) {
+    res.status(500).json({ error: "No se pudo remover la asignación" });
+  }
+};
+
+// 6. Obtener reporte de envíos parciales
+const getPedidosParciales = async (req, res) => {
+  try {
+    const sql = `
+      SELECT p.*, 
+             td.nombre as tipo_documento,
+             c.nombre as nombre_cliente, c.telefono, 
+             d.nombre as destino, z.nombre as zona_envio,
+             b.nombre as bodega
+      FROM pedidos p
+      JOIN clientes c ON p.cliente_id = c.id
+      JOIN destinos d ON p.destino_id = d.id
+      LEFT JOIN zonas z ON d.zona_id = z.id
+      LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+      LEFT JOIN usuarios uc ON p.usuario_id = uc.id
+      LEFT JOIN bodegas b ON uc.bodega_id = b.id
+      WHERE p.valor_factura_pendiente > 0
+      ORDER BY p.fecha_agendada DESC, p.id_factura ASC
+    `;
+    const [pedidos] = await db.query(sql);
+    res.json(pedidos);
+  } catch (error) {
+    res.status(500).json({ error: "Error al cargar pedidos parciales" });
+  }
+};
+
+// 7. Generar "Pedido Hijo" (Clon) para despachar un saldo pendiente
+const despacharSaldo = async (req, res) => {
+  const { id } = req.params;
+  const { conductor_id, vehiculo_id, valor_despachar, observaciones_entrega, fecha_agendada, detalles, nota_despacho } = req.body;
+
+  try {
+    const [rows] = await db.query('SELECT * FROM pedidos WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: "Pedido original no encontrado" });
+    const original = rows[0];
+
+    const montoADespachar = parseFloat(valor_despachar) || 0;
+    const pendienteActual = parseFloat(original.valor_factura_pendiente) || 0;
+    
+    if (montoADespachar <= 0) return res.status(400).json({ error: "El valor a despachar debe ser mayor a 0" });
+    
+    if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
+      return res.status(400).json({ error: "Debe agregar al menos una bodega de salida y su peso" });
+    }
+
+    const nuevoPendiente = pendienteActual - montoADespachar;
+    const sufijo = Math.floor(Math.random() * 90) + 10; 
+    const nuevoIdFactura = `${original.id_factura}-S${sufijo}`;
+
+    let notaFinalHijo = `(SALDO) ${original.nota_manual || ''}`.trim();
+    if (nota_despacho) {
+      if (original.nota_manual) {
+        notaFinalHijo = `(SALDO) ENVÍA: ${nota_despacho} | Nota orig: ${original.nota_manual}`;
+      } else {
+        notaFinalHijo = `(SALDO) ENVÍA: ${nota_despacho}`;
+      }
+    }
+
+    const sqlInsert = `
+      INSERT INTO pedidos (
+        usuario_id, cliente_id, id_factura, tipo_documento_id, prioridad, 
+        valor_factura, destino_id, conductor_id, vehiculo_id, estado_entrega, 
+        fecha_agendada, fecha_facturacion, fecha_promesa, hora_registro, 
+        nota_manual, total_despachado, valor_factura_pendiente, observaciones_entrega
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const [insertResult] = await db.query(sqlInsert, [
+      original.usuario_id, original.cliente_id, nuevoIdFactura, original.tipo_documento_id, original.prioridad,
+      montoADespachar, original.destino_id, conductor_id, vehiculo_id, 'Asignado',
+      fecha_agendada, original.fecha_facturacion, original.fecha_promesa || null, original.hora_registro || null,
+      notaFinalHijo, 
+      montoADespachar, 0, null // 👇 AHORA VA EN NULL (Evita el texto forzado "Envío de saldo")
+    ]);
+
+    const nuevoPedidoId = insertResult.insertId;
+
+    for (const det of detalles) {
+      const pesoNum = parseFloat(det.peso) || 0;
+      if (pesoNum > 0 && det.bodega_id) {
+        await db.query('INSERT INTO pedidos_detalle (pedido_id, bodega_id, peso) VALUES (?, ?, ?)', [nuevoPedidoId, det.bodega_id, pesoNum]);
+      }
+    }
+
+    // 👇 SOLUCIÓN: PRESERVAMOS LA NOTA DEL CONDUCTOR EN EL PEDIDO PADRE 👇
+    const sqlUpdate = `
+      UPDATE pedidos 
+      SET valor_factura_pendiente = ?, 
+          observaciones_entrega = ?
+      WHERE id = ?
+    `;
+    
+    // Rescatamos lo que había escrito el conductor
+    let notaHistorica = original.observaciones_entrega || '';
+
+    // Si aún queda plata pendiente y el de logística escribió algo nuevo, lo sumamos al final. 
+    // De lo contrario, guardamos la nota intacta.
+    if (nuevoPendiente > 0 && observaciones_entrega) {
+      notaHistorica = `${notaHistorica} | AÚN PENDIENTE: ${observaciones_entrega}`.trim();
+    }
+
+    await db.query(sqlUpdate, [nuevoPendiente, notaHistorica, id]);
+
+    res.json({ message: "Saldo despachado y nueva ruta generada exitosamente" });
+  } catch (error) {
+    console.error("Error al despachar saldo:", error);
+    res.status(500).json({ error: "Error al procesar el saldo" });
+  }
+};
+
+// 8. OBTENER BODEGAS (Nuevo)
+const getBodegas = async (req, res) => {
+  try {
+    const [bodegas] = await db.query("SELECT id, nombre FROM bodegas");
+    res.json(bodegas);
+  } catch (error) {
+    res.status(500).json({ error: "Error al cargar bodegas" });
+  }
+};
+
+// EXPORTAMOS TODO
+module.exports = { getPedidosPorFecha, getConductores, getVehiculos, asignarRuta, quitarAsignacion, getPedidosParciales, despacharSaldo, getBodegas };

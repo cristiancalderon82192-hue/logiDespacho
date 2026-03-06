@@ -40,6 +40,9 @@ app.use('/api', usuariosRoutes);
 app.use('/api', bodegasRoutes);
 app.use('/api', vehiculosRoutes);
 app.use('/api/tipos-documento', tiposDocumentoRoutes);
+// 👇 TRUCO: Aumentar el límite a 50MB para permitir firmas e imágenes 👇
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // rutas lider
 //app.use('/api/lider', liderRoutes);
@@ -47,7 +50,8 @@ app.use('/api/lider', pedidosLiderRoutes);
 
 app.use('/api/logistica', logisticaRoutes);
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-});
+//Rutas del conductor
+app.use('/api/conductor', require('./routes/conductorRoutes'));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => { console.log(`Servidor corriendo en puerto ${PORT}`); });

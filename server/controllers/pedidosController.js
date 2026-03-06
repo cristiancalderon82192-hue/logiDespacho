@@ -93,16 +93,17 @@ const crearPedido = async (req, res) => {
 };
 
 // --- 2. LISTAR PEDIDOS POR RANGO DE FECHA ---
+// --- 2. LISTAR PEDIDOS POR RANGO DE FECHA ---
 const listarPedidosRango = async (req, res) => {
   let { inicio, fin } = req.query;
   
   if (fin) fin = `${fin} 23:59:59`;
 
   try {
-    // ACTUALIZADO: Traer nombre del documento con JOIN y remover direccion_entrega
     const sql = `
       SELECT 
         p.id, p.id_factura, p.prioridad, p.estado_entrega,
+        p.observaciones_entrega, p.valor_factura_pendiente,
         td.nombre as tipo_documento,
         DATE_FORMAT(p.fecha_facturacion, '%Y-%m-%d') as fecha_facturacion,
         DATE_FORMAT(p.fecha_agendada, '%Y-%m-%d') as fecha_agendada,
@@ -118,7 +119,14 @@ const listarPedidosRango = async (req, res) => {
       LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
       WHERE p.fecha_agendada BETWEEN ? AND ? 
       GROUP BY p.id 
-      ORDER BY p.fecha_agendada DESC 
+      ORDER BY 
+        CASE 
+          WHEN p.estado_entrega = 'Pendiente' THEN 1
+          WHEN p.estado_entrega = 'Asignado' THEN 2
+          WHEN p.estado_entrega = 'En Ruta' THEN 3
+          ELSE 4 
+        END,
+        p.fecha_agendada DESC, p.id_factura ASC 
     `;
 
     const [rows] = await db.query(sql, [inicio, fin]);

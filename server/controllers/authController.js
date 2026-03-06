@@ -16,15 +16,22 @@ const login = async (req, res) => {
 
     const usuario = rows[0];
 
-    // 3. Verificar contraseña (simple por ahora)
+    // 👇 NUEVO: 3. VALIDACIÓN DE ESTADO (USUARIO INACTIVO) 👇
+    // Bloqueamos el acceso desde la base de datos antes de mirar la contraseña
+    if (usuario.estado === 0 || usuario.estado === '0' || usuario.estado === false) {
+      return res.status(403).json({ error: "Acceso denegado: Tu cuenta está inactiva. Comunícate con el administrador." });
+    }
+
+    // 4. Verificar contraseña (simple por ahora)
     if (password === usuario.password_hash) {
       
-      // 👇 YA NO INVENTAMOS NOMBRES. ENVIAMOS EL NÚMERO EXACTO DE LA BD
+      // Enviamos la respuesta exitosa, INCLUYENDO el estado
       res.json({
         id: usuario.id,
         nombre_completo: usuario.nombre_completo,
-        role: usuario.rol_id,      // <-- Enviará un 3
-        rol_nombre: usuario.rol_nombre // <-- Opcional, pero útil
+        role: usuario.rol_id,      
+        rol_nombre: usuario.rol_nombre,
+        estado: usuario.estado // <--- AÑADIDO PARA QUE EL FRONTEND LO SEPA
       });
       
     } else {
