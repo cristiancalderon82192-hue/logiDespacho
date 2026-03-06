@@ -22,8 +22,8 @@ const RegisterUser = () => {
   const fetchData = async () => {
     try {
       const [resU, resB] = await Promise.all([
-        fetch('http://localhost:3000/api/usuarios'),
-        fetch('http://localhost:3000/api/bodegas') 
+        fetch('${import.meta.env.VITE_API_URL}/api/usuarios'),
+        fetch('${import.meta.env.VITE_API_URL}/api/bodegas') 
       ]);
       
       if(resU.ok) setUsuarios(await resU.json());
@@ -51,8 +51,8 @@ const RegisterUser = () => {
     }
 
     const url = editingId 
-      ? `http://localhost:3000/api/usuarios/${editingId}` 
-      : 'http://localhost:3000/api/usuarios';
+      ? `${import.meta.env.VITE_API_URL}/api/usuarios/${editingId}` 
+      : '${import.meta.env.VITE_API_URL}/api/usuarios';
     
     const method = editingId ? 'PUT' : 'POST';
 
@@ -92,7 +92,7 @@ const RegisterUser = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("¿Eliminar usuario?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/usuarios/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/usuarios/${id}`, { method: 'DELETE' });
       if(res.ok) fetchData();
       else alert("No se pudo eliminar");
     } catch (error) { alert("Error de conexión"); }

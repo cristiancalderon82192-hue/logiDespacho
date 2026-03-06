@@ -26,7 +26,7 @@ const DashboardLogistica = () => {
     setLoading(true);
     try {
       // Como tu backend ya filtra por fecha_agendada, usamos el mismo endpoint
-      const res = await fetch(`http://localhost:3000/api/dashboard?inicio=${fechaFiltro}&fin=${fechaFiltro}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard?inicio=${fechaFiltro}&fin=${fechaFiltro}`);
       const data = await res.json();
       
       setKpis({ 

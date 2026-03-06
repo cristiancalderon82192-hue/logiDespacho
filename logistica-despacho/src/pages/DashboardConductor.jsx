@@ -35,7 +35,7 @@ const DashboardConductor = () => {
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`http://localhost:3000/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}`, {
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}', {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       if (response.ok) {
@@ -57,7 +57,7 @@ const DashboardConductor = () => {
 
   const handleCambiarEstado = async (pedidoId, nuevoEstado) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/conductor/pedidos/${pedidoId}/estado`, {
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoId}/estado', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado: nuevoEstado })
@@ -85,7 +85,7 @@ const DashboardConductor = () => {
     const firmaBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
 
     try {
-      const response = await fetch(`http://localhost:3000/api/conductor/pedidos/${pedidoFirma.id}/estado`, {
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoFirma.id}/estado', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -122,7 +122,7 @@ const DashboardConductor = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3000/api/conductor/pedidos/${pedidoDevolucion.id}/estado`, {
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado: 'Devolución', observacion_devolucion: motivoDevolucion, valor_devolucion: valorD })

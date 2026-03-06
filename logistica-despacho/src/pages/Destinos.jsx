@@ -11,8 +11,8 @@ const Destinos = () => {
   const loadData = async () => {
     try {
       const [resDest, resZonas] = await Promise.all([
-        fetch('http://localhost:3000/api/destinos'),
-        fetch('http://localhost:3000/api/zonas')
+        fetch('${import.meta.env.VITE_API_URL}/api/destinos'),
+        fetch('${import.meta.env.VITE_API_URL}/api/zonas')
       ]);
       setDestinos(await resDest.json());
       setZonas(await resZonas.json());
@@ -27,8 +27,8 @@ const Destinos = () => {
     if (!form.nombre || !form.zona_id) return alert("Complete los campos");
 
     const url = editingId 
-      ? `http://localhost:3000/api/destinos/${editingId}` 
-      : 'http://localhost:3000/api/destinos';
+      ? `${import.meta.env.VITE_API_URL}/api/destinos/${editingId}` 
+      : '${import.meta.env.VITE_API_URL}/api/destinos';
     const method = editingId ? 'PUT' : 'POST';
 
     try {
@@ -51,7 +51,7 @@ const Destinos = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("¿Eliminar esta ciudad?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/destinos/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/destinos/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok) loadData();
       else alert(data.error);

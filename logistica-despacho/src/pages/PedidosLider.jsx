@@ -53,10 +53,10 @@ const PedidosLider = () => {
   const fetchCatalogos = async () => {
     try {
       const [resC, resZ, resD, resT] = await Promise.all([
-        fetch('http://localhost:3000/api/clientes'),
-        fetch('http://localhost:3000/api/zonas'),
-        fetch('http://localhost:3000/api/destinos'),
-        fetch('http://localhost:3000/api/tipos-documento')
+        fetch('${import.meta.env.VITE_API_URL}/api/clientes'),
+        fetch('${import.meta.env.VITE_API_URL}/api/zonas'),
+        fetch('${import.meta.env.VITE_API_URL}/api/destinos'),
+        fetch('${import.meta.env.VITE_API_URL}/api/tipos-documento')
       ]);
       setListaClientes(await resC.json());
       setListaZonas(await resZ.json());
@@ -77,7 +77,7 @@ const PedidosLider = () => {
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime(); 
-      const response = await fetch(`http://localhost:3000/api/lider/mis-pedidos?fecha=${fechaFiltro}&usuario_id=${user.id}&_t=${timestamp}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/lider/mis-pedidos?fecha=${fechaFiltro}&usuario_id=${user.id}&_t=${timestamp}`, {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       if (!response.ok) throw new Error("Error en la respuesta");
@@ -127,7 +127,7 @@ const PedidosLider = () => {
     e.preventDefault();
     if (isReadOnly) return;
 
-    const url = editingId ? `http://localhost:3000/api/pedidos/${editingId}` : 'http://localhost:3000/api/pedidos';
+    const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : 'http://localhost:3000/api/pedidos';
     const method = editingId ? 'PUT' : 'POST';
 
     try {
@@ -156,7 +156,7 @@ const PedidosLider = () => {
     
     setSavingClient(true);
     try {
-      const response = await fetch('http://localhost:3000/api/clientes', {
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/clientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newClientData)
@@ -165,7 +165,7 @@ const PedidosLider = () => {
       
       if (response.ok) {
         alert("✅ Cliente creado exitosamente");
-        const resC = await fetch('http://localhost:3000/api/clientes');
+        const resC = await fetch('${import.meta.env.VITE_API_URL}/api/clientes');
         setListaClientes(await resC.json());
         setFormData(prev => ({ ...prev, nombre_cliente: newClientData.nombre, telefono: newClientData.telefono }));
         setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
@@ -181,7 +181,7 @@ const PedidosLider = () => {
   const handleEdit = async (pedidoId) => {
     try {
       const timestamp = new Date().getTime();
-      const res = await fetch(`http://localhost:3000/api/pedidos/${pedidoId}?_t=${timestamp}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoId}?_t=${timestamp}`);
       if (!res.ok) throw new Error("Error cargar");
       const data = await res.json();
       

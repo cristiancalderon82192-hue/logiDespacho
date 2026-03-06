@@ -15,7 +15,7 @@ const Clientes = () => {
 
   const fetchClientes = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/clientes');
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/clientes');
       const data = await res.json();
       setClientes(data);
     } catch (error) { console.error("Error:", error); }
@@ -30,8 +30,8 @@ const Clientes = () => {
     if (!formData.documento) return alert("La Cédula/NIT es obligatoria");
     
     const url = editingId 
-      ? `http://localhost:3000/api/clientes/${editingId}` 
-      : 'http://localhost:3000/api/clientes';
+      ? '${import.meta.env.VITE_API_URL}/api/clientes/${editingId}' 
+      : '${import.meta.env.VITE_API_URL}/api/clientes';
     
     const method = editingId ? 'PUT' : 'POST';
     
@@ -71,7 +71,7 @@ const Clientes = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("¿Estás seguro de eliminar este cliente?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/clientes/${id}`, { method: 'DELETE' });
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/clientes/${id}', { method: 'DELETE' });
       const data = await res.json();
       
       if (res.ok) {

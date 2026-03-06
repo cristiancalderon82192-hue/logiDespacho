@@ -47,10 +47,10 @@ const PedidosAdmin = () => {
     const fetchCatalogos = async () => {
       try {
         const [resC, resZ, resD, resT] = await Promise.all([
-          fetch('http://localhost:3000/api/clientes'),
-          fetch('http://localhost:3000/api/zonas'),
-          fetch('http://localhost:3000/api/destinos'),
-          fetch('http://localhost:3000/api/tipos-documento') 
+          fetch('${import.meta.env.VITE_API_URL}/api/clientes'),
+          fetch('${import.meta.env.VITE_API_URL}/api/zonas'),
+          fetch('${import.meta.env.VITE_API_URL}/api/destinos'),
+          fetch('${import.meta.env.VITE_API_URL}/api/tipos-documento') 
         ]);
         setListaClientes(await resC.json());
         setListaZonas(await resZ.json());
@@ -66,7 +66,7 @@ const PedidosAdmin = () => {
   const fetchPedidos = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3000/api/pedidos-rango?inicio=${fechaInicio}&fin=${fechaFin}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos-rango?inicio=${fechaInicio}&fin=${fechaFin}`);
       setPedidos(await response.json());
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
@@ -99,7 +99,7 @@ const PedidosAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isReadOnly) return;
-    const url = editingId ? `http://localhost:3000/api/pedidos/${editingId}` : 'http://localhost:3000/api/pedidos';
+    const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : 'http://localhost:3000/api/pedidos';
     const method = editingId ? 'PUT' : 'POST';
     try {
       const response = await fetch(url, {
@@ -121,12 +121,12 @@ const PedidosAdmin = () => {
     if (!newClientData.nombre || !newClientData.documento) return alert("Nombre y Cédula obligatorios");
     setSavingClient(true);
     try {
-      const response = await fetch('http://localhost:3000/api/clientes', {
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/clientes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClientData)
       });
       if (response.ok) {
         alert("✅ Cliente creado");
-        const resC = await fetch('http://localhost:3000/api/clientes');
+        const resC = await fetch('${import.meta.env.VITE_API_URL}/api/clientes');
         setListaClientes(await resC.json());
         setFormData(prev => ({ ...prev, nombre_cliente: newClientData.nombre, telefono: newClientData.telefono }));
         setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
@@ -139,7 +139,7 @@ const PedidosAdmin = () => {
 
   const handleEdit = async (pedidoId) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/pedidos/${pedidoId}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoId}`);
       if (!res.ok) throw new Error("No se pudo cargar el pedido");
       const data = await res.json();
       const formatearFecha = (fecha) => fecha ? new Date(fecha).toISOString().split('T')[0] : '';
@@ -158,7 +158,7 @@ const PedidosAdmin = () => {
   const handleDelete = async (pedidoId) => {
     if (!window.confirm("¿ELIMINAR este pedido?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/pedidos/${pedidoId}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoId}`, { method: 'DELETE' });
       if (res.ok) { alert("🗑️ Eliminado"); fetchPedidos(); } 
     } catch (error) { console.error(error); }
   };

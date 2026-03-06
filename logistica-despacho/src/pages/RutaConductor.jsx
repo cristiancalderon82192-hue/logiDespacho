@@ -19,7 +19,7 @@ const RutaConductor = () => {
   const fetchRuta = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/ruta-conductor/${user.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ruta-conductor/${user.id}`);
       const data = await res.json();
       setPedidos(data);
     } catch (error) {
@@ -38,7 +38,7 @@ const RutaConductor = () => {
     if (!selectedPedido) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/pedidos/${selectedPedido.id}/entrega`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${selectedPedido.id}/entrega`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formEntrega)

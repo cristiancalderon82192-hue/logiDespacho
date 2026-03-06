@@ -33,9 +33,9 @@ const AsignacionLogistica = () => {
     if (mostrarPantallaCarga) setLoading(true);
     try {
       const [resP, resC, resV] = await Promise.all([
-        fetch(`http://localhost:3000/api/logistica/pedidos-dia?fecha=${fechaFiltro}`),
-        fetch('http://localhost:3000/api/logistica/conductores'), 
-        fetch('http://localhost:3000/api/logistica/vehiculos')
+        fetch('${import.meta.env.VITE_API_URL}/api/logistica/pedidos-dia?fecha=${fechaFiltro}'),
+        fetch('${import.meta.env.VITE_API_URL}/api/logistica/conductores'), 
+        fetch('${import.meta.env.VITE_API_URL}/api/logistica/vehiculos')
       ]);
       
       if(resP.ok) setPedidos(await resP.json());
@@ -76,7 +76,7 @@ const AsignacionLogistica = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:3000/api/logistica/pedidos/${pedidoSeleccionado.id}/asignar`, {
+      const res = await fetch('${import.meta.env.VITE_API_URL}api/logistica/pedidos/${pedidoSeleccionado.id}/asignar', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(asignacion)
@@ -92,7 +92,7 @@ const AsignacionLogistica = () => {
   const handleQuitarAsignacion = async () => {
     if (!window.confirm("¿Estás seguro de quitar la asignación?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/logistica/pedidos/${pedidoSeleccionado.id}/desasignar`, {
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/desasignar', {
         method: 'PUT'
       });
       if (res.ok) {

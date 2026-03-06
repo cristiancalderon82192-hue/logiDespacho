@@ -21,7 +21,7 @@ const AdminDashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:3000/api/dashboard?inicio=${fechaInicio}&fin=${fechaFin}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard?inicio=${fechaInicio}&fin=${fechaFin}`);
       if (!response.ok) throw new Error('Error al obtener datos del servidor');
       const data = await response.json();
       setStats(data);

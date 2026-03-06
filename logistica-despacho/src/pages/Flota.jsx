@@ -15,7 +15,7 @@ const Flota = () => {
   // CARGAR DATOS
   const fetchVehiculos = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/vehiculos');
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/vehiculos');
       setVehiculos(await res.json());
     } catch (error) { console.error(error); }
   };
@@ -28,8 +28,8 @@ const Flota = () => {
     if (!formData.placa) return alert("La placa es obligatoria");
 
     const url = editingId 
-      ? `http://localhost:3000/api/vehiculos/${editingId}` 
-      : 'http://localhost:3000/api/vehiculos';
+      ? `${import.meta.env.VITE_API_URL}/api/vehiculos/${editingId}` 
+      : '${import.meta.env.VITE_API_URL}/api/vehiculos';
     const method = editingId ? 'PUT' : 'POST';
 
     try {
@@ -67,7 +67,7 @@ const Flota = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("¿Eliminar vehículo?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/vehiculos/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vehiculos/${id}`, { method: 'DELETE' });
       if (res.ok) fetchVehiculos();
       else alert("No se puede eliminar (tiene historial)");
     } catch (e) { alert("Error de conexión"); }

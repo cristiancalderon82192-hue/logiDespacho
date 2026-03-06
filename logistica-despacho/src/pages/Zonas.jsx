@@ -9,7 +9,7 @@ const Zonas = () => {
 
   const fetchZonas = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/zonas');
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/zonas');
       setZonas(await res.json());
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
@@ -22,8 +22,8 @@ const Zonas = () => {
     if (!nombre.trim()) return;
 
     const url = editingId 
-      ? `http://localhost:3000/api/zonas/${editingId}` 
-      : 'http://localhost:3000/api/zonas';
+      ? `${import.meta.env.VITE_API_URL}/api/zonas/${editingId}` 
+      : '${import.meta.env.VITE_API_URL}/api/zonas';
     
     const method = editingId ? 'PUT' : 'POST';
 
@@ -48,7 +48,7 @@ const Zonas = () => {
     if (!window.confirm("¿Seguro que quieres eliminar esta zona?")) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/zonas/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/zonas/${id}`, { method: 'DELETE' });
       const data = await res.json();
       
       if (res.ok) {

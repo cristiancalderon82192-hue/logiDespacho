@@ -9,7 +9,7 @@ const Bodegas = () => {
   // CARGAR DATOS
   const fetchBodegas = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/bodegas');
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/bodegas');
       setBodegas(await res.json());
     } catch (error) { console.error(error); }
   };
@@ -22,8 +22,8 @@ const Bodegas = () => {
     if (!formData.nombre.trim()) return alert("El nombre es obligatorio");
 
     const url = editingId 
-      ? `http://localhost:3000/api/bodegas/${editingId}` 
-      : 'http://localhost:3000/api/bodegas';
+      ? '${import.meta.env.VITE_API_URL}/api/bodegas/${editingId}' 
+      : '${import.meta.env.VITE_API_URL}/api/bodegas';
     
     const method = editingId ? 'PUT' : 'POST';
     

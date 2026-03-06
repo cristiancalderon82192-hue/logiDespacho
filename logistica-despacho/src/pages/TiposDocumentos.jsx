@@ -11,7 +11,7 @@ const TiposDocumento = () => {
   const fetchTipos = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3000/api/tipos-documento');
+      const res = await fetch('${import.meta.env.VITE_API_URL}/api/tipos-documento');
       if (res.ok) setTipos(await res.json());
     } catch (error) { console.error(error); }
     finally { setLoading(false); }
@@ -25,8 +25,8 @@ const TiposDocumento = () => {
     if (!nombre.trim()) return alert("El nombre es obligatorio");
 
     const url = editingId 
-      ? `http://localhost:3000/api/tipos-documento/${editingId}` 
-      : 'http://localhost:3000/api/tipos-documento';
+      ? `${import.meta.env.VITE_API_URL}/api/tipos-documento/${editingId}` 
+      : '${import.meta.env.VITE_API_URL}/api/tipos-documento';
     const method = editingId ? 'PUT' : 'POST';
 
     try {
@@ -58,7 +58,7 @@ const TiposDocumento = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("¿Seguro que deseas eliminar este tipo?")) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/tipos-documento/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok) {
         fetchTipos();

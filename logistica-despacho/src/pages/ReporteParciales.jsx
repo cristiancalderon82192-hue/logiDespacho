@@ -31,7 +31,7 @@ const ReporteParciales = () => {
   const fetchParciales = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/logistica/pedidos-parciales');
+      const response = await fetch('${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales');
       if (response.ok) setPedidos(await response.json());
     } catch (error) { console.error("Error:", error); } 
     finally { setLoading(false); }
@@ -40,9 +40,9 @@ const ReporteParciales = () => {
   const fetchCatalogos = async () => {
     try {
       const [resC, resV, resB] = await Promise.all([
-        fetch('http://localhost:3000/api/logistica/conductores'), 
-        fetch('http://localhost:3000/api/logistica/vehiculos'),
-        fetch('http://localhost:3000/api/logistica/bodegas') 
+        fetch('${import.meta.env.VITE_API_URL}/api/logistica/conductores'), 
+        fetch('${import.meta.env.VITE_API_URL}/api/logistica/vehiculos'),
+        fetch('${import.meta.env.VITE_API_URL}/api/logistica/bodegas') 
       ]);
       if(resC.ok) setConductores(await resC.json());
       if(resV.ok) setVehiculos(await resV.json());
@@ -98,7 +98,7 @@ const ReporteParciales = () => {
       return alert("Todas las filas de mercancía deben tener una bodega seleccionada y un peso mayor a 0.");
     }
     try {
-      const res = await fetch(`http://localhost:3000/api/logistica/pedidos/${pedidoSeleccionado.id}/despachar-saldo`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/despachar-saldo`, {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(asignacion) 
