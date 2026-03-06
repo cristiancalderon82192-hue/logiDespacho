@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FileSpreadsheet } from 'lucide-react';
 import { 
   LayoutDashboard, Package, UserPlus, Truck, LogOut, 
-  Building2, UsersRound, Map, MapPin, FileStack, AlertCircle, Menu, X 
+  Building2, UsersRound, Map, MapPin, FileStack, AlertCircle, Menu, X,
+  DollarSign, BarChart2 // Añadimos nuevos iconos para los reportes
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
@@ -12,7 +12,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
   const location = useLocation();
   const { logout } = useAuth();
   
-  // 👇 ESTADO PARA CONTROLAR EL MENÚ EN MÓVILES 👇
+  // ESTADO PARA CONTROLAR EL MENÚ EN MÓVILES
   const [isOpen, setIsOpen] = useState(false);
 
   const normalizeRole = (role) => {
@@ -26,6 +26,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
   const currentRole = normalizeRole(userRole);
 
+  // 1. BLOQUE DE OPERACIONES
   const mainItems = [
     { path: currentRole === 'admin' ? '/dashboard-admin' : '/dashboard-lider', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'lider_sala'] },
     { path: currentRole === 'admin' ? '/pedidos-admin' : '/pedidos-lider', icon: Package, label: 'Pedidos', roles: ['admin', 'lider_sala'] },
@@ -33,11 +34,18 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] },
     { path: '/dashboard-logistica', icon: LayoutDashboard, label: 'Dashboard', roles: ['logistica'] },
     { path: '/logistica-asignacion', icon: Truck, label: 'Asignar Rutas', roles: ['logistica'] },
-    { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'] },
-    // 👇 NUEVO ÍTEM DE REPORTES AGREGADO AQUÍ 👇
-    { path: '/reportes', icon: FileSpreadsheet, label: 'Reportes', roles: ['admin'] } 
+    { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'] }
   ];
 
+  // 👇 2. NUEVO BLOQUE DE REPORTES 👇
+  const reportItems = [
+    { path: '/reportes/productividad', icon: Truck, label: 'Productividad', roles: ['admin'] },
+    { path: '/reportes/financiero', icon: DollarSign, label: 'Financiero y Saldos', roles: ['admin'] },
+    { path: '/reportes/novedades', icon: AlertCircle, label: 'Efectividad', roles: ['admin'] },
+    { path: '/reportes/flota', icon: BarChart2, label: 'Ocupación Flota', roles: ['admin'] }
+  ];
+
+  // 3. BLOQUE DE SISTEMA
   const configItems = [
     { path: '/usuarios/nuevo', icon: UserPlus, label: 'Usuarios', roles: ['admin'] },
     { path: '/bodegas', icon: Building2, label: 'Bodegas', roles: ['admin'] },
@@ -51,13 +59,13 @@ const Sidebar = ({ userRole = 'guest' }) => {
       if (!item.roles.includes(currentRole)) return null;
       
       const Icon = item.icon;
-      const isActive = location.pathname.startsWith(item.path); // Cambiado a startsWith para que siga activo si entras a un sub-reporte
+      const isActive = location.pathname === item.path; 
 
       return (
         <Link
           key={item.path}
           to={item.path}
-          onClick={() => setIsOpen(false)} // Cerramos el menú al hacer clic en móvil
+          onClick={() => setIsOpen(false)} 
           className={`flex items-center space-x-3 p-3 rounded-lg transition-all mb-1 font-medium ${
             isActive 
               ? 'bg-slate-900 text-white shadow-lg' 
@@ -73,7 +81,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
   return (
     <>
-      {/* 👇 BOTÓN DE MENÚ (Solo visible en celulares) 👇 */}
+      {/* BOTÓN DE MENÚ MÓVIL */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="lg:hidden fixed top-4 left-4 z-[60] bg-[#47B3A8] text-slate-900 p-2 rounded-lg shadow-lg border border-white/20 active:scale-90 transition-transform"
@@ -81,7 +89,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* 👇 OVERLAY OSCURO (Para cerrar el menú al tocar afuera en móvil) 👇 */}
+      {/* OVERLAY OSCURO MÓVIL */}
       {isOpen && (
         <div 
           className="lg:hidden fixed inset-0 bg-black/50 z-[40] backdrop-blur-sm transition-opacity"
@@ -89,7 +97,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
         />
       )}
 
-      {/* 👇 SIDEBAR CORREGIDO: w-64 en PC, Animado en Móvil 👇 */}
+      {/* SIDEBAR */}
       <div className={`
         h-screen w-64 bg-[#47B3A8] flex flex-col fixed left-0 top-0 z-50 shadow-2xl border-r border-slate-900/5 transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -110,14 +118,26 @@ const Sidebar = ({ userRole = 'guest' }) => {
           </div>
         </div>
         
-        {/* MENÚ DE NAVEGACIÓN */}
-        <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+        {/* MENÚ DE NAVEGACIÓN (CON SCROLL) */}
+        <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar pb-20">
+          
+          {/* SECCIÓN: OPERACIONES */}
           <div className="space-y-1">
             <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Operaciones</p>
             {renderLinks(mainItems)}
           </div>
+
+          {/* 👇 SECCIÓN: REPORTES (NUEVA) 👇 */}
           {currentRole === 'admin' && (
-            <div className="mt-8 space-y-1">
+            <div className="mt-6 space-y-1">
+              <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Reportes</p>
+              {renderLinks(reportItems)}
+            </div>
+          )}
+
+          {/* SECCIÓN: SISTEMA */}
+          {currentRole === 'admin' && (
+            <div className="mt-6 space-y-1">
               <p className="px-3 text-[10px] font-bold text-slate-700 uppercase mb-2 tracking-wider">Sistema</p>
               {renderLinks(configItems)}
             </div>
