@@ -1,5 +1,10 @@
 // UBICACIÓN: server/controllers/authController.js
 const db = require('../db'); 
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+// Clave secreta para firmar los tokens
+const SECRET_KEY = process.env.JWT_SECRET || 'rodeo_zomac_super_secret_key_2026';
 
 const login = async (req, res) => {
   const { email, password } = req.body;
@@ -16,27 +21,44 @@ const login = async (req, res) => {
 
     const usuario = rows[0];
 
-    // 👇 NUEVO: 3. VALIDACIÓN DE ESTADO (USUARIO INACTIVO) 👇
-    // Bloqueamos el acceso desde la base de datos antes de mirar la contraseña
+    // 3. VALIDACIÓN DE ESTADO (USUARIO INACTIVO)
     if (usuario.estado === 0 || usuario.estado === '0' || usuario.estado === false) {
       return res.status(403).json({ error: "Acceso denegado: Tu cuenta está inactiva. Comunícate con el administrador." });
     }
 
-    // 4. Verificar contraseña (simple por ahora)
-    if (password === usuario.password_hash) {
-      
-      // Enviamos la respuesta exitosa, INCLUYENDO el estado
-      res.json({
-        id: usuario.id,
-        nombre_completo: usuario.nombre_completo,
-        role: usuario.rol_id,      
-        rol_nombre: usuario.rol_nombre,
-        estado: usuario.estado // <--- AÑADIDO PARA QUE EL FRONTEND LO SEPA
-      });
-      
+    // 👇 4. VERIFICACIÓN HÍBRIDA (EL SALVAVIDAS DE TRANSICIÓN) 👇
+    let passwordValida = false;
+    
+    // Primero, miramos si la base de datos tiene la contraseña vieja en texto plano ("123456")
+    if (usuario.password_hash === password) {
+      passwordValida = true;
     } else {
-      res.status(401).json({ error: "Contraseña incorrecta" });
+      // Si no es texto plano, comparamos usando el algoritmo encriptado de Bcrypt
+      passwordValida = await bcrypt.compare(password, usuario.password_hash);
     }
+
+    if (!passwordValida) {
+      return res.status(401).json({ error: "Contraseña incorrecta" });
+    }
+
+    // 5. Crear el Token JWT (Dura 8 horas)
+    const tokenPayload = {
+      id: usuario.id,
+      role: usuario.rol_id,
+      email: usuario.email
+    };
+    
+    const token = jwt.sign(tokenPayload, SECRET_KEY, { expiresIn: '8h' });
+
+    // 6. Enviamos la respuesta exitosa manteniendo tu estructura frontal, pero inyectando el token
+    res.json({
+      id: usuario.id,
+      nombre_completo: usuario.nombre_completo,
+      role: usuario.rol_id,      
+      rol_nombre: usuario.rol_nombre,
+      estado: usuario.estado,
+      token: token // <--- AÑADIMOS EL TOKEN AQUÍ
+    });
 
   } catch (error) {
     console.error("Error en login:", error);

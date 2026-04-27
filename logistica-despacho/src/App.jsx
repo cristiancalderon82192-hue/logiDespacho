@@ -16,6 +16,14 @@ import Destinos from './pages/Destinos';
 import Flota from './pages/Flota';
 import TiposDocumento from './pages/TiposDocumentos'; 
 
+// IMPORTACIONES DE REPORTES
+import ReporteProductividad from './pages/ReporteProductividad';
+import ReporteFinanciero from './pages/ReporteFinanciero';
+import ReporteEfectividad from './pages/ReporteEfectividad';
+import ReporteFlota from './pages/ReporteFlota';
+import ReportePerfectos from './pages/ReportePerfectos';
+import ReporteLeadTime from './pages/ReporteLeadTime'; // 👇 NUEVA IMPORTACIÓN DE LEAD TIME 👇
+
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar'; 
 import DashboardLogistica from './pages/DashboardLogistica';
@@ -23,7 +31,7 @@ import AsignacionLogistica from './pages/AsignacionLogistica';
 import ReporteParciales from './pages/ReporteParciales'; 
 import DashboardConductor from './pages/DashboardConductor'; 
 
-// 1. REDIRECT INTELIGENTE
+// REDIRECT INTELIGENTE
 const RootRedirect = () => {
   const { user } = useAuth();
   
@@ -38,20 +46,13 @@ const RootRedirect = () => {
   return <Navigate to="/dashboard-lider" replace />;
 };
 
-// --- LAYOUT RESPONSIVO CORREGIDO ---
 const MainLayout = ({ children }) => {
-  const { user } = useAuth(); // Obtenemos el usuario para pasar el rol al Sidebar
+  const { user } = useAuth();
 
   return (
     <div className="flex bg-slate-50 min-h-screen w-full">
-      {/* El Sidebar ahora recibe el rol real del usuario logueado */}
       <Sidebar userRole={user?.role} />
       
-      {/* 👇 SOLUCIÓN AL PROBLEMA VISUAL 👇
-         - lg:pl-64: Solo pone el margen en pantallas grandes (PC).
-         - w-full: Asegura que ocupe todo el ancho en celulares.
-         - p-4 md:p-8: Relleno más pequeño en celular para que no se vea apretado.
-      */}
       <main className="flex-1 w-full lg:pl-64 p-4 md:p-8 transition-all duration-300 overflow-x-hidden">
         {children}
       </main>
@@ -79,16 +80,26 @@ export default function App() {
           <Route path="/bodegas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Bodegas /></MainLayout></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Clientes /></MainLayout></ProtectedRoute>} />
 
+          {/* RUTAS DE REPORTES */}
+          <Route path="/reportes/productividad" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteProductividad /></MainLayout></ProtectedRoute>} />
+          <Route path="/reportes/financiero" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteFinanciero /></MainLayout></ProtectedRoute>} />
+          <Route path="/reportes/efectividad" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteEfectividad /></MainLayout></ProtectedRoute>} />
+          <Route path="/reportes/flota" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteFlota /></MainLayout></ProtectedRoute>} />
+          <Route path="/reportes/perfectos" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReportePerfectos /></MainLayout></ProtectedRoute>} />
+          
+          {/* 👇 NUEVA RUTA DE LEAD TIME 👇 */}
+          <Route path="/reportes/leadtime" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteLeadTime /></MainLayout></ProtectedRoute>} />
+          
           {/* RUTAS DEL LÍDER DE SALA */}
           <Route path="/dashboard-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2]}><MainLayout><DashboardLider /></MainLayout></ProtectedRoute>} />
-          <Route path="/pedidos-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2]}><MainLayout><PedidosLider /></MainLayout></ProtectedRoute>} />
+          <Route path="/pedidos-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2, 'logistica', '3', 3]}><MainLayout><PedidosLider /></MainLayout></ProtectedRoute>} />
           
           {/* RUTAS DE LOGÍSTICA */}
           <Route path="/dashboard-logistica" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><DashboardLogistica /></MainLayout></ProtectedRoute>} />
           <Route path="/logistica-asignacion" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><AsignacionLogistica /></MainLayout></ProtectedRoute>} />
           <Route path="/logistica-parciales" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><ReporteParciales /></MainLayout></ProtectedRoute>} />
 
-          {/* RUTAS DEL CONDUCTOR (Sin Sidebar) */}
+          {/* RUTAS DEL CONDUCTOR */}
           <Route path="/conductor-home" element={
             <ProtectedRoute allowedRoles={['conductor', '4', 4]}>
               <DashboardConductor />

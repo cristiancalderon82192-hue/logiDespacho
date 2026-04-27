@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { UsersRound, Save, Edit, Trash2, MapPin, Phone, RefreshCw, CreditCard } from 'lucide-react';
+import { UsersRound, Save, Edit, Trash2, MapPin, Phone, RefreshCw, CreditCard, Search } from 'lucide-react';
 
 const Clientes = () => {
   const [clientes, setClientes] = useState([]);
+  
+  // 👇 NUEVO ESTADO PARA EL BUSCADOR 👇
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [formData, setFormData] = useState({ 
     nombre: '', 
@@ -15,7 +18,6 @@ const Clientes = () => {
 
   const fetchClientes = async () => {
     try {
-      // CORREGIDO: Uso de backticks (``)
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
       const data = await res.json();
       setClientes(data);
@@ -30,7 +32,6 @@ const Clientes = () => {
     if (!formData.nombre) return alert("El nombre es obligatorio");
     if (!formData.documento) return alert("La Cédula/NIT es obligatoria");
     
-    // CORREGIDO: Uso de backticks (``)
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/clientes/${editingId}` 
       : `${import.meta.env.VITE_API_URL}/api/clientes`;
@@ -73,7 +74,6 @@ const Clientes = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("¿Estás seguro de eliminar este cliente?")) return;
     try {
-      // CORREGIDO: Uso de backticks (``)
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes/${id}`, { method: 'DELETE' });
       const data = await res.json();
       
@@ -85,8 +85,20 @@ const Clientes = () => {
     } catch (e) { alert("Error de conexión"); }
   };
 
+  // 👇 LÓGICA DE FILTRADO Y LÍMITE DE 5 👇
+  // 1. Ordenamos siempre del ID más alto al más bajo (Los más recientes primero)
+  const clientesOrdenados = [...clientes].sort((a, b) => b.id - a.id);
+  
+  // 2. Si hay búsqueda filtramos, si no, cortamos solo los primeros 5
+  const clientesFiltrados = searchTerm.trim() !== ''
+    ? clientesOrdenados.filter(c => 
+        c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (c.documento && c.documento.includes(searchTerm))
+      )
+    : clientesOrdenados.slice(0, 5);
+
   return (
-    <div className="space-y-4 md:space-y-8 w-full max-w-full overflow-x-hidden">
+    <div className="space-y-4 md:space-y-8 w-full max-w-full overflow-x-hidden animate-fadeIn">
       
       {/* HEADER RESPONSIVO */}
       <div className="border-b border-slate-200 pb-4 md:pb-6">
@@ -97,7 +109,7 @@ const Clientes = () => {
 
       {/* FORMULARIO RESPONSIVO */}
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden w-full">
-        <div className={`px-4 md:px-8 py-3 md:py-4 border-b font-bold uppercase tracking-wider text-xs md:text-sm flex justify-between items-center ${editingId ? 'bg-orange-100 text-orange-800' : 'bg-slate-900 text-white'}`}>
+        <div className={`px-4 md:px-8 py-3 md:py-4 border-b font-bold uppercase tracking-wider text-xs md:text-sm flex justify-between items-center transition-colors ${editingId ? 'bg-orange-100 text-orange-800' : 'bg-slate-900 text-white'}`}>
           <span>{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</span>
           {editingId && (
             <button 
@@ -181,6 +193,25 @@ const Clientes = () => {
         </form>
       </div>
 
+      {/* 👇 BARRA DE BÚSQUEDA INTEGRADA 👇 */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 md:p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div className="relative w-full sm:max-w-md flex-1">
+          <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+          <input 
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 bg-slate-50 text-sm md:text-base outline-none transition-colors font-medium text-slate-700 placeholder:font-normal"
+            placeholder="Buscar por nombre o cédula..."
+          />
+        </div>
+        <div className="w-full sm:w-auto text-center sm:text-right">
+          <span className="text-[10px] md:text-xs font-bold text-slate-500 uppercase bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+            {searchTerm ? `Mostrando ${clientesFiltrados.length} resultados` : 'Mostrando últimos 5 agregados'}
+          </span>
+        </div>
+      </div>
+
       {/* TABLA CON SCROLL HORIZONTAL TÁCTIL */}
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden w-full">
         <div className="overflow-x-auto w-full">
@@ -194,11 +225,11 @@ const Clientes = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-xs md:text-sm text-slate-700">
-              {clientes.length === 0 ? (
-                <tr><td colSpan="4" className="p-8 text-center text-slate-400">No hay clientes registrados.</td></tr>
+              {clientesFiltrados.length === 0 ? (
+                <tr><td colSpan="4" className="p-8 text-center text-slate-400">No se encontraron clientes con esos datos.</td></tr>
               ) : (
-                clientes.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                clientesFiltrados.map((c) => (
+                  <tr key={c.id} className="hover:bg-blue-50 transition-colors">
                     
                     <td className="p-3 md:p-5 align-middle">
                       <div className="font-bold text-slate-800 break-words">{c.nombre}</div>

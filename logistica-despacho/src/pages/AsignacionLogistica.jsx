@@ -33,7 +33,6 @@ const AsignacionLogistica = () => {
     if (mostrarPantallaCarga) setLoading(true);
     try {
       const [resP, resC, resV] = await Promise.all([
-        // CORREGIDO: Uso de backticks (``)
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-dia?fecha=${fechaFiltro}`),
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/conductores`), 
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/vehiculos`)
@@ -76,8 +75,15 @@ const AsignacionLogistica = () => {
       return alert("Debes seleccionar un conductor, un vehículo y el valor despachado.");
     }
 
+    // VALIDACIÓN ESTRICTA DE VALOR DESPACHADO vs VALOR FACTURA
+    const valorIngresado = Number(asignacion.total_despachado);
+    const valorFactura = Number(pedidoSeleccionado.valor_factura || 0);
+
+    if (valorIngresado > valorFactura) {
+      return alert(`❌ ALERTA DE SEGURIDAD:\n\nEl valor a despachar ($${valorIngresado.toLocaleString('es-CO')}) NO puede superar el valor total de la factura ($${valorFactura.toLocaleString('es-CO')}).`);
+    }
+
     try {
-      // CORREGIDO: Uso de backticks y agregado el "/" antes de "api"
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/asignar`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -94,7 +100,6 @@ const AsignacionLogistica = () => {
   const handleQuitarAsignacion = async () => {
     if (!window.confirm("¿Estás seguro de quitar la asignación?")) return;
     try {
-      // CORREGIDO: Uso de backticks
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/desasignar`, {
         method: 'PUT'
       });
@@ -151,10 +156,8 @@ const AsignacionLogistica = () => {
         `}
       </style>
 
-      {/* CONTENEDOR PRINCIPAL RESPONSIVO */}
       <div className="ocultar-al-imprimir bg-slate-50 min-h-screen space-y-4 md:space-y-8 p-3 md:p-6 w-full max-w-full overflow-x-hidden">
         
-        {/* HEADER Y FILTROS */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col xl:flex-row justify-between xl:items-center gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2 md:gap-3">
@@ -190,7 +193,6 @@ const AsignacionLogistica = () => {
           </div>
         </div>
 
-        {/* TABLA PRINCIPAL (SCROLL HORIZONTAL) */}
         <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden w-full">
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left min-w-[900px]">
@@ -271,10 +273,10 @@ const AsignacionLogistica = () => {
           </div>
         </div>
 
-        {/* MODAL RESPONSIVO (SCROLL INTERNO Y VALIDACIÓN DE TALLER) */}
         {showModal && pedidoSeleccionado && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh]">
+              
               <div className="bg-slate-900 p-4 md:p-5 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="bg-[#47B3A8] p-1.5 md:p-2 rounded-lg"><Truck size={18} className="text-white"/></div>
@@ -286,87 +288,98 @@ const AsignacionLogistica = () => {
                 <button onClick={() => setShowModal(false)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
               </div>
 
-              <form onSubmit={handleAsignar} className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+              <form onSubmit={handleAsignar} className="flex flex-col flex-1 overflow-hidden">
                 
-                <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm">
-                  <p className="text-xs md:text-sm font-medium text-slate-700 mb-1">Destino:</p>
-                  <p className="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <MapPin size={16} className="text-orange-500" /> {pedidoSeleccionado.destino} <span className="font-normal text-sm text-slate-500">({pedidoSeleccionado.zona_envio})</span>
-                  </p>
-                  <div className="mt-3 md:mt-4 flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs md:text-sm text-slate-500">
-                    <span>Peso: <span className="font-bold text-slate-700">{obtenerPesoFormateado(pedidoSeleccionado)} Kg</span></span>
-                    <span>V. Factura: <span className="font-bold text-slate-800">${Number(pedidoSeleccionado.valor_factura || 0).toLocaleString('es-CO')}</span></span>
+                <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                  
+                  <div className="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs md:text-sm font-medium text-slate-700 mb-1">Destino:</p>
+                    <p className="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <MapPin size={16} className="text-orange-500" /> {pedidoSeleccionado.destino} <span className="font-normal text-sm text-slate-500">({pedidoSeleccionado.zona_envio})</span>
+                    </p>
+                    <div className="mt-3 flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs md:text-sm text-slate-500">
+                      <span>Peso: <span className="font-bold text-slate-700">{obtenerPesoFormateado(pedidoSeleccionado)} Kg</span></span>
+                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md font-bold">
+                        V. Factura: ${Number(pedidoSeleccionado.valor_factura || 0).toLocaleString('es-CO')}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-3 md:space-y-4">
-                  <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1 md:mb-2"><User size={12} /> Seleccionar Conductor</label>
-                    <select value={asignacion.conductor_id} onChange={(e) => { const n = e.target.value; const v = pedidos.find(p => String(p.conductor_id) === String(n) && p.vehiculo_id && p.id !== pedidoSeleccionado.id)?.vehiculo_id; setAsignacion({...asignacion, conductor_id: n, vehiculo_id: v || '' }); }} className="w-full border-2 border-slate-200 p-2.5 md:p-3 rounded-lg md:rounded-xl focus:border-[#47B3A8] outline-none text-slate-700 font-medium bg-white text-sm" required>
-                      <option value="">-- Elige un conductor --</option>
-                      {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1 md:mb-2"><Truck size={12} /> Vehículo (Placa)</label>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><User size={14} /> Seleccionar Conductor</label>
+                      <select value={asignacion.conductor_id} onChange={(e) => { const n = e.target.value; const v = pedidos.find(p => String(p.conductor_id) === String(n) && p.vehiculo_id && p.id !== pedidoSeleccionado.id)?.vehiculo_id; setAsignacion({...asignacion, conductor_id: n, vehiculo_id: v || '' }); }} className="w-full border-2 border-slate-200 p-2.5 md:p-3 rounded-xl focus:border-[#47B3A8] outline-none text-slate-700 font-medium bg-white text-sm" required>
+                        <option value="">-- Elige un conductor --</option>
+                        {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                      </select>
+                    </div>
                     
-                    {/* 👇 AQUÍ APLICAMOS LA VALIDACIÓN DEL VEHÍCULO INACTIVO 👇 */}
-                    <select 
-                      value={asignacion.vehiculo_id} 
-                      onChange={(e) => setAsignacion({...asignacion, vehiculo_id: e.target.value})} 
-                      className={`w-full border-2 p-2.5 md:p-3 rounded-lg md:rounded-xl outline-none font-medium text-sm transition-colors ${vehiculoPreasignado ? 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed' : 'bg-white border-slate-200 focus:border-[#47B3A8] text-slate-700'}`} 
-                      required 
-                      disabled={!!vehiculoPreasignado}
-                    >
-                      <option value="">-- Elige un vehículo --</option>
-                      {vehiculos.map(v => (
-                        <option 
-                          key={v.id} 
-                          value={v.id} 
-                          disabled={Number(v.estado) === 0} 
-                        >
-                          {v.placa} {v.modelo ? `- ${v.modelo}` : ''} ({v.capacidad_kg} Kg) {Number(v.estado) === 0 ? ' 🚫 (EN TALLER)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {vehiculoPreasignado && (
-                      <p className="mt-1.5 text-[10px] md:text-xs text-orange-600 font-bold flex items-center gap-1">* Vehículo ya asignado a este conductor hoy.</p>
-                    )}
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><Truck size={14} /> Vehículo (Placa)</label>
+                      <select 
+                        value={asignacion.vehiculo_id} 
+                        onChange={(e) => setAsignacion({...asignacion, vehiculo_id: e.target.value})} 
+                        className={`w-full border-2 p-2.5 md:p-3 rounded-xl outline-none font-medium text-sm transition-colors ${vehiculoPreasignado ? 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed' : 'bg-white border-slate-200 focus:border-[#47B3A8] text-slate-700'}`} 
+                        required 
+                        disabled={!!vehiculoPreasignado}
+                      >
+                        <option value="">-- Elige un vehículo --</option>
+                        {vehiculos.map(v => (
+                          <option key={v.id} value={v.id} disabled={Number(v.estado) === 0}>
+                            {v.placa} {v.modelo ? `- ${v.modelo}` : ''} ({v.capacidad_kg} Kg) {Number(v.estado) === 0 ? ' 🚫 (EN TALLER)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {vehiculoPreasignado && (
+                        <p className="mt-1.5 text-[10px] md:text-xs text-orange-600 font-bold flex items-center gap-1">* Vehículo ya asignado a este conductor hoy.</p>
+                      )}
+                    </div>
+                    
+                    <div className="pb-2">
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5">Valor a Despachar</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold text-base pointer-events-none">$</span>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          max={pedidoSeleccionado.valor_factura || ''}
+                          value={asignacion.total_despachado} 
+                          onChange={(e) => setAsignacion({...asignacion, total_despachado: e.target.value})} 
+                          className="w-full pl-10 md:pl-12 py-2.5 pr-2.5 md:py-3 md:pr-3 border-2 border-slate-200 rounded-xl focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white text-sm" 
+                          placeholder="Ingresa el valor..." 
+                          required 
+                        />
+                      </div>
+                    </div>
 
+                    {esEnvioParcial && (
+                      <div className="animate-fadeIn p-4 bg-red-50 border border-red-200 rounded-xl">
+                        <label className="text-[10px] md:text-xs font-bold text-red-700 uppercase flex items-center gap-2 mb-2"><AlertCircle size={14} /> Observación Parcial Requerida</label>
+                        <textarea value={asignacion.observaciones_entrega} onChange={(e) => setAsignacion({...asignacion, observaciones_entrega: e.target.value})} className="w-full border border-red-300 p-2.5 rounded-lg focus:border-red-500 outline-none text-sm text-slate-800 bg-white" placeholder="Justifica el saldo pendiente..." rows="2" required={esEnvioParcial} />
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1 md:mb-2">Valor Despachado</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold">$</span>
-                      <input type="number" step="0.01" min="0" value={asignacion.total_despachado} onChange={(e) => setAsignacion({...asignacion, total_despachado: e.target.value})} className="w-full pl-8 border-2 border-slate-200 p-2.5 md:p-3 rounded-lg md:rounded-xl focus:border-[#47B3A8] outline-none text-slate-700 font-medium bg-white text-sm" placeholder="Ej: 150000" required />
-                    </div>
-                  </div>
-                  {esEnvioParcial && (
-                    <div className="animate-fadeIn p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg md:rounded-xl">
-                      <label className="text-[10px] md:text-xs font-bold text-red-700 uppercase flex items-center gap-2 mb-2"><AlertCircle size={14} /> Nota Parcial</label>
-                      <textarea value={asignacion.observaciones_entrega} onChange={(e) => setAsignacion({...asignacion, observaciones_entrega: e.target.value})} className="w-full border border-red-300 p-2 md:p-3 rounded-lg focus:border-red-500 outline-none text-xs md:text-sm text-slate-800 bg-white" placeholder="Ej: Quedan pendientes 2 cajas..." rows="2" required={esEnvioParcial} />
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-between items-center pt-4 md:pt-6 mt-4 border-t border-slate-100 gap-3 shrink-0">
+                <div className="bg-slate-50 border-t border-slate-200 p-4 md:p-5 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
                   <div className="w-full sm:w-auto text-center sm:text-left">
                     {pedidoSeleccionado.conductor_id && (
-                      <button type="button" onClick={handleQuitarAsignacion} className="text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg font-bold text-xs md:text-sm transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"><Trash2 size={16} /> Quitar Asignación</button>
+                      <button type="button" onClick={handleQuitarAsignacion} className="text-red-500 hover:bg-red-100 px-3 py-2 rounded-lg font-bold text-xs md:text-sm transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"><Trash2 size={16} /> Quitar Asignación</button>
                     )}
                   </div>
-                  <div className="flex gap-2 md:gap-3 w-full sm:w-auto">
-                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 sm:flex-none px-4 md:px-5 py-2 md:py-2.5 text-slate-500 font-bold text-xs md:text-sm hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                    <button type="submit" className="flex-1 sm:flex-none bg-[#47B3A8] hover:bg-[#3A948C] text-white px-4 md:px-6 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-bold shadow-lg flex justify-center items-center gap-2">Guardar <CheckCircle size={16} /></button>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 sm:flex-none px-4 py-2.5 text-slate-500 font-bold text-xs md:text-sm hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
+                    <button type="submit" className="flex-1 sm:flex-none bg-[#47B3A8] hover:bg-[#3A948C] text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-bold shadow-md hover:shadow-lg transition-all flex justify-center items-center gap-2">Asignar <CheckCircle size={16} /></button>
                   </div>
                 </div>
+
               </form>
             </div>
           </div>
         )}
       </div>
 
-      {/* VISTA DE IMPRESIÓN (Mantenida intacta) */}
       {conductorFiltro && (
         <div className="solo-impresion bg-white text-black p-4 font-sans w-full">
           <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-end">

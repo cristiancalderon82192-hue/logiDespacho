@@ -1,5 +1,6 @@
 // UBICACIÓN: server/controllers/usuariosController.js
 const db = require('../db');
+const bcrypt = require('bcrypt'); // 👈 Importante para la seguridad
 
 // --- 1. LISTAR USUARIOS ---
 const getUsuarios = async (req, res) => {
@@ -14,6 +15,7 @@ const getUsuarios = async (req, res) => {
     const [rows] = await db.query(sql);
     res.json(rows);
   } catch (error) {
+    console.error("Error al cargar usuarios:", error);
     res.status(500).json({ error: "Error al cargar usuarios" });
   }
 };
@@ -28,18 +30,21 @@ const createUsuario = async (req, res) => {
       return res.status(400).json({ error: "El correo ya está registrado." });
     }
 
-    // Convertimos un string vacío en NULL para la base de datos
     const b_id = bodega_id || null;
+
+    // 👇 ENCRIPTAMOS LA CONTRASEÑA ANTES DE GUARDARLA 👇
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     await db.query(
       "INSERT INTO usuarios (nombre_completo, email, password_hash, rol_id, estado, bodega_id) VALUES (?, ?, ?, ?, ?, ?)",
-      [nombre_completo, email, password, rol_id, estado || 1, b_id]
+      [nombre_completo, email, hashedPassword, rol_id, estado || 1, b_id]
     );
 
     res.json({ message: "Usuario creado exitosamente" });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error al crear usuario:", error);
     res.status(500).json({ error: "Error al crear usuario" });
   }
 };
@@ -62,8 +67,12 @@ const updateUsuario = async (req, res) => {
     let sql, params;
     
     if (password && password.trim() !== "") {
+      // 👇 SI SE ENVÍA UNA CONTRASEÑA NUEVA, TAMBIÉN LA ENCRIPTAMOS 👇
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
       sql = "UPDATE usuarios SET nombre_completo=?, email=?, password_hash=?, rol_id=?, estado=?, bodega_id=? WHERE id=?";
-      params = [nombre_completo, email, password, rol_id, estado, b_id, id];
+      params = [nombre_completo, email, hashedPassword, rol_id, estado, b_id, id];
     } else {
       sql = "UPDATE usuarios SET nombre_completo=?, email=?, rol_id=?, estado=?, bodega_id=? WHERE id=?";
       params = [nombre_completo, email, rol_id, estado, b_id, id];
@@ -73,7 +82,7 @@ const updateUsuario = async (req, res) => {
     res.json({ message: "Usuario actualizado correctamente" });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error al actualizar usuario:", error);
     res.status(500).json({ error: "Error al actualizar usuario" });
   }
 };
@@ -88,8 +97,10 @@ const deleteUsuario = async (req, res) => {
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
       return res.status(400).json({ error: "No se puede eliminar: El usuario tiene registros en el historial." });
     }
+    console.error("Error al eliminar usuario:", error);
     res.status(500).json({ error: "Error al eliminar usuario" });
   }
 };
 
+// 👇 ESTA ES LA LÍNEA CRÍTICA QUE EXPORTA TODO Y EVITA TU ERROR 👇
 module.exports = { getUsuarios, createUsuario, updateUsuario, deleteUsuario };

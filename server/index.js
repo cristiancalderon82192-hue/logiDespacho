@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
@@ -39,6 +40,13 @@ app.use('/api/tipos-documento', tiposDocumentoRoutes);
 app.use('/api/lider', pedidosLiderRoutes);
 app.use('/api/logistica', logisticaRoutes);
 app.use('/api/conductor', conductorRoutes);
+
+// --- RUTAS DE REPORTES INDIVIDUALES ---
+app.use('/api/reportes/financiero', require('./routes/financieroRoutes'));
+app.use('/api/reportes/productividad', require('./routes/productividadRoutes'));
+app.use('/api/reportes/efectividad', require('./routes/efectividadRoutes'));
+app.use('/api/reportes/flota', require('./routes/flotaRoutes'));
+app.use('/api/reportes/perfectos', require('./routes/perfectosRoutes'));
 
 // 4. INICIO DEL SERVIDOR
 const PORT = process.env.PORT || 3000;

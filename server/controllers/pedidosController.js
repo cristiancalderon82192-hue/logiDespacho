@@ -6,6 +6,12 @@ const crearPedido = async (req, res) => {
   const data = req.body;
   
   try {
+    // 👇 CANDADO 3: VALIDAR FACTURA DUPLICADA 👇
+    const [facturaExiste] = await db.query("SELECT id FROM pedidos WHERE id_factura = ?", [data.id_factura]);
+    if (facturaExiste.length > 0) {
+      return res.status(400).json({ error: `La factura '${data.id_factura}' ya está registrada en el sistema.` });
+    }
+
     // A. VALIDAR EL DESTINO
     let destinoId = data.destino_id;
 
@@ -36,14 +42,14 @@ const crearPedido = async (req, res) => {
       cliente_id = resC.insertId;
     }
 
-    // C. OBTENER ID DEL TIPO DE DOCUMENTO (NUEVO PASO DE NORMALIZACIÓN)
-    let tipoDocId = 1; // Por defecto 1 (Factura) por si algo falla
+    // C. OBTENER ID DEL TIPO DE DOCUMENTO
+    let tipoDocId = 1; 
     if (data.tipo_documento) {
       const [tipos] = await db.query("SELECT id FROM tipos_documento WHERE nombre = ?", [data.tipo_documento]);
       if (tipos.length > 0) tipoDocId = tipos[0].id;
     }
 
-    // D. INSERTAR PEDIDO (Se elimina direccion_entrega y se cambia tipo_documento por tipo_documento_id)
+    // D. INSERTAR PEDIDO
     const sql = `
       INSERT INTO pedidos (
         usuario_id, cliente_id, destino_id, id_factura, tipo_documento_id, 
@@ -57,7 +63,7 @@ const crearPedido = async (req, res) => {
       cliente_id,
       destinoId,
       data.id_factura,
-      tipoDocId, // Usamos el ID buscado arriba
+      tipoDocId, 
       data.prioridad,
       data.valor_factura || 0, 
       data.fecha_facturacion,
@@ -65,7 +71,6 @@ const crearPedido = async (req, res) => {
       data.fecha_agendada || null,
       data.hora_registro,
       data.nota_manual
-      // Borramos direccion_entrega de aquí
     ];
 
     const [result] = await db.query(sql, values);
@@ -93,10 +98,8 @@ const crearPedido = async (req, res) => {
 };
 
 // --- 2. LISTAR PEDIDOS POR RANGO DE FECHA ---
-// --- 2. LISTAR PEDIDOS POR RANGO DE FECHA ---
 const listarPedidosRango = async (req, res) => {
   let { inicio, fin } = req.query;
-  
   if (fin) fin = `${fin} 23:59:59`;
 
   try {
@@ -138,38 +141,29 @@ const listarPedidosRango = async (req, res) => {
   }
 };
 
-// --- 3. OBTENER DATOS DASHBOARD (FILTRADO POR FECHA AGENDADA) ---
+// --- 3. OBTENER DATOS DASHBOARD ---
 const obtenerDashboard = async (req, res) => {
   let { inicio, fin } = req.query;
   if (fin) fin = fin + ' 23:59:59';
   const fechas = [inicio, fin];
 
   try {
-    // A. KPIs DE CABECERA
     const [kpisHeader] = await db.query(`
-      SELECT 
-        COUNT(*) as total_pedidos, 
-        COALESCE(SUM(valor_factura), 0) as total_valor
-      FROM pedidos 
-      WHERE fecha_agendada BETWEEN ? AND ?
+      SELECT COUNT(*) as total_pedidos, COALESCE(SUM(valor_factura), 0) as total_valor
+      FROM pedidos WHERE fecha_agendada BETWEEN ? AND ?
     `, fechas);
 
-    // B. KPIs DE DETALLE (Solo para sumar pesos)
     const [kpisDetalle] = await db.query(`
       SELECT COALESCE(SUM(pd.peso), 0) as total_peso
-      FROM pedidos_detalle pd
-      JOIN pedidos p ON pd.pedido_id = p.id
+      FROM pedidos_detalle pd JOIN pedidos p ON pd.pedido_id = p.id
       WHERE p.fecha_agendada BETWEEN ? AND ?
     `, fechas);
 
-    // C. Bodegas
     const [bodegas] = await db.query(`
       SELECT b.nombre, COALESCE(SUM(pd.peso), 0) as peso
-      FROM pedidos_detalle pd
-      JOIN pedidos p ON pd.pedido_id = p.id
+      FROM pedidos_detalle pd JOIN pedidos p ON pd.pedido_id = p.id
       JOIN bodegas b ON pd.bodega_id = b.id
-      WHERE p.fecha_agendada BETWEEN ? AND ?
-      GROUP BY b.id
+      WHERE p.fecha_agendada BETWEEN ? AND ? GROUP BY b.id
     `, fechas);
 
     const bodegasObj = {};
@@ -178,52 +172,30 @@ const obtenerDashboard = async (req, res) => {
       bodegasObj[key] = b.peso;
     });
 
-    // D. Top Destinos
     const [destinos] = await db.query(`
-      SELECT 
-        d.nombre as destino, 
-        COUNT(DISTINCT p.id) as entregas, 
-        COALESCE(SUM(pd.peso), 0) as peso
-      FROM pedidos p
-      JOIN destinos d ON p.destino_id = d.id 
-      LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
-      WHERE p.fecha_agendada BETWEEN ? AND ?
-      GROUP BY d.id 
-      ORDER BY peso DESC 
-      LIMIT 5
+      SELECT d.nombre as destino, COUNT(DISTINCT p.id) as entregas, COALESCE(SUM(pd.peso), 0) as peso
+      FROM pedidos p JOIN destinos d ON p.destino_id = d.id LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
+      WHERE p.fecha_agendada BETWEEN ? AND ? GROUP BY d.id ORDER BY peso DESC LIMIT 5
     `, fechas);
 
-    // E. Prioridades
     const [prioridad] = await db.query(`
-      SELECT prioridad, COUNT(*) as cantidad 
-      FROM pedidos 
-      WHERE fecha_agendada BETWEEN ? AND ? 
-      GROUP BY prioridad
+      SELECT prioridad, COUNT(*) as cantidad FROM pedidos WHERE fecha_agendada BETWEEN ? AND ? GROUP BY prioridad
     `, fechas);
 
-    // Unir resultados
     res.json({
-      kpis: {
-        total_pedidos: kpisHeader[0].total_pedidos,
-        total_valor: kpisHeader[0].total_valor, 
-        total_peso: kpisDetalle[0].total_peso
-      },
-      bodegas: bodegasObj,
-      destinos,
-      prioridad
+      kpis: { total_pedidos: kpisHeader[0].total_pedidos, total_valor: kpisHeader[0].total_valor, total_peso: kpisDetalle[0].total_peso },
+      bodegas: bodegasObj, destinos, prioridad
     });
 
   } catch (error) {
-    console.error("Error en Dashboard:", error);
     res.status(500).json({ error: "Error calculando estadísticas" });
   }
 };
 
-// --- 4. OBTENER UN PEDIDO POR ID (Para editar) ---
+// --- 4. OBTENER UN PEDIDO POR ID ---
 const obtenerPedidoPorId = async (req, res) => {
   const { id } = req.params;
   try {
-    // ACTUALIZADO: Traer el texto del tipo_documento para que React lo entienda
     const sqlHeader = `
       SELECT p.*, td.nombre as tipo_documento, c.nombre as nombre_cliente, c.telefono, d.nombre as destino_nombre, z.nombre as zona_nombre
       FROM pedidos p
@@ -237,14 +209,12 @@ const obtenerPedidoPorId = async (req, res) => {
     
     if (header.length === 0) return res.status(404).json({ error: "Pedido no encontrado" });
 
-    // 2. Datos de los pesos
     const [detalles] = await db.query("SELECT bodega_id, peso FROM pedidos_detalle WHERE pedido_id = ?", [id]);
 
     const pedido = header[0];
     pedido.destino = pedido.destino_nombre; 
     pedido.zona_envio = pedido.zona_nombre;
 
-    // Mapear pesos (peso_b1... peso_b8)
     for (let i = 1; i <= 8; i++) {
       const det = detalles.find(d => d.bodega_id === i);
       pedido[`peso_b${i}`] = det ? det.peso : 0;
@@ -262,38 +232,35 @@ const actualizarPedido = async (req, res) => {
   const data = req.body;
 
   try {
-    // 1. GESTIÓN DEL DESTINO
+    // 👇 CANDADO 3: VALIDAR FACTURA DUPLICADA AL EDITAR 👇
+    const [facturaExiste] = await db.query("SELECT id FROM pedidos WHERE id_factura = ? AND id != ?", [data.id_factura, id]);
+    if (facturaExiste.length > 0) {
+      return res.status(400).json({ error: `La factura '${data.id_factura}' ya pertenece a otro pedido.` });
+    }
+
     let destinoId = data.destino_id;
     if (!destinoId && data.destino) {
       const [destinos] = await db.query("SELECT id FROM destinos WHERE nombre = ?", [data.destino]);
       if (destinos.length > 0) destinoId = destinos[0].id;
     }
 
-    // 2. GESTIÓN DEL CLIENTE
     let cliente_id = data.cliente_id; 
-    
     if (data.nombre_cliente) {
       let [clientes] = await db.query("SELECT id FROM clientes WHERE nombre = ?", [data.nombre_cliente]);
-      
       if (clientes.length > 0) {
         cliente_id = clientes[0].id;
       } else {
-        const [resC] = await db.query(
-          "INSERT INTO clientes (nombre, telefono) VALUES (?, ?)",
-          [data.nombre_cliente, data.telefono || 'Sin telefono']
-        );
+        const [resC] = await db.query("INSERT INTO clientes (nombre, telefono) VALUES (?, ?)", [data.nombre_cliente, data.telefono || 'Sin telefono']);
         cliente_id = resC.insertId;
       }
     }
 
-    // 3. OBTENER ID DEL TIPO DE DOCUMENTO (NUEVO)
     let tipoDocId = 1; 
     if (data.tipo_documento) {
       const [tipos] = await db.query("SELECT id FROM tipos_documento WHERE nombre = ?", [data.tipo_documento]);
       if (tipos.length > 0) tipoDocId = tipos[0].id;
     }
 
-    // 4. ACTUALIZAR EL PEDIDO (Cambios en columnas)
     const sql = `
       UPDATE pedidos SET 
         id_factura=?, tipo_documento_id=?, prioridad=?, 
@@ -310,7 +277,6 @@ const actualizarPedido = async (req, res) => {
       destinoId, cliente_id, id
     ]);
 
-    // 5. Actualizar Pesos: Borrar viejos e insertar nuevos
     await db.query("DELETE FROM pedidos_detalle WHERE pedido_id = ?", [id]);
 
     for (let i = 1; i <= 8; i++) {
@@ -342,10 +308,5 @@ const eliminarPedido = async (req, res) => {
 
 // --- EXPORTAR TODO ---
 module.exports = { 
-  crearPedido, 
-  listarPedidosRango, 
-  obtenerDashboard, 
-  obtenerPedidoPorId, 
-  actualizarPedido, 
-  eliminarPedido 
+  crearPedido, listarPedidosRango, obtenerDashboard, obtenerPedidoPorId, actualizarPedido, eliminarPedido 
 };

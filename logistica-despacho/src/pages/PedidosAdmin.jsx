@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   Save, Truck, FileText, Calendar, User, Weight, MapPin, Search, 
   ChevronDown, ChevronUp, PlusCircle, DollarSign, Phone, X, CheckCircle, 
-  Edit, Trash2, RefreshCw, AlertTriangle, Lock, Eye, XCircle, UserPlus, CreditCard 
+  Edit, Trash2, RefreshCw, AlertTriangle, Lock, Eye, XCircle, UserPlus, CreditCard,
+  Printer 
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 
 const PedidosAdmin = () => {
@@ -23,6 +26,9 @@ const PedidosAdmin = () => {
   const [listaZonas, setListaZonas] = useState([]);
   const [listaDestinos, setListaDestinos] = useState([]);
   const [listaTiposDoc, setListaTiposDoc] = useState([]);
+  
+  const [listaConductores, setListaConductores] = useState([]);
+  const [listaVehiculos, setListaVehiculos] = useState([]);
 
   const initialFormState = {
     id_factura: '', tipo_documento: 'Factura', prioridad: 'Media',
@@ -46,18 +52,28 @@ const PedidosAdmin = () => {
   useEffect(() => {
     const fetchCatalogos = async () => {
       try {
-        const [resC, resZ, resD, resT] = await Promise.all([
+        const [resC, resZ, resD, resT, resCond, resVeh] = await Promise.all([
           fetch(`${import.meta.env.VITE_API_URL}/api/clientes`),
           fetch(`${import.meta.env.VITE_API_URL}/api/zonas`),
           fetch(`${import.meta.env.VITE_API_URL}/api/destinos`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento`) 
+          fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/logistica/conductores`).catch(() => ({ ok: false })),
+          fetch(`${import.meta.env.VITE_API_URL}/api/logistica/vehiculos`).catch(() => ({ ok: false }))
         ]);
-        setListaClientes(await resC.json());
-        setListaZonas(await resZ.json());
-        setListaDestinos(await resD.json());
-        const tipos = await resT.json();
-        setListaTiposDoc(tipos);
-        if (tipos.length > 0) setFormData(prev => ({ ...prev, tipo_documento: tipos[0].nombre }));
+        
+        if (resC.ok) setListaClientes(await resC.json());
+        if (resZ.ok) setListaZonas(await resZ.json());
+        if (resD.ok) setListaDestinos(await resD.json());
+        
+        if (resT.ok) {
+          const tipos = await resT.json();
+          setListaTiposDoc(tipos);
+          if (tipos.length > 0) setFormData(prev => ({ ...prev, tipo_documento: tipos[0].nombre }));
+        }
+        
+        if (resCond && resCond.ok) setListaConductores(await resCond.json());
+        if (resVeh && resVeh.ok) setListaVehiculos(await resVeh.json());
+
       } catch (error) { console.error(error); }
     };
     fetchCatalogos();
@@ -99,6 +115,16 @@ const PedidosAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isReadOnly) return;
+
+    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) {
+      return alert("❌ Debes ingresar un Valor de Factura válido (No puede estar vacío ni ser negativo).");
+    }
+
+    const totalPeso = [1, 2, 3, 4, 5, 6, 7, 8].reduce((acc, num) => acc + Number(formData[`peso_b${num}`] || 0), 0);
+    if (totalPeso <= 0) {
+      return alert("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega para poder despachar.");
+    }
+
     const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
     const method = editingId ? 'PUT' : 'POST';
     try {
@@ -155,12 +181,135 @@ const PedidosAdmin = () => {
     } catch (error) { alert("Error al cargar datos"); }
   };
 
-  const handleDelete = async (pedidoId) => {
-    if (!window.confirm("¿ELIMINAR este pedido?")) return;
+  // 👇 NUEVA LÓGICA DE ELIMINACIÓN TIPO "GOD MODE" 👇
+  const handleDelete = async (pedidoFila) => {
+    const estaBloqueado = ['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedidoFila.estado_entrega);
+    
+    let mensaje = `¿Estás seguro de ELIMINAR el pedido ${pedidoFila.id_factura}?`;
+    
+    if (estaBloqueado) {
+      mensaje = `⚠️ ADVERTENCIA DE ADMINISTRADOR ⚠️\n\nEl pedido ${pedidoFila.id_factura} está en estado "${pedidoFila.estado_entrega}". Normalmente no se debería borrar.\n\n¿Estás seguro de forzar la eliminación por mantenimiento?`;
+    }
+
+    if (!window.confirm(mensaje)) return;
+    
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoId}`, { method: 'DELETE' });
-      if (res.ok) { alert("🗑️ Eliminado"); fetchPedidos(); } 
-    } catch (error) { console.error(error); }
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoFila.id}`, { method: 'DELETE' });
+      if (res.ok) { 
+        alert("🗑️ Pedido eliminado correctamente."); 
+        fetchPedidos(); 
+      } else {
+        const errorData = await res.json();
+        alert(`❌ Error al eliminar: ${errorData.error || 'Desconocido'}`);
+      }
+    } catch (error) { 
+      console.error(error); 
+      alert("Error de conexión al intentar eliminar el pedido.");
+    }
+  };
+
+  const generarComprobantePDF = async (pedidoFila) => {
+    try {
+      const timestamp = new Date().getTime();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoFila.id}?_t=${timestamp}`);
+      if (!res.ok) throw new Error("No se pudo cargar el pedido");
+      
+      const fetchExtraData = await res.json();
+      const data = { ...fetchExtraData, ...pedidoFila };
+
+      const doc = new jsPDF();
+      
+      doc.setFillColor(71, 179, 168); 
+      doc.rect(0, 0, 210, 30, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("COMPROBANTE DE ENTREGA Y CARGA", 105, 18, { align: 'center' });
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(12);
+      doc.text(`Documento / Factura: ${data.id_factura}`, 14, 45);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Fecha Agendada: ${data.fecha_agendada || 'N/A'}`, 14, 52);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Estado Actual: ${data.estado_entrega}`, 14, 59);
+
+      autoTable(doc, {
+          startY: 65,
+          head: [['Datos del Cliente', 'Ubicación']],
+          body: [
+              [`Nombre: ${data.nombre_cliente}\nTeléfono: ${data.telefono || 'N/A'}`, `Destino: ${data.destino}\nZona: ${data.zona_envio || 'N/A'}`]
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: [71, 179, 168] }
+      });
+
+      const bodegas = [];
+      let pesoTotalCalculado = 0;
+
+      for(let i=1; i<=8; i++) {
+          const pesoBodega = Number(data[`peso_b${i}`] || 0);
+          if(pesoBodega > 0) {
+              bodegas.push([`Bodega ${i}`, `${pesoBodega} Kg`]);
+              pesoTotalCalculado += pesoBodega;
+          }
+      }
+      
+      const pesoFinal = (data.total_peso && data.total_peso !== "undefined") ? data.total_peso : pesoTotalCalculado;
+      bodegas.push(['PESO TOTAL', `${pesoFinal} Kg`]);
+
+      bodegas.push(['VALOR FACTURA', `$${Number(data.valor_factura || 0).toLocaleString('es-CO')}`]);
+      if (data.total_despachado) {
+          bodegas.push(['VALOR DESPACHADO', `$${Number(data.total_despachado).toLocaleString('es-CO')}`]);
+      }
+
+      autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 10,
+          head: [['Detalle de Carga', 'Valores']],
+          body: bodegas,
+          theme: 'grid',
+          headStyles: { fillColor: [50, 50, 50] }
+      });
+
+      const conductorObj = listaConductores.find(c => String(c.id) === String(data.conductor_id));
+      const vehiculoObj = listaVehiculos.find(v => String(v.id) === String(data.vehiculo_id));
+
+      const nombreConductor = data.conductor_nombre || data.conductor || (conductorObj ? conductorObj.nombre : 'Sin asignar');
+      const placaVehiculo = data.vehiculo_placa || data.placa || (vehiculoObj ? vehiculoObj.placa : 'Sin asignar');
+
+      autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 10,
+          head: [['Conductor', 'Placa Vehículo', 'Observaciones de Entrega']],
+          body: [
+              [nombreConductor, placaVehiculo, data.observaciones_entrega || data.nota_manual || 'Ninguna']
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: [50, 50, 50] }
+      });
+
+      const finalY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Firma de Recibido:", 14, finalY);
+      
+      if (data.firma_cliente) {
+          doc.addImage(data.firma_cliente, 'PNG', 14, finalY + 5, 80, 40);
+          doc.setDrawColor(200, 200, 200);
+          doc.rect(14, finalY + 5, 80, 40);
+      } else {
+          doc.setDrawColor(200, 200, 200);
+          doc.rect(14, finalY + 5, 80, 40);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(150, 150, 150);
+          doc.text("Sin firma registrada", 30, finalY + 25);
+      }
+
+      doc.save(`Comprobante_${data.id_factura}.pdf`);
+
+    } catch (error) {
+      console.error("Error generando PDF", error);
+      alert("Error al generar el comprobante. Intenta de nuevo.");
+    }
   };
 
   const resetForm = () => {
@@ -211,13 +360,12 @@ const PedidosAdmin = () => {
               <div className="space-y-3 md:space-y-4">
                 <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                  {/* AJUSTE DE PADDING: py-2.5 md:py-2 px-3 para inputs normales sin icono */}
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" required /></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white"/></div>
+                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor *</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} required min="0" className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white placeholder:text-slate-300" placeholder="Ej: 150000"/></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Fac.</label><input type="date" name="fecha_facturacion" value={formData.fecha_facturacion} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Hora Registro</label><input type="time" name="hora_registro" value={formData.hora_registro} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
+                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Hora Registro Entrega</label><input type="time" name="hora_registro" value={formData.hora_registro} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Promesa</label><input type="date" name="fecha_promesa" value={formData.fecha_promesa} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
                   <div><label className="text-[10px] md:text-xs font-bold text-blue-600 uppercase">Fecha Agendada</label><input type="date" name="fecha_agendada" value={formData.fecha_agendada} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded border-blue-200 bg-blue-50 focus:ring-blue-500 disabled:bg-slate-100" /></div>
                 </div>
@@ -231,7 +379,6 @@ const PedidosAdmin = () => {
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Cliente</label>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <div className="relative flex-1">
-                        {/* ARREGLO DEL DISEÑO: pr-3 pl-8 garantiza que el texto respete el espacio del icono */}
                         <input type="text" name="nombre_cliente" value={formData.nombre_cliente} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" placeholder="Buscar o crear..." required />
                         <User size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                       </div>
@@ -241,7 +388,6 @@ const PedidosAdmin = () => {
                   <div>
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Teléfono</label>
                     <div className="relative">
-                      {/* ARREGLO DEL DISEÑO: pr-3 pl-8 */}
                       <input type="text" name="telefono" value={formData.telefono} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white"/>
                       <Phone size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                     </div>
@@ -250,7 +396,6 @@ const PedidosAdmin = () => {
                   <div className="sm:col-span-2">
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Destino</label>
                     <div className="relative">
-                      {/* ARREGLO DEL DISEÑO: pr-3 pl-8 */}
                       <select name="destino_id" value={formData.destino_id} onChange={handleDestinoChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100" required><option value="">-- Seleccione --</option>{listaDestinos.map(d => (<option key={d.id} value={d.id}>{d.nombre} {d.zona_nombre ? `(${d.zona_nombre})` : ''}</option>))}</select>
                       <MapPin size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                     </div>
@@ -344,13 +489,25 @@ const PedidosAdmin = () => {
                           <td className="p-3 md:p-4 align-middle text-center">
                             <div className="flex justify-center gap-1.5 md:gap-2">
                               {estaBloqueado ? (
-                                <button onClick={() => handleEdit(p.id)} className="flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-1.5 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-lg text-[10px] md:text-xs font-bold transition-colors">
-                                  <Eye size={12} className="md:w-[14px] md:h-[14px]" /> Ver
-                                </button>
+                                <>
+                                  <button onClick={() => handleEdit(p.id)} className="flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-1.5 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded-lg text-[10px] md:text-xs font-bold transition-colors">
+                                    <Eye size={12} className="md:w-[14px] md:h-[14px]" /> Ver
+                                  </button>
+                                  <button onClick={() => generarComprobantePDF(p)} className="flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-1.5 bg-teal-100 text-teal-700 hover:bg-teal-200 rounded-lg text-[10px] md:text-xs font-bold transition-colors" title="Descargar Comanda">
+                                    <Printer size={12} className="md:w-[14px] md:h-[14px]" /> PDF
+                                  </button>
+                                  {/* 👇 BOTÓN ELIMINAR PARA ADMIN (SIEMPRE VISIBLE) 👇 */}
+                                  <button onClick={() => handleDelete(p)} className="p-1.5 md:p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors" title="Eliminar (Modo Admin)">
+                                    <Trash2 size={14} className="md:w-[16px] md:h-[16px]" />
+                                  </button>
+                                </>
                               ) : (
                                 <>
                                   <button onClick={() => handleEdit(p.id)} className="p-1.5 md:p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-colors"><Edit size={14} className="md:w-[16px] md:h-[16px]" /></button>
-                                  <button onClick={() => handleDelete(p.id)} className="p-1.5 md:p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors"><Trash2 size={14} className="md:w-[16px] md:h-[16px]" /></button>
+                                  <button onClick={() => handleDelete(p)} className="p-1.5 md:p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors" title="Eliminar"><Trash2 size={14} className="md:w-[16px] md:h-[16px]" /></button>
+                                  <button onClick={() => generarComprobantePDF(p)} className="p-1.5 md:p-2 bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white rounded-lg transition-colors" title="Descargar Comanda">
+                                    <Printer size={14} className="md:w-[16px] md:h-[16px]" />
+                                  </button>
                                 </>
                               )}
                             </div>
