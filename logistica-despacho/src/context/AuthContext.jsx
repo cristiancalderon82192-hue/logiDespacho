@@ -3,27 +3,31 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // CORRECCIÓN PRO: Inicializamos el estado directamente del localStorage
+  // Esto evita que el usuario sea 'null' un instante y te saque al login al dar F5
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('userData');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
-  // 1. Al cargar la página, buscamos si hay sesión guardada
+  // Mantenemos este useEffect como respaldo para sincronizar cambios
   useEffect(() => {
     const storedUser = localStorage.getItem('userData');
-    if (storedUser) {
+    if (storedUser && !user) {
       setUser(JSON.parse(storedUser));
     }
-  }, []);
+  }, [user]);
 
-  // 2. Función LOGIN (Simulada o Real)
   const login = (userData) => {
     setUser(userData);
-    localStorage.setItem('userData', JSON.stringify(userData)); // Guardamos sesión
+    localStorage.setItem('userData', JSON.stringify(userData));
   };
 
-  // 3. Función LOGOUT (LA QUE FALTABA)
   const logout = () => {
-    setUser(null); // Borramos usuario de la memoria
-    localStorage.removeItem('userData'); // Borramos usuario del navegador
-    window.location.href = '/'; // Forzamos la recarga hacia el Login
+    setUser(null);
+    localStorage.removeItem('userData');
+    // Usamos replace para que no puedan volver atrás con el botón del navegador
+    window.location.replace('/');
   };
 
   return (
