@@ -5,7 +5,7 @@ import {
   Mail, Lock, ArrowRight, Loader2, Truck, Box, BarChart3, 
   User, Building, Phone, ArrowLeft, Send, CheckCircle2, Package
 } from 'lucide-react';
-import logoCliente from '../assets/logo_it_verde.png'; 
+import logoCliente from '../assets/logoitsoluciones.png'; 
 
 const Login = () => {
   const { login } = useAuth();
