@@ -95,22 +95,65 @@ El sistema maneja múltiples roles de usuario con vistas y permisos diferenciado
 ```
 LogiDespacho/
 │
-├── client/                     # Frontend React
+├── LOGISTICA-DESPACHO/              # Frontend — React + Vite + Tailwind
 │   ├── public/
-│   └── src/
-│       ├── components/         # Componentes reutilizables
-│       ├── pages/              # Vistas por módulo
-│       └── App.jsx
+│   ├── src/
+│   │   ├── assets/                  # Recursos estáticos
+│   │   │   ├── logoitsoluciones.png
+│   │   │   ├── rodeo.png
+│   │   │   └── rodeo.svg
+│   │   ├── components/              # Componentes reutilizables
+│   │   │   ├── ProtectedRoute.jsx   # Guard de rutas por rol
+│   │   │   └── Sidebar.jsx          # Navegación lateral
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx      # Estado global de autenticación (JWT)
+│   │   └── pages/                   # Vistas por módulo
+│   │       ├── Login.jsx
+│   │       ├── AdminDashboard.jsx
+│   │       ├── PedidosAdmin.jsx
+│   │       ├── PedidosLider.jsx
+│   │       ├── AsignacionLogistica.jsx
+│   │       ├── DashboardLogistica.jsx
+│   │       ├── DashboardLider.jsx
+│   │       ├── DashboardConductor.jsx
+│   │       ├── RutaConductor.jsx
+│   │       ├── RegisterUser.jsx
+│   │       ├── Bodegas.jsx
+│   │       ├── Clientes.jsx
+│   │       ├── Destinos.jsx
+│   │       ├── Zonas.jsx
+│   │       ├── TiposDocumentos.jsx
+│   │       ├── Flota.jsx
+│   │       ├── ReporteProductividad.jsx
+│   │       ├── ReporteFlota.jsx
+│   │       ├── ReportePerfectos.jsx
+│   │       ├── ReporteEfectividad.jsx
+│   │       ├── ReporteFinanciero.jsx
+│   │       ├── ReporteParciales.jsx
+│   │       └── ReporteLeadTime.jsx
+│   ├── App.jsx
+│   ├── App.css
+│   ├── index.html
+│   ├── index.css
+│   ├── main.jsx
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   ├── vite.config.js
+│   ├── eslint.config.js
+│   ├── vercel.json
+│   ├── .env
+│   ├── .gitignore
+│   └── package.json
 │
-└── server/                     # Backend Node.js + Express
-    ├── controllers/            # Lógica de negocio por módulo
+└── SERVER/                          # Backend — Node.js + Express
+    ├── controllers/                 # Lógica de negocio por módulo
     │   ├── authController.js
     │   ├── usuariosController.js
     │   ├── pedidosController.js
+    │   ├── pedidosLiderController.js
     │   ├── logisticaController.js
     │   ├── conductorController.js
     │   ├── liderController.js
-    │   ├── pedidosLiderController.js
     │   ├── clientesController.js
     │   ├── vehiculosController.js
     │   ├── bodegasController.js
@@ -122,12 +165,31 @@ LogiDespacho/
     │   ├── perfectosController.js
     │   ├── efectividadController.js
     │   └── financieroController.js
-    ├── routes/                 # Definición de rutas Express
-    ├── middleware/             # Autenticación JWT
-    ├── db.js                   # Conexión a MySQL
-    ├── swagger.js              # Configuración Swagger UI
-    ├── swagger.yaml            # Especificación OpenAPI 3.0
-    └── index.js                # Punto de entrada del servidor
+    ├── routes/                      # Definición de rutas Express
+    │   ├── authRoutes.js
+    │   ├── usuariosRoutes.js
+    │   ├── pedidosRoutes.js
+    │   ├── pedidosLiderRoutes.js
+    │   ├── logisticaRoutes.js
+    │   ├── conductorRoutes.js
+    │   ├── liderRoutes.js
+    │   ├── clientesRoutes.js
+    │   ├── vehiculosRoutes.js
+    │   ├── bodegasRoutes.js
+    │   ├── zonasRoutes.js
+    │   ├── destinosRoutes.js
+    │   ├── tiposDocumentoRoutes.js
+    │   ├── flotaRoutes.js
+    │   ├── productividadRoutes.js
+    │   ├── perfectosRoutes.js
+    │   ├── efectividadRoutes.js
+    │   └── financieroRoutes.js
+    ├── db.js                        # Conexión al pool de MySQL
+    ├── index.js                     # Punto de entrada del servidor
+    ├── swagger.js                   # Configuración Swagger UI
+    ├── swagger.yaml                 # Especificación OpenAPI 3.0
+    ├── .env
+    └── package.json
 ```
 
 ---
