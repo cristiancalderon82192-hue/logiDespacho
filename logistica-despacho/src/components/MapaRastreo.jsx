@@ -7,49 +7,36 @@ import { socket } from '../utils/socket';
 import { Truck } from 'lucide-react';
 
 // =====================================================================
-// 👇 NUEVO: DISEÑO DEL CAMIÓN PERSONALIZADO PARA EL MAPA 👇
+// 🚚 CREACIÓN DEL ICONO DE CAMIÓN (Cero pines azules)
 // =====================================================================
 const truckIconHTML = `
   <div style="
-    background-color: #47B3A8; 
-    width: 38px; 
-    height: 38px; 
+    background-color: #0f172a; /* Fondo oscuro elegante (slate-900) */
+    width: 44px; 
+    height: 44px; 
     border-radius: 50%; 
-    border: 3px solid white; 
-    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    border: 3px solid #47B3A8; /* Tu verde corporativo */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     display: flex; 
     align-items: center; 
     justify-content: center;
-    position: relative;
   ">
-    <!-- SVG del camión dibujado en blanco -->
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#47B3A8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <rect x="1" y="3" width="15" height="13"></rect>
       <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
       <circle cx="5.5" cy="18.5" r="2.5"></circle>
       <circle cx="18.5" cy="18.5" r="2.5"></circle>
     </svg>
-    <!-- Pequeño triángulo abajo para hacer efecto de "Pin" -->
-    <div style="
-      position: absolute;
-      bottom: -6px;
-      left: 14px;
-      width: 0; 
-      height: 0; 
-      border-left: 5px solid transparent;
-      border-right: 5px solid transparent;
-      border-top: 6px solid white;
-    "></div>
   </div>
 `;
 
-// Registramos el ícono en Leaflet
+// Registramos el ícono y le quitamos las clases por defecto de Leaflet
 const truckIcon = L.divIcon({
   html: truckIconHTML,
-  className: 'custom-leaflet-truck', // Anula el cuadro blanco por defecto de Leaflet
-  iconSize: [38, 44],
-  iconAnchor: [19, 44], // El ancla es la punta del pin
-  popupAnchor: [0, -44] // El cuadro de texto sale arriba del camión
+  className: '', // <-- Esto es vital, anula el cuadro blanco y el pin azul de Leaflet
+  iconSize: [44, 44],
+  iconAnchor: [22, 22], // El centro exacto del círculo
+  popupAnchor: [0, -25] // El letrero del nombre sale arriba
 });
 // =====================================================================
 
@@ -87,7 +74,6 @@ const MapaRastreo = () => {
     };
   }, [user]);
 
-  // Coordenadas centrales de Apartadó
   const centroUrabá = [7.88299, -76.62587];
 
   return (
@@ -109,7 +95,7 @@ const MapaRastreo = () => {
             attribution='&copy; OpenStreetMap contributors'
           />
           {Object.values(vehiculos).map((vehiculo) => (
-            // 👇 Le aplicamos nuestro icon={truckIcon} al Marker 👇
+            // APLICAMOS NUESTRO ICONO AL MARCADOR
             <Marker key={vehiculo.id_conductor} position={[vehiculo.lat, vehiculo.lng]} icon={truckIcon}>
               <Popup>
                 <div className="text-center">
