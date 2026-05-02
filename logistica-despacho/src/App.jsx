@@ -22,7 +22,10 @@ import ReporteFinanciero from './pages/ReporteFinanciero';
 import ReporteEfectividad from './pages/ReporteEfectividad';
 import ReporteFlota from './pages/ReporteFlota';
 import ReportePerfectos from './pages/ReportePerfectos';
-import ReporteLeadTime from './pages/ReporteLeadTime'; // 👇 NUEVA IMPORTACIÓN DE LEAD TIME 👇
+import ReporteLeadTime from './pages/ReporteLeadTime'; 
+
+// 👇 NUEVA IMPORTACIÓN DE LA VISTA DEL MAPA 👇
+import UbicacionFlota from './pages/UbicacionFlota';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar'; 
@@ -80,33 +83,29 @@ export default function App() {
           <Route path="/bodegas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Bodegas /></MainLayout></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Clientes /></MainLayout></ProtectedRoute>} />
 
+          {/* RUTAS DE OPERACIONES (LOGÍSTICA Y MAPAS) */}
+          <Route path="/dashboard-logistica" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><DashboardLogistica /></MainLayout></ProtectedRoute>} />
+          <Route path="/logistica-asignacion" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><AsignacionLogistica /></MainLayout></ProtectedRoute>} />
+          <Route path="/logistica-parciales" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><ReporteParciales /></MainLayout></ProtectedRoute>} />
+          
+          {/* 👇 NUEVA RUTA PARA EL MAPA (Solo Admin y Logística) 👇 */}
+          <Route path="/ubicacion-vivo" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><UbicacionFlota /></MainLayout></ProtectedRoute>} />
+
           {/* RUTAS DE REPORTES */}
           <Route path="/reportes/productividad" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteProductividad /></MainLayout></ProtectedRoute>} />
           <Route path="/reportes/financiero" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteFinanciero /></MainLayout></ProtectedRoute>} />
           <Route path="/reportes/efectividad" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteEfectividad /></MainLayout></ProtectedRoute>} />
           <Route path="/reportes/flota" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteFlota /></MainLayout></ProtectedRoute>} />
           <Route path="/reportes/perfectos" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReportePerfectos /></MainLayout></ProtectedRoute>} />
-          
-          {/* 👇 NUEVA RUTA DE LEAD TIME 👇 */}
           <Route path="/reportes/leadtime" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteLeadTime /></MainLayout></ProtectedRoute>} />
           
           {/* RUTAS DEL LÍDER DE SALA */}
           <Route path="/dashboard-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2]}><MainLayout><DashboardLider /></MainLayout></ProtectedRoute>} />
           <Route path="/pedidos-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2, 'logistica', '3', 3]}><MainLayout><PedidosLider /></MainLayout></ProtectedRoute>} />
           
-          {/* RUTAS DE LOGÍSTICA */}
-          <Route path="/dashboard-logistica" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><DashboardLogistica /></MainLayout></ProtectedRoute>} />
-          <Route path="/logistica-asignacion" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><AsignacionLogistica /></MainLayout></ProtectedRoute>} />
-          <Route path="/logistica-parciales" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><ReporteParciales /></MainLayout></ProtectedRoute>} />
-
           {/* RUTAS DEL CONDUCTOR */}
-          <Route path="/conductor-home" element={
-            <ProtectedRoute allowedRoles={['conductor', '4', 4]}>
-              <DashboardConductor />
-            </ProtectedRoute>
-          } />
+          <Route path="/conductor-home" element={<ProtectedRoute allowedRoles={['conductor', '4', 4]}><DashboardConductor /></ProtectedRoute>} />
 
-          {/* Ruta 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const http = require('http'); // <-- NUEVO: Importación nativa de Node para servidores HTTP
+const { Server } = require('socket.io'); // <-- NUEVO: Importación de WebSockets
 
 // === IMPORTACIÓN DE TODAS LAS RUTAS ===
 // (Asegúrate de que los nombres de los archivos en tu carpeta 'routes' coincidan con estos)
@@ -48,6 +50,57 @@ app.use('/api/reportes/efectividad', require('./routes/efectividadRoutes'));
 app.use('/api/reportes/flota', require('./routes/flotaRoutes'));
 app.use('/api/reportes/perfectos', require('./routes/perfectosRoutes'));
 
-// 4. INICIO DEL SERVIDOR
+// ==============================================================
+// 4. CONFIGURACIÓN DE WEBSOCKETS (GPS EN TIEMPO REAL)
+// ==============================================================
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*", 
+    methods: ["GET", "POST"]
+  }
+});
+
+// Memoria RAM del servidor para guardar el último GPS de cada conductor
+const ultimasUbicaciones = {};
+
+io.on('connection', (socket) => {
+  console.log('🟢 Nuevo dispositivo conectado al Socket:', socket.id);
+
+  socket.on('registrar_usuario', (datosUsuario) => {
+    if (datosUsuario.role === 'admin' || datosUsuario.role === 'logistica') {
+      socket.join('sala_monitores');
+      console.log(`👁️ Monitoreo Activo: Usuario (${datosUsuario.role}) se unió a sala_monitores`);
+      
+      // Apenas el monitor entra, le mandamos la "foto actual" de todos los carros en memoria
+      socket.emit('ubicaciones_iniciales', Object.values(ultimasUbicaciones));
+      
+    } else if (datosUsuario.role === 'conductor') {
+      console.log(`🚗 Conductor en ruta conectado: ${socket.id}`);
+    }
+  });
+
+  socket.on('enviar_ubicacion', (datosGPS) => {
+    // 1. Actualizamos la posición en la memoria del servidor
+    ultimasUbicaciones[datosGPS.id_conductor] = datosGPS;
+
+    // 👇 2. NUEVO: Imprimimos en la terminal del backend cada vez que llega un reporte
+    console.log(`⏱️ [${new Date().toLocaleTimeString()}] GPS recibido de ${datosGPS.nombre}: Lat ${datosGPS.lat}, Lng ${datosGPS.lng}`);
+
+    // 3. Rebotamos la info a la sala de monitores
+    socket.to('sala_monitores').emit('actualizacion_gps', datosGPS);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔴 Dispositivo desconectado:', socket.id);
+  });
+});
+
+// ==============================================================
+// 5. INICIO DEL SERVIDOR 
+// ==============================================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log(`Servidor corriendo en puerto ${PORT}`); });
+server.listen(PORT, () => { 
+  console.log(`🚀 Servidor API y WebSockets corriendo en puerto ${PORT}`); 
+});

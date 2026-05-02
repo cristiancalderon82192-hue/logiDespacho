@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, UserPlus, Truck, LogOut, 
   Building2, UsersRound, Map, MapPin, FileStack, AlertCircle, Menu, X,
-  DollarSign, BarChart2, CheckCircle, Clock // 👇 Importé el ícono Clock
+  DollarSign, BarChart2, CheckCircle, Clock 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
@@ -35,6 +35,10 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/dashboard-logistica', icon: LayoutDashboard, label: 'Dashboard', roles: ['logistica'] },
     { path: currentRole === 'admin' ? '/pedidos-admin' : '/pedidos-lider', icon: Package, label: 'Pedidos', roles: ['admin', 'lider_sala', 'logistica'] },
     { path: '/logistica-asignacion', icon: Truck, label: 'Asignar Rutas', roles: ['logistica'] },
+    
+    // 👇 OPCIÓN: MAPA EN TIEMPO REAL (ADMIN Y LOGÍSTICA) 👇
+    { path: '/ubicacion-vivo', icon: Map, label: 'GPS en Vivo', roles: ['admin', 'logistica'] },
+    
     { path: '/clientes', icon: UsersRound, label: 'Clientes', roles: ['admin'] },
     { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] },
     { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'] }
@@ -42,7 +46,6 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
   const reportItems = [
     { path: '/reportes/perfectos', icon: CheckCircle, label: 'Pedidos Perfectos', roles: ['admin', 'logistica'] },
-    // 👇 NUEVO BOTÓN DE LEAD TIME 👇
     { path: '/reportes/leadtime', icon: Clock, label: 'Análisis Lead Time', roles: ['admin', 'logistica'] },
     { path: '/reportes/productividad', icon: Truck, label: 'Productividad', roles: ['admin', 'logistica'] },
     { path: '/reportes/financiero', icon: DollarSign, label: 'Financiero y Saldos', roles: ['admin', 'logistica'] },

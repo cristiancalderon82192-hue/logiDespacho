@@ -4,6 +4,9 @@ import SignatureCanvas from 'react-signature-canvas';
 import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 
+// 👇 NUEVO: Importamos el socket que creamos en el paso anterior 👇
+import { socket } from '../utils/socket'; 
+
 const DashboardConductor = () => {
   const { user, logout } = useAuth();
 
@@ -27,6 +30,69 @@ const DashboardConductor = () => {
   const [showModalFirma, setShowModalFirma] = useState(false);
   const [pedidoFirma, setPedidoFirma] = useState(null);
   const sigCanvas = useRef({});
+
+  // =========================================================================
+  // 📍 NUEVO: LÓGICA DE RASTREO GPS FORZADO CADA 5 SEGUNDOS
+  // =========================================================================
+  // Usamos una referencia para guardar la posición en silencio sin recargar la pantalla
+  const ultimaPosicionRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Registramos al conductor en el servidor
+    socket.emit('registrar_usuario', { 
+      id: user.id_usuario, 
+      email: user.email, 
+      role: user.role 
+    });
+
+    let watchId;
+    let intervalId;
+    
+    if ("geolocation" in navigator) {
+      // 2. El GPS lee la ubicación en tiempo real y la guarda silenciosamente en la referencia
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          ultimaPosicionRef.current = position;
+        },
+        (error) => {
+          console.error("❌ Error obteniendo GPS:", error.message);
+        },
+        {
+          enableHighAccuracy: true, 
+          maximumAge: 0
+        }
+      );
+
+      // 3. EL RELOJ: Cada 5000 milisegundos (5 segundos), toma la última posición y la dispara
+      intervalId = setInterval(() => {
+        if (ultimaPosicionRef.current) {
+          const datosGPS = {
+            id_conductor: user.id_usuario,
+            nombre: user.nombre_completo || user.email, 
+            lat: ultimaPosicionRef.current.coords.latitude,
+            lng: ultimaPosicionRef.current.coords.longitude,
+            timestamp: new Date().toISOString()
+          };
+          
+          socket.emit('enviar_ubicacion', datosGPS);
+          console.log("⏱️ Ping GPS enviado (5s):", datosGPS.lat, datosGPS.lng);
+        }
+      }, 5000);
+
+    } else {
+      console.log("⚠️ El navegador de este celular no soporta GPS.");
+    }
+
+    // 4. Apagamos el GPS y el Reloj si el conductor sale de la app
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (intervalId) clearInterval(intervalId);
+      console.log("🛑 Rastreo GPS detenido.");
+    };
+  }, [user]);
+  // =========================================================================
 
   const fetchRutas = async (mostrarCarga = true) => {
     if (!user) return;
