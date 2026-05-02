@@ -4,7 +4,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 
-// 👇 NUEVO: Importamos el socket que creamos en el paso anterior 👇
+// Importamos el socket
 import { socket } from '../utils/socket'; 
 
 const DashboardConductor = () => {
@@ -32,17 +32,19 @@ const DashboardConductor = () => {
   const sigCanvas = useRef({});
 
   // =========================================================================
-  // 📍 NUEVO: LÓGICA DE RASTREO GPS FORZADO CADA 5 SEGUNDOS
+  // 📍 LÓGICA DE RASTREO GPS BLINDADA (MULTIPLE DISPOSITIVOS)
   // =========================================================================
-  // Usamos una referencia para guardar la posición en silencio sin recargar la pantalla
   const ultimaPosicionRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
 
+    // 👇 BLINDAJE: Garantizamos que cada conductor tenga un identificador único real
+    const conductorId = user.id || user.id_usuario || user.email;
+
     // 1. Registramos al conductor en el servidor
     socket.emit('registrar_usuario', { 
-      id: user.id_usuario, 
+      id: conductorId, 
       email: user.email, 
       role: user.role 
     });
@@ -51,7 +53,7 @@ const DashboardConductor = () => {
     let intervalId;
     
     if ("geolocation" in navigator) {
-      // 2. El GPS lee la ubicación en tiempo real y la guarda silenciosamente en la referencia
+      // 2. El GPS lee la ubicación en tiempo real
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           ultimaPosicionRef.current = position;
@@ -65,11 +67,11 @@ const DashboardConductor = () => {
         }
       );
 
-      // 3. EL RELOJ: Cada 5000 milisegundos (5 segundos), toma la última posición y la dispara
+      // 3. EL RELOJ: Dispara la ubicación cada 5 segundos
       intervalId = setInterval(() => {
         if (ultimaPosicionRef.current) {
           const datosGPS = {
-            id_conductor: user.id_usuario,
+            id_conductor: conductorId, // Usamos el ID blindado
             nombre: user.nombre_completo || user.email, 
             lat: ultimaPosicionRef.current.coords.latitude,
             lng: ultimaPosicionRef.current.coords.longitude,
@@ -77,7 +79,6 @@ const DashboardConductor = () => {
           };
           
           socket.emit('enviar_ubicacion', datosGPS);
-          console.log("⏱️ Ping GPS enviado (5s):", datosGPS.lat, datosGPS.lng);
         }
       }, 5000);
 
@@ -85,11 +86,9 @@ const DashboardConductor = () => {
       console.log("⚠️ El navegador de este celular no soporta GPS.");
     }
 
-    // 4. Apagamos el GPS y el Reloj si el conductor sale de la app
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
       if (intervalId) clearInterval(intervalId);
-      console.log("🛑 Rastreo GPS detenido.");
     };
   }, [user]);
   // =========================================================================
@@ -99,6 +98,7 @@ const DashboardConductor = () => {
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime();
+      // Usamos el mismo user.id que ya tenías funcionando para las rutas
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}`, {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
@@ -179,7 +179,6 @@ const DashboardConductor = () => {
     let cargaEnCamion = parseFloat(pedidoDevolucion.total_despachado);
     if (isNaN(cargaEnCamion) || cargaEnCamion <= 0) cargaEnCamion = parseFloat(pedidoDevolucion.valor_factura || 0);
     
-    // Convertimos de texto a número puro (quitando puntos, letras, etc.)
     const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
 
     if (valorD <= 0) {
@@ -190,7 +189,6 @@ const DashboardConductor = () => {
       return alert(`Estás devolviendo $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
     }
 
-    // EL CÁLCULO FINAL (MATEMÁTICA PURA Y BLINDADA)
     const valorRecaudado = cargaEnCamion - valorD;
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
@@ -213,7 +211,6 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión."); }
   };
 
-  // UI Modal Math (Limpia el string visualmente)
   let totalModal = parseFloat(pedidoDevolucion?.total_despachado);
   if (isNaN(totalModal) || totalModal <= 0) totalModal = parseFloat(pedidoDevolucion?.valor_factura || 0);
 
@@ -460,7 +457,6 @@ const DashboardConductor = () => {
                 <label className="text-[11px] font-bold text-red-800 uppercase mb-2 block">¿Cuánta plata en mercancía se está devolviendo?</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-red-700 font-bold"><DollarSign size={18}/></span>
-                  {/* CAMBIO VITAL: inputMode="numeric" y auto formateo. No importa lo que el conductor digite, extraeremos números */}
                   <input 
                     type="text" 
                     inputMode="numeric"
