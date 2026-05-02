@@ -6,14 +6,52 @@ import { useAuth } from '../context/AuthContext';
 import { socket } from '../utils/socket';
 import { Truck } from 'lucide-react';
 
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconAnchor: [12, 41]
+// =====================================================================
+// 👇 NUEVO: DISEÑO DEL CAMIÓN PERSONALIZADO PARA EL MAPA 👇
+// =====================================================================
+const truckIconHTML = `
+  <div style="
+    background-color: #47B3A8; 
+    width: 38px; 
+    height: 38px; 
+    border-radius: 50%; 
+    border: 3px solid white; 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    position: relative;
+  ">
+    <!-- SVG del camión dibujado en blanco -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="3" width="15" height="13"></rect>
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+      <circle cx="5.5" cy="18.5" r="2.5"></circle>
+      <circle cx="18.5" cy="18.5" r="2.5"></circle>
+    </svg>
+    <!-- Pequeño triángulo abajo para hacer efecto de "Pin" -->
+    <div style="
+      position: absolute;
+      bottom: -6px;
+      left: 14px;
+      width: 0; 
+      height: 0; 
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid white;
+    "></div>
+  </div>
+`;
+
+// Registramos el ícono en Leaflet
+const truckIcon = L.divIcon({
+  html: truckIconHTML,
+  className: 'custom-leaflet-truck', // Anula el cuadro blanco por defecto de Leaflet
+  iconSize: [38, 44],
+  iconAnchor: [19, 44], // El ancla es la punta del pin
+  popupAnchor: [0, -44] // El cuadro de texto sale arriba del camión
 });
-L.Marker.prototype.options.icon = DefaultIcon;
+// =====================================================================
 
 const MapaRastreo = () => {
   const { user } = useAuth();
@@ -22,16 +60,13 @@ const MapaRastreo = () => {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Nos registramos
     socket.emit('registrar_usuario', { 
       id: user.id_usuario, 
       email: user.email, 
       role: user.role 
     });
 
-    // 👇 NUEVO: Escuchamos la "foto inicial" apenas abrimos el mapa 👇
     socket.on('ubicaciones_iniciales', (listaUbicaciones) => {
-      console.log("📥 Recibiendo foto inicial de la flota:", listaUbicaciones);
       const ubicacionesObj = {};
       listaUbicaciones.forEach(ubi => {
         ubicacionesObj[ubi.id_conductor] = ubi;
@@ -39,7 +74,6 @@ const MapaRastreo = () => {
       setVehiculos(ubicacionesObj);
     });
 
-    // 2. Escuchamos los pequeños movimientos uno a uno
     socket.on('actualizacion_gps', (datosGPS) => {
       setVehiculos((prev) => ({
         ...prev,
@@ -53,6 +87,7 @@ const MapaRastreo = () => {
     };
   }, [user]);
 
+  // Coordenadas centrales de Apartadó
   const centroUrabá = [7.88299, -76.62587];
 
   return (
@@ -74,7 +109,8 @@ const MapaRastreo = () => {
             attribution='&copy; OpenStreetMap contributors'
           />
           {Object.values(vehiculos).map((vehiculo) => (
-            <Marker key={vehiculo.id_conductor} position={[vehiculo.lat, vehiculo.lng]}>
+            // 👇 Le aplicamos nuestro icon={truckIcon} al Marker 👇
+            <Marker key={vehiculo.id_conductor} position={[vehiculo.lat, vehiculo.lng]} icon={truckIcon}>
               <Popup>
                 <div className="text-center">
                   <p className="font-bold text-slate-800 text-sm mb-1">{vehiculo.nombre}</p>
