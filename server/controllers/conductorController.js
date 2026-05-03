@@ -74,7 +74,6 @@ const actualizarEstado = async (req, res) => {
     const horaColombia = obtenerFechaColombia();
 
     if (estado === 'Entregado') {
-      // Reemplazamos NOW() por el parámetro '?'
       sql = 'UPDATE pedidos SET estado_entrega = ?, fecha_entrega_conductor = ?, firma_cliente = ?, valor_recaudado = ? WHERE id = ?';
       params = [estado, horaColombia, firma_cliente || null, recaudoReal, id];
     } 
@@ -91,7 +90,7 @@ const actualizarEstado = async (req, res) => {
       const notaPrevia = pedido.observaciones_entrega ? ` | Previo: ${pedido.observaciones_entrega}` : '';
       const nuevaNota = `[RECAUDÓ $${recaudoReal.toLocaleString('es-CO')} - DEVUELVE $${valorDevolver.toLocaleString('es-CO')}: ${observacion_devolucion}]${notaPrevia}`;
 
-      // Reemplazamos NOW() por el parámetro '?'
+      // 👇 AQUÍ AGREGAMOS firma_cliente AL UPDATE 👇
       sql = `
         UPDATE pedidos 
         SET estado_entrega = ?, 
@@ -99,10 +98,12 @@ const actualizarEstado = async (req, res) => {
             valor_factura_pendiente = ?,
             total_despachado = ?,
             observaciones_entrega = ?,
-            valor_recaudado = ?
+            valor_recaudado = ?,
+            firma_cliente = COALESCE(?, firma_cliente)
         WHERE id = ?
       `;
-      params = [estado, horaColombia, nuevaDeudaPendiente, nuevoTotalDespachado, nuevaNota, recaudoReal, id];
+      // 👇 Y AQUÍ AGREGAMOS firma_cliente || null A LOS PARÁMETROS 👇
+      params = [estado, horaColombia, nuevaDeudaPendiente, nuevoTotalDespachado, nuevaNota, recaudoReal, firma_cliente || null, id];
     } 
     else {
       sql = 'UPDATE pedidos SET estado_entrega = ? WHERE id = ?';
@@ -110,11 +111,10 @@ const actualizarEstado = async (req, res) => {
     }
 
     await db.query(sql, params);
-    res.json({ message: "Guardado Correctamente con Hora Local" });
+    res.json({ message: "Guardado Correctamente con Hora Local y Firma" });
   } catch (error) {
     console.error("Error al actualizar:", error);
     res.status(500).json({ error: "Error al cambiar el estado" });
   }
 };
-
 module.exports = { getMisRutas, actualizarEstado };
