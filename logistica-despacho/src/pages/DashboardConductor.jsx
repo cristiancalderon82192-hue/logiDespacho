@@ -22,27 +22,30 @@ const DashboardConductor = () => {
   const [rutas, setRutas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [showModalDevolucion, setShowModalDevolucion] = useState(false);
-  const [pedidoDevolucion, setPedidoDevolucion] = useState(null);
-  const [motivoDevolucion, setMotivoDevolucion] = useState('');
-  const [valorDevolucion, setValorDevolucion] = useState('');
-
+  // Estados para Modal de Entrega Exitosa
   const [showModalFirma, setShowModalFirma] = useState(false);
   const [pedidoFirma, setPedidoFirma] = useState(null);
   const sigCanvas = useRef({});
 
+  // Estados para Modal de Devolución/Novedad
+  const [showModalDevolucion, setShowModalDevolucion] = useState(false);
+  const [pedidoDevolucion, setPedidoDevolucion] = useState(null);
+  const [motivoDevolucion, setMotivoDevolucion] = useState('');
+  const [valorDevolucion, setValorDevolucion] = useState('');
+  // 👇 NUEVOS ESTADOS PARA EL FLUJO DE 2 PASOS EN DEVOLUCIÓN
+  const [pasoDevolucion, setPasoDevolucion] = useState(1); 
+  const sigCanvasDev = useRef({}); 
+
   // =========================================================================
-  // 📍 LÓGICA DE RASTREO GPS BLINDADA (MULTIPLE DISPOSITIVOS)
+  // 📍 LÓGICA DE RASTREO GPS BLINDADA
   // =========================================================================
   const ultimaPosicionRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
 
-    // 👇 BLINDAJE: Garantizamos que cada conductor tenga un identificador único real
     const conductorId = user.id || user.id_usuario || user.email;
 
-    // 1. Registramos al conductor en el servidor
     socket.emit('registrar_usuario', { 
       id: conductorId, 
       email: user.email, 
@@ -53,7 +56,6 @@ const DashboardConductor = () => {
     let intervalId;
     
     if ("geolocation" in navigator) {
-      // 2. El GPS lee la ubicación en tiempo real
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           ultimaPosicionRef.current = position;
@@ -67,11 +69,10 @@ const DashboardConductor = () => {
         }
       );
 
-      // 3. EL RELOJ: Dispara la ubicación cada 5 segundos
       intervalId = setInterval(() => {
         if (ultimaPosicionRef.current) {
           const datosGPS = {
-            id_conductor: conductorId, // Usamos el ID blindado
+            id_conductor: conductorId,
             nombre: user.nombre_completo || user.email, 
             lat: ultimaPosicionRef.current.coords.latitude,
             lng: ultimaPosicionRef.current.coords.longitude,
@@ -82,8 +83,6 @@ const DashboardConductor = () => {
         }
       }, 5000);
 
-    } else {
-      console.log("⚠️ El navegador de este celular no soporta GPS.");
     }
 
     return () => {
@@ -98,7 +97,6 @@ const DashboardConductor = () => {
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      // Usamos el mismo user.id que ya tenías funcionando para las rutas
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}`, {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
@@ -129,6 +127,7 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión al servidor."); }
   };
 
+  // ---- LÓGICA DE ENTREGA EXITOSA ----
   const iniciarEntrega = (pedido) => {
     setPedidoFirma(pedido);
     setShowModalFirma(true);
@@ -165,14 +164,17 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión."); }
   };
 
+  // ---- LÓGICA DE DEVOLUCIÓN / NOVEDAD (AHORA CON FIRMA) ----
   const abrirModalDevolucion = (pedido) => {
     setPedidoDevolucion(pedido);
     setMotivoDevolucion('');
     setValorDevolucion(''); 
+    setPasoDevolucion(1); // Siempre arranca en el paso 1 (Formulario)
     setShowModalDevolucion(true);
   };
 
-  const confirmarDevolucion = async (e) => {
+  // PASO 1: Valida los datos y pasa a la firma
+  const validarDatosDevolucion = (e) => {
     e.preventDefault();
     if (!motivoDevolucion.trim()) return alert("Debes escribir el motivo.");
     
@@ -181,14 +183,27 @@ const DashboardConductor = () => {
     
     const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
 
-    if (valorD <= 0) {
-      return alert("El valor de la devolución no puede ser cero. Digita el valor correctamente.");
-    }
+    if (valorD <= 0) return alert("El valor de la devolución no puede ser cero. Digita el valor correctamente.");
+    if (valorD > cargaEnCamion) return alert(`Estás devolviendo $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
 
-    if (valorD > cargaEnCamion) {
-      return alert(`Estás devolviendo $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
-    }
+    // Si todo está bien, pasamos a capturar la firma
+    setPasoDevolucion(2);
+  };
 
+  const limpiarFirmaDevolucion = () => {
+    sigCanvasDev.current.clear();
+  };
+
+  // PASO 2: Guarda todo (Datos + Firma) en la Base de Datos
+  const confirmarDevolucionConFirma = async () => {
+    if (sigCanvasDev.current.isEmpty()) return alert("El cliente debe firmar la novedad para proceder.");
+    
+    const firmaBase64 = sigCanvasDev.current.getCanvas().toDataURL('image/png');
+
+    let cargaEnCamion = parseFloat(pedidoDevolucion.total_despachado);
+    if (isNaN(cargaEnCamion) || cargaEnCamion <= 0) cargaEnCamion = parseFloat(pedidoDevolucion.valor_factura || 0);
+    
+    const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
     const valorRecaudado = cargaEnCamion - valorD;
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
@@ -201,7 +216,8 @@ const DashboardConductor = () => {
           observaciones_entrega: motivoDevolucion,
           observacion_devolucion: motivoDevolucion, 
           valor_devolucion: valorD,
-          valor_recaudado: valorRecaudado 
+          valor_recaudado: valorRecaudado,
+          firma_cliente: firmaBase64 // Aquí enviamos la firma de la novedad al backend
         })
       });
       if (response.ok) {
@@ -211,6 +227,7 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión."); }
   };
 
+  // Cálculos visuales
   let totalModal = parseFloat(pedidoDevolucion?.total_despachado);
   if (isNaN(totalModal) || totalModal <= 0) totalModal = parseFloat(pedidoDevolucion?.valor_factura || 0);
 
@@ -439,67 +456,102 @@ const DashboardConductor = () => {
         </div>
       )}
 
-      {/* ================= MODAL INTELIGENTE DE NOVEDADES Y DEVOLUCIONES ================= */}
+      {/* ================= MODAL INTELIGENTE DE NOVEDADES Y DEVOLUCIONES (EN 2 PASOS) ================= */}
       {showModalDevolucion && pedidoDevolucion && (
         <div className="fixed inset-0 bg-slate-900/80 z-[100] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="bg-red-600 p-4 flex justify-between items-center text-white">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            
+            {/* Cabecera dinámica según el paso */}
+            <div className={`${pasoDevolucion === 1 ? 'bg-red-600' : 'bg-orange-600'} p-4 flex justify-between items-center text-white transition-colors`}>
               <div className="flex items-center gap-2">
-                <AlertCircle size={20} />
-                <h3 className="font-bold text-lg">Reportar Novedad</h3>
+                {pasoDevolucion === 1 ? <AlertCircle size={20} /> : <PenTool size={20} />}
+                <h3 className="font-bold text-lg">{pasoDevolucion === 1 ? 'Reportar Novedad' : 'Firma de Conformidad'}</h3>
               </div>
               <button onClick={() => setShowModalDevolucion(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20}/></button>
             </div>
 
-            <form onSubmit={confirmarDevolucion} className="p-5">
-              
-              <div className="bg-red-50 p-4 rounded-xl border border-red-200 mb-4 shadow-sm">
-                <label className="text-[11px] font-bold text-red-800 uppercase mb-2 block">¿Cuánta plata en mercancía se está devolviendo?</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-red-700 font-bold"><DollarSign size={18}/></span>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    value={valorDevolucion ? Number(String(valorDevolucion).replace(/[^0-9]/g, '')).toLocaleString('es-CO') : ''} 
-                    onChange={(e) => {
-                      const numerosPuros = e.target.value.replace(/[^0-9]/g, '');
-                      setValorDevolucion(numerosPuros);
-                    }} 
-                    className="w-full pl-9 border-2 border-red-200 p-3 rounded-xl focus:border-red-500 outline-none text-red-900 font-extrabold text-lg bg-white transition-colors" 
-                    placeholder="Ej: 350000" 
-                    required 
+            {/* PASO 1: Llenar motivo y valor */}
+            {pasoDevolucion === 1 ? (
+              <form onSubmit={validarDatosDevolucion} className="p-5 overflow-y-auto">
+                <div className="bg-red-50 p-4 rounded-xl border border-red-200 mb-4 shadow-sm">
+                  <label className="text-[11px] font-bold text-red-800 uppercase mb-2 block">¿Cuánta plata en mercancía se está devolviendo?</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-red-700 font-bold"><DollarSign size={18}/></span>
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      value={valorDevolucion ? Number(String(valorDevolucion).replace(/[^0-9]/g, '')).toLocaleString('es-CO') : ''} 
+                      onChange={(e) => {
+                        const numerosPuros = e.target.value.replace(/[^0-9]/g, '');
+                        setValorDevolucion(numerosPuros);
+                      }} 
+                      className="w-full pl-9 border-2 border-red-200 p-3 rounded-xl focus:border-red-500 outline-none text-red-900 font-extrabold text-lg bg-white transition-colors" 
+                      placeholder="Ej: 350000" 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 mb-5 space-y-3">
+                  <div className="flex justify-between items-center text-slate-500 text-sm">
+                    <span className="font-bold uppercase text-[11px]">Total Carga Llevada:</span>
+                    <span className="font-bold">${totalModal.toLocaleString('es-CO')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-red-500 text-sm">
+                    <span className="font-bold uppercase text-[11px]">Se Devuelve:</span>
+                    <span className="font-bold">- ${devModal.toLocaleString('es-CO')}</span>
+                  </div>
+                  <div className="h-px w-full bg-slate-300"></div>
+                  <div className="flex justify-between items-center text-green-700">
+                    <span className="font-black uppercase text-xs">A Recaudar del Cliente:</span>
+                    <span className="font-black text-xl">${aRecaudarModal.toLocaleString('es-CO')}</span>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1.5"><FileText size={14}/> Motivo de la Novedad</label>
+                  <textarea value={motivoDevolucion} onChange={(e) => setMotivoDevolucion(e.target.value)} className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-red-500 outline-none text-slate-700 bg-white resize-none text-sm" rows="3" placeholder="Explica detalladamente por qué no se entregó todo..." required />
+                </div>
+
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowModalDevolucion(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+                  <button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2">
+                    Siguiente <PlayCircle size={18}/>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* PASO 2: Capturar Firma del Cliente */
+              <div className="p-5 flex-1 flex flex-col animate-fadeIn">
+                <p className="text-sm text-slate-600 mb-4 text-center">
+                  Pide al cliente <b>{pedidoDevolucion.nombre_cliente}</b> que firme en el recuadro para confirmar que entrega/recibe con esta novedad.
+                </p>
+                
+                <div className="border-2 border-dashed border-orange-300 rounded-xl bg-orange-50 mb-4 relative overflow-hidden touch-none" style={{ height: '250px' }}>
+                  <SignatureCanvas 
+                    ref={sigCanvasDev} 
+                    penColor="black"
+                    canvasProps={{ className: 'w-full h-full' }}
                   />
                 </div>
-              </div>
 
-              <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 mb-5 space-y-3">
-                <div className="flex justify-between items-center text-slate-500 text-sm">
-                  <span className="font-bold uppercase text-[11px]">Total Carga Llevada:</span>
-                  <span className="font-bold">${totalModal.toLocaleString('es-CO')}</span>
+                <div className="flex justify-between items-center mb-6">
+                  <button onClick={() => setPasoDevolucion(1)} className="text-slate-500 text-xs font-bold flex items-center gap-1 hover:text-slate-800">
+                    &larr; Volver
+                  </button>
+                  <button onClick={limpiarFirmaDevolucion} className="text-slate-500 text-xs font-bold flex items-center gap-1 hover:text-slate-800">
+                    <Eraser size={14}/> Borrar firma
+                  </button>
                 </div>
-                <div className="flex justify-between items-center text-red-500 text-sm">
-                  <span className="font-bold uppercase text-[11px]">Se Devuelve:</span>
-                  <span className="font-bold">- ${devModal.toLocaleString('es-CO')}</span>
-                </div>
-                <div className="h-px w-full bg-slate-300"></div>
-                <div className="flex justify-between items-center text-green-700">
-                  <span className="font-black uppercase text-xs">A Recaudar del Cliente:</span>
-                  <span className="font-black text-xl">${aRecaudarModal.toLocaleString('es-CO')}</span>
-                </div>
-              </div>
 
-              <div className="mb-6">
-                <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1.5"><FileText size={14}/> Motivo de la Novedad</label>
-                <textarea value={motivoDevolucion} onChange={(e) => setMotivoDevolucion(e.target.value)} className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-red-500 outline-none text-slate-700 bg-white resize-none text-sm" rows="3" placeholder="Explica detalladamente por qué no se entregó todo..." required />
+                <div className="flex gap-3 mt-auto">
+                  <button onClick={confirmarDevolucionConFirma} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2">
+                    <CheckCircle size={18}/> Finalizar Novedad
+                  </button>
+                </div>
               </div>
+            )}
 
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowModalDevolucion(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
-                <button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2">
-                  <CheckCircle size={18}/> Confirmar
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
