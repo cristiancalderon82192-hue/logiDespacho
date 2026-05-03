@@ -107,6 +107,7 @@ const listarPedidosRango = async (req, res) => {
       SELECT 
         p.id, p.id_factura, p.prioridad, p.estado_entrega,
         p.observaciones_entrega, p.valor_factura_pendiente,
+        p.firma_cliente, /* 👇 AQUÍ AGREGAMOS LA FIRMA 👇 */
         td.nombre as tipo_documento,
         DATE_FORMAT(p.fecha_facturacion, '%Y-%m-%d') as fecha_facturacion,
         DATE_FORMAT(p.fecha_agendada, '%Y-%m-%d') as fecha_agendada,

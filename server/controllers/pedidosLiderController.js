@@ -56,7 +56,7 @@ const getDashboard = async (req, res) => {
   }
 };
 
-// 2. OBTENER MIS PEDIDOS (Actualizado para traer estados, notas y deudas)
+// 2. OBTENER MIS PEDIDOS (Actualizado para traer firma, estados, notas y deudas)
 const getMisPedidos = async (req, res) => {
   const { fecha, usuario_id } = req.query; 
   
@@ -67,7 +67,8 @@ const getMisPedidos = async (req, res) => {
     const sql = `
       SELECT 
         p.id, p.id_factura, p.prioridad, 
-        p.estado_entrega, p.observaciones_entrega, p.valor_factura_pendiente, /* 👇 ESTAS SON LAS COLUMNAS QUE FALTABAN 👇 */
+        p.estado_entrega, p.observaciones_entrega, p.valor_factura_pendiente,
+        p.firma_cliente, /* 👇 AQUÍ AGREGAMOS LA FIRMA 👇 */
         DATE_FORMAT(p.fecha_agendada, '%Y-%m-%d') as fecha_agendada,
         td.nombre as tipo_documento,
         c.nombre as nombre_cliente, 
