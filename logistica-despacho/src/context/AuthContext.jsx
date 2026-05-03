@@ -23,11 +23,39 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userData', JSON.stringify(userData));
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('userData');
-    // Usamos replace para que no puedan volver atrás con el botón del navegador
-    window.location.replace('/');
+  // 👇 MODIFICADO: Ahora es asíncrono y le avisa al backend 👇
+  const logout = async () => {
+    try {
+      // 1. Recuperamos los datos del usuario para extraer el token ANTES de borrarlo
+      const storedUserStr = localStorage.getItem('userData');
+      
+      if (storedUserStr) {
+        const storedUser = JSON.parse(storedUserStr);
+        const token = storedUser.token; // Sacamos el token del objeto
+        
+        if (token) {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          
+          // 2. Le avisamos al backend que limpie el 'session_token' en la base de datos
+          await fetch(`${apiUrl}/api/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error al liberar la sesión en el servidor:", error);
+    } finally {
+      // 3. Limpiamos el frontend SIN IMPORTAR si el backend falló o fue exitoso
+      setUser(null);
+      localStorage.removeItem('userData');
+      
+      // Usamos replace para que no puedan volver atrás con el botón del navegador
+      window.location.replace('/');
+    }
   };
 
   return (
