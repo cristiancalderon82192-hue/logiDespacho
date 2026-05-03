@@ -46,7 +46,7 @@ const ReporteFinanciero = () => {
           valRec: Number(f.valor_recaudado || 0)
         }));
 
-        // 2. MAPA DE "PADRES" (Para saber si un sufijo pertenece a una factura original)
+        // 2. MAPA DE "PADRES"
         const allIds = new Set(facturasRaw.map(f => f.id_factura_raw));
 
         const facturasMap = {};
@@ -55,15 +55,11 @@ const ReporteFinanciero = () => {
           let idFacRaw = fila.id_factura_raw;
           let idFacBase = idFacRaw;
 
-          // 👇 DETECCIÓN DE RAÍZ ULTRA-INTELIGENTE (Padres, Hijos y Nietos) 👇
-          // Si tiene guiones, quitamos sufijos de derecha a izquierda hasta encontrar la factura original
           if (idFacBase.includes('-')) {
             let partes = idFacBase.split('-');
             while (partes.length > 1) {
-              partes.pop(); // Quitamos el último sufijo
+              partes.pop(); 
               let posibleBase = partes.join('-');
-              
-              // Si la base existe en los datos, la guardamos como raíz y seguimos buscando más atrás
               if (allIds.has(posibleBase)) {
                 idFacBase = posibleBase; 
               }
@@ -82,15 +78,12 @@ const ReporteFinanciero = () => {
               facturas_asociadas: new Set([idFacRaw]) 
             };
           } else {
-            // Si es un "hijo" o "nieto", no duplicamos el valor de la factura, 
-            // solo nos interesa el valor máximo (la deuda real original)
             if (fila.valFac > 0) {
               facturasMap[idFacBase].max_positivo = Math.max(facturasMap[idFacBase].max_positivo, fila.valFac);
             } else {
               facturasMap[idFacBase].suma_negativos += fila.valFac;
             }
             
-            // SUMA TOTAL: Aquí es donde ocurre la magia del cruce
             facturasMap[idFacBase].valor_recaudado_cruzado += fila.valRec;
             facturasMap[idFacBase].viajes_count += 1;
             
@@ -106,9 +99,7 @@ const ReporteFinanciero = () => {
           
           let estadoFinal = fac.estado_entrega;
           
-          // Auditoría del saldo para dictar el estado logístico
           if (fac.viajes_count > 1 || fac.suma_negativos < 0) {
-            // Abs resuelve problemas de milésimas en JavaScript (0.0000001)
             if (Math.abs(saldo) < 0.1) estadoFinal = 'SALDADO (Cruzado)';
             else if (saldo <= 0) estadoFinal = 'SALDO A FAVOR';
             else estadoFinal = 'PAGO PARCIAL (Cruzado)';
@@ -121,7 +112,7 @@ const ReporteFinanciero = () => {
             saldo_pendiente: saldo,
             estado_entrega: estadoFinal,
             conductor: Array.from(fac.conductores_historial).join(' + ') || 'Sin asignar',
-            id_factura_display: Array.from(fac.facturas_asociadas).join(', ') // Mostrará: "56789, 56789-S61"
+            id_factura_display: Array.from(fac.facturas_asociadas).join(', ') 
           };
         });
 
@@ -144,6 +135,17 @@ const ReporteFinanciero = () => {
     obtenerDatos();
   }, [fechaInicio, fechaFin]);
 
+  // Calculamos los totales de forma global para poder usarlos tanto en UI como en PDF
+  const totales = datos.reduce((acc, curr) => ({
+    facturado: acc.facturado + Number(curr.valor_factura || 0),
+    recaudado: acc.recaudado + Number(curr.valor_recaudado || 0),
+    pendiente: acc.pendiente + (Number(curr.saldo_pendiente) > 0 ? Number(curr.saldo_pendiente) : 0)
+  }), { facturado: 0, recaudado: 0, pendiente: 0 });
+
+  const sinDatos = datos.length === 0 || totales.facturado === 0;
+  // Calculamos en tiempo real si necesitamos pintar la deuda
+  const pRecaudo = sinDatos ? 0 : (totales.facturado > 0 ? Math.round((totales.recaudado / totales.facturado) * 100) : 0);
+
   const exportarExcel = () => {
     const datosFormateados = datos.map(fila => ({
       'Factura(s)': fila.id_factura_display,
@@ -163,14 +165,63 @@ const ReporteFinanciero = () => {
     XLSX.writeFile(libro, `Reporte_Financiero_${fechaInicio}_al_${fechaFin}.xlsx`);
   };
 
+  // 👇 PDF REDISEÑADO CON TARJETAS ESTILO DASHBOARD 👇
   const exportarPDF = () => {
     const doc = new jsPDF('landscape');
     
-    doc.setFontSize(18);
-    doc.text("Reporte Financiero y Saldos Cruzados", 14, 22);
+    // 1. HEADER (Fondo Oscuro Corporativo)
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 300, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Estado Financiero y Cartera", 14, 20);
+    doc.setTextColor(148, 163, 184); // slate-400
     doc.setFontSize(11);
-    doc.text(`Rango evaluado: ${fechaInicio} al ${fechaFin}`, 14, 30);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Rango evaluado: ${fechaInicio} hasta ${fechaFin}`, 14, 30);
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
+    // 2. TARJETAS DE INDICADORES (KPIs)
+    let startY = 48;
+    
+    // Tarjeta 1: Total Facturado (Oscura)
+    doc.setFillColor(30, 41, 59); // slate-800
+    doc.roundedRect(14, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL FACTURADO", 20, startY + 8);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.text(`${formatearMoneda(totales.facturado)}`, 20, startY + 22);
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Ingreso bruto neto (cruces aplicados)`, 20, startY + 30);
+
+    // Tarjeta 2: Ingresos Reales (Verde)
+    doc.setFillColor(240, 253, 244); // green-50
+    doc.roundedRect(105, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(22, 163, 74); // green-600
+    doc.setFontSize(10);
+    doc.text("INGRESOS REALES", 111, startY + 8);
+    doc.setFontSize(20);
+    doc.text(`${formatearMoneda(totales.recaudado)}`, 111, startY + 22);
+    doc.setFontSize(9);
+    doc.text(`${pRecaudo}% Recaudado`, 111, startY + 30);
+
+    // Tarjeta 3: Cartera Pendiente (Rojo)
+    doc.setFillColor(254, 242, 242); // red-50
+    doc.roundedRect(196, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(220, 38, 38); // red-600
+    doc.setFontSize(10);
+    doc.text("CARTERA PENDIENTE", 202, startY + 8);
+    doc.setFontSize(20);
+    doc.text(`${formatearMoneda(totales.pendiente)}`, 202, startY + 22);
+    doc.setFontSize(9);
+    doc.text(`${sinDatos ? '0' : (100 - pRecaudo)}% En deuda`, 202, startY + 30);
+
+    // 3. TABLA DE DATOS (Mismo estilo que la UI web)
     const columnas = ["Factura(s)", "Fecha", "Cliente", "Conductor", "Estado", "V. Factura", "Recaudado", "Saldo"];
     const filas = datos.map(fila => [
       fila.id_factura_display,
@@ -180,24 +231,51 @@ const ReporteFinanciero = () => {
       fila.estado_entrega,
       formatearMoneda(fila.valor_factura),
       formatearMoneda(fila.valor_recaudado),
-      formatearMoneda(fila.saldo_pendiente)
+      Number(fila.saldo_pendiente) < 0 ? `A Favor: ${formatearMoneda(Math.abs(fila.saldo_pendiente))}` : formatearMoneda(fila.saldo_pendiente)
     ]);
 
     autoTable(doc, {
-      startY: 40, head: [columnas], body: filas, theme: 'grid',
-      headStyles: { fillColor: [71, 179, 168] }, styles: { fontSize: 8 }, 
+      startY: startY + 45,
+      head: [columnas],
+      body: filas,
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [15, 23, 42], // Fondo oscuro para el header de la tabla (igual a la UI web)
+        textColor: 255, 
+        fontStyle: 'bold' 
+      },
+      styles: { fontSize: 8, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      didParseCell: function(data) {
+        if (data.section === 'body') {
+          // Valor Factura (Normal)
+          if (data.column.index === 5) {
+            data.cell.styles.textColor = [71, 85, 105]; // slate-600
+          }
+          // Recaudado (Verde)
+          if (data.column.index === 6) {
+            data.cell.styles.textColor = [21, 128, 61]; // green-700
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [240, 253, 244]; // green-50
+          }
+          // Saldo (Rojo o Verde)
+          if (data.column.index === 7) {
+             const saldoStr = data.cell.raw;
+             if (saldoStr.includes('A Favor') || saldoStr === '$0' || saldoStr === 'Saldado') {
+                data.cell.styles.textColor = [37, 99, 235]; // blue-600 o verde, puse azul para saldos a favor
+                data.cell.styles.fontStyle = 'bold';
+             } else {
+                data.cell.styles.textColor = [220, 38, 38]; // red-600
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [254, 242, 242]; // red-50
+             }
+          }
+        }
+      }
     });
 
     doc.save(`Reporte_Financiero_${fechaInicio}_al_${fechaFin}.pdf`);
   };
-
-  const totales = datos.reduce((acc, curr) => ({
-    facturado: acc.facturado + Number(curr.valor_factura || 0),
-    recaudado: acc.recaudado + Number(curr.valor_recaudado || 0),
-    pendiente: acc.pendiente + (Number(curr.saldo_pendiente) > 0 ? Number(curr.saldo_pendiente) : 0)
-  }), { facturado: 0, recaudado: 0, pendiente: 0 });
-
-  const sinDatos = datos.length === 0 || totales.facturado === 0;
 
   const getColorEstado = (estado) => {
     const txt = estado.toUpperCase();
@@ -209,26 +287,78 @@ const ReporteFinanciero = () => {
   };
 
   return (
-    <div className="bg-slate-50 rounded-xl p-3 md:p-6 min-h-[80vh] overflow-x-hidden">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-200">
+    <div className="bg-slate-50 rounded-xl p-4 sm:p-6 min-h-[80vh] overflow-x-hidden">
+      
+      {/* ================= ENCABEZADO Y EXPORTACIÓN RESPONSIVO ================= */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-200">
+        
+        {/* Título y Logo */}
         <div className="flex items-center gap-3">
-          <div className="bg-teal-100 p-3 rounded-lg text-[#47B3A8] shadow-sm"><Building size={24} /></div>
+          <div className="bg-teal-100 p-3 rounded-lg text-[#47B3A8] shadow-sm shrink-0">
+            <Building size={24} />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Estado Financiero</h1>
-            <p className="text-sm text-slate-500">Consolidado inteligente de facturación, recaudos y cartera</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 leading-tight">Estado Financiero</h1>
+            <p className="text-xs sm:text-sm text-slate-500">Consolidado inteligente de facturación, recaudos y cartera</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors">
-            <Calendar size={18} className="text-[#47B3A8]" />
-            <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400 uppercase">Desde</span><input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer w-[110px]"/></div>
-            <div className="w-px h-5 bg-slate-300"></div>
-            <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400 uppercase">Hasta</span><input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} min={fechaInicio} className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer w-[110px]"/></div>
+        {/* Controles: Fechas y Exportación (Adaptable a Móvil) */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch lg:items-center gap-3 w-full lg:w-auto">
+          
+          {/* Caja de Fechas */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white border border-slate-200 rounded-lg p-3 sm:px-4 sm:py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors w-full sm:w-auto">
+            
+            {/* Fecha Desde */}
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-[#47B3A8]" />
+                <span className="text-xs font-bold text-slate-400 uppercase">Desde</span>
+              </div>
+              <input 
+                type="date" 
+                value={fechaInicio} 
+                onChange={(e) => setFechaInicio(e.target.value)} 
+                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer"
+              />
+            </div>
+
+            {/* Separador */}
+            <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200"></div>
+
+            {/* Fecha Hasta */}
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+              <span className="text-xs font-bold text-slate-400 uppercase">Hasta</span>
+              <input 
+                type="date" 
+                value={fechaFin} 
+                onChange={(e) => setFechaFin(e.target.value)} 
+                min={fechaInicio} 
+                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer"
+              />
+            </div>
           </div>
+
           <div className="w-px h-8 bg-slate-200 hidden xl:block mx-1"></div>
-          <button onClick={exportarExcel} disabled={cargando || sinDatos} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm shadow-sm"><FileText size={18} /> Excel</button>
-          <button onClick={exportarPDF} disabled={cargando || sinDatos} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium text-sm shadow-sm"><Download size={18} /> PDF</button>
+
+          {/* Botones de Exportación */}
+          <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+            <button 
+              onClick={exportarExcel} 
+              disabled={cargando || sinDatos} 
+              className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm shadow-sm"
+            >
+              <FileText size={18} /> Excel
+            </button>
+            <button 
+              onClick={exportarPDF} 
+              disabled={cargando || sinDatos} 
+              className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium text-sm shadow-sm"
+            >
+              <Download size={18} /> PDF
+            </button>
+          </div>
+
         </div>
       </div>
 

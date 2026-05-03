@@ -14,14 +14,14 @@ const getReportePerfectos = async (req, res) => {
         p.hora_registro AS hora_limite,
         DATE_FORMAT(p.fecha_entrega_conductor, '%Y-%m-%d %H:%i') AS fecha_real_entrega,
         p.estado_entrega,
+        p.observaciones_entrega,  -- AQUI ESTÁ EL CAMBIO
+        p.nota_manual,            -- AQUI ESTÁ EL CAMBIO
         CASE 
           WHEN p.estado_entrega = 'Entregado' 
                AND DATE(p.fecha_entrega_conductor) = p.fecha_agendada
                AND (
-                 -- 👇 JORNADA MAÑANA: Agendado AM y Entregado antes de las 12:00 PM (00:00 a 11:59) 👇
                  (HOUR(p.hora_registro) < 12 AND HOUR(p.fecha_entrega_conductor) < 12) 
                  OR 
-                 -- 👇 JORNADA TARDE: Agendado PM y Entregado entre 12:00 PM y 23:59 PM (Ciclo completo) 👇
                  (HOUR(p.hora_registro) >= 12 AND HOUR(p.fecha_entrega_conductor) >= 12 AND HOUR(p.fecha_entrega_conductor) <= 23)
                )
           THEN 'Perfecto'
@@ -34,7 +34,6 @@ const getReportePerfectos = async (req, res) => {
       ORDER BY calificacion ASC, p.fecha_entrega_conductor DESC
     `;
 
-    // Si no llegan fechas, por seguridad usamos la fecha de hoy para ambas
     if (!fechaInicio || !fechaFin) {
         querySQL = querySQL.replace('BETWEEN ? AND ?', 'BETWEEN CURDATE() AND CURDATE()');
         const [filas] = await pool.query(querySQL);

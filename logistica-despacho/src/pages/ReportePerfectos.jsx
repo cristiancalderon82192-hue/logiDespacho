@@ -13,14 +13,13 @@ const ReportePerfectos = () => {
   const [fechaInicio, setFechaInicio] = useState(hoy);
   const [fechaFin, setFechaFin] = useState(hoy);
 
-  // Estado para la animación de la gráfica circular
   const [animacionOtif, setAnimacionOtif] = useState(0);
 
   useEffect(() => {
     const obtenerDatos = async () => {
       setCargando(true);
       setError(null);
-      setAnimacionOtif(0); // Reiniciar animación al buscar
+      setAnimacionOtif(0);
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         const respuesta = await fetch(`${apiUrl}/api/reportes/perfectos?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
@@ -30,7 +29,6 @@ const ReportePerfectos = () => {
         const data = await respuesta.json();
         setDatos(data);
 
-        // Disparar la animación de la gráfica después de que los datos cargan
         if (data.length > 0) {
           const perfectos = data.filter(d => d.calificacion === 'Perfecto').length;
           const porcentaje = Math.round((perfectos / data.length) * 100);
@@ -56,7 +54,8 @@ const ReportePerfectos = () => {
       'Fecha Agendada': fila.fecha_agendada,
       'Hora Límite': fila.hora_limite,
       'Entrega Real': fila.fecha_real_entrega || 'N/A',
-      'Calificación': fila.calificacion
+      'Calificación': fila.calificacion,
+      'Observaciones / Novedad': fila.observaciones_entrega || fila.nota_manual || 'Sin observaciones'
     }));
 
     const hoja = XLSX.utils.json_to_sheet(datosFormateados);
@@ -65,91 +64,192 @@ const ReportePerfectos = () => {
     XLSX.writeFile(libro, `OTIF_${fechaInicio}_al_${fechaFin}.xlsx`);
   };
 
+  // 👇 FUNCIÓN DE PDF REDISEÑADA ESTILO DASHBOARD 👇
   const exportarPDF = () => {
     const doc = new jsPDF('landscape');
     
-    doc.setFontSize(18);
-    doc.text("Auditoría de Pedidos Perfectos (OTIF)", 14, 22);
+    // 1. HEADER (Fondo Oscuro Corporativo)
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 300, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Reporte de Nivel de Servicio (OTIF)", 14, 20);
+    
+    doc.setTextColor(148, 163, 184); // slate-400
     doc.setFontSize(11);
-    doc.text(`Rango evaluado: ${fechaInicio} al ${fechaFin}`, 14, 30);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Rango evaluado: ${fechaInicio} hasta ${fechaFin}`, 14, 30);
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
-    const columnas = ["Factura", "Cliente", "Conductor", "Estado", "Hora Límite", "Entrega Real", "Calificación"];
-    const filas = datos.map(fila => [
-      fila.id_factura,
-      fila.cliente,
-      fila.conductor,
-      fila.estado_entrega,
-      fila.hora_limite,
-      fila.fecha_real_entrega || 'N/A',
-      fila.calificacion
-    ]);
+    // 2. CÁLCULOS PARA LAS TARJETAS (KPIs)
+    const tPedidos = datos.length;
+    const tPerfectos = datos.filter(d => d.calificacion === 'Perfecto').length;
+    const tFallidas = tPedidos - tPerfectos;
+    const pExito = tPedidos > 0 ? Math.round((tPerfectos / tPedidos) * 100) : 0;
+    const pError = 100 - pExito;
+
+    // 3. TARJETAS DE INDICADORES (KPIs visuales)
+    let startY = 48;
+    
+    // Tarjeta 1: Score Global
+    doc.setFillColor(30, 41, 59); // slate-800
+    doc.roundedRect(14, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("SCORE GLOBAL (OTIF)", 20, startY + 8);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.text(`${pExito}%`, 20, startY + 22);
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`De ${tPedidos} pedidos evaluados`, 20, startY + 30);
+
+    // Tarjeta 2: Pedidos Perfectos
+    doc.setFillColor(240, 253, 244); // green-50
+    doc.roundedRect(105, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(22, 163, 74); // green-600
+    doc.setFontSize(10);
+    doc.text("PEDIDOS PERFECTOS", 111, startY + 8);
+    doc.setFontSize(24);
+    doc.text(`${tPerfectos}`, 111, startY + 22);
+    doc.setFontSize(9);
+    doc.text(`Tasa de éxito: ${pExito}%`, 111, startY + 30);
+
+    // Tarjeta 3: Entregas Fallidas
+    doc.setFillColor(254, 242, 242); // red-50
+    doc.roundedRect(196, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(220, 38, 38); // red-600
+    doc.setFontSize(10);
+    doc.text("ENTREGAS FALLIDAS", 202, startY + 8);
+    doc.setFontSize(24);
+    doc.text(`${tFallidas}`, 202, startY + 22);
+    doc.setFontSize(9);
+    doc.text(`Margen de error: ${pError}%`, 202, startY + 30);
+
+    // 4. TABLA DE DATOS (Con colores intercalados)
+    const columnas = ["Factura", "Cliente", "Estado", "Límite", "Real", "OTIF", "Observaciones"];
+    const filas = datos.map(fila => {
+      const nota = fila.observaciones_entrega || fila.nota_manual || 'N/A';
+      const notaCorta = nota.length > 40 ? nota.substring(0, 40) + '...' : nota;
+      
+      return [
+        fila.id_factura,
+        fila.cliente,
+        fila.estado_entrega,
+        fila.hora_limite,
+        fila.fecha_real_entrega || 'N/A',
+        fila.calificacion,
+        notaCorta
+      ];
+    });
 
     autoTable(doc, {
-      startY: 40,
+      startY: startY + 45,
       head: [columnas],
       body: filas,
       theme: 'grid',
-      headStyles: { fillColor: [71, 179, 168] },
+      headStyles: { 
+        fillColor: [71, 179, 168], // Tu color verde principal
+        textColor: 255,
+        fontStyle: 'bold' 
+      },
+      styles: { 
+        fontSize: 8,
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252] // slate-50 (Ligero gris para lectura fácil)
+      },
+      // Pintar la celda de OTIF según sea Perfecto o No
+      didParseCell: function(data) {
+        if (data.section === 'body' && data.column.index === 5) { // Columna "OTIF"
+          if (data.cell.raw === 'Perfecto') {
+            data.cell.styles.textColor = [22, 163, 74]; // green-600
+            data.cell.styles.fontStyle = 'bold';
+          } else {
+            data.cell.styles.textColor = [220, 38, 38]; // red-600
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      }
     });
 
     doc.save(`OTIF_${fechaInicio}_al_${fechaFin}.pdf`);
   };
 
-  // Cálculos para las gráficas
+  // Cálculos para las gráficas de la UI web
   const totalPedidos = datos.length;
   const perfectos = datos.filter(d => d.calificacion === 'Perfecto').length;
   const noPerfectos = totalPedidos - perfectos;
   const porcentajePerfectos = totalPedidos > 0 ? Math.round((perfectos / totalPedidos) * 100) : 0;
-  const porcentajeNoPerfectos = totalPedidos > 0 ? Math.round((noPerfectos / totalPedidos) * 100) : 0;
-
-  // Variables matemáticas para el SVG circular
+  
   const radio = 40;
   const circunferencia = 2 * Math.PI * radio;
   const strokeOffset = circunferencia - ((animacionOtif / 100) * circunferencia);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[80vh] overflow-x-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[80vh] overflow-x-hidden">
       
       {/* ================= ENCABEZADO Y FILTROS ================= */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-100">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-100">
+        
+        {/* Título y Logo */}
         <div className="flex items-center gap-3">
-          <div className="bg-teal-100 p-3 rounded-lg text-[#47B3A8]">
+          <div className="bg-teal-100 p-3 rounded-lg text-[#47B3A8] shrink-0">
             <Target size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Nivel de Servicio (OTIF)</h1>
-            <p className="text-sm text-slate-500">Evaluación analítica de Pedidos Perfectos</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 leading-tight">Nivel de Servicio (OTIF)</h1>
+            <p className="text-xs sm:text-sm text-slate-500">Evaluación analítica de Pedidos Perfectos</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors">
-            <Calendar size={18} className="text-[#47B3A8]" />
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase">Desde</span>
+        {/* Controles: Fechas y Exportación (Adaptable a Móvil) */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch lg:items-center gap-3 w-full lg:w-auto">
+          
+          {/* Caja de Fechas (En móvil se apila, en PC se alinea) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 sm:px-4 sm:py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors w-full sm:w-auto">
+            
+            {/* Fecha Desde */}
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-[#47B3A8]" />
+                <span className="text-xs font-bold text-slate-400 uppercase">Desde</span>
+              </div>
               <input 
                 type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}
-                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer w-[110px]"
+                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer"
               />
             </div>
-            <div className="w-px h-5 bg-slate-300"></div>
-            <div className="flex items-center gap-2">
+
+            {/* Separador (Línea Horizontal en móvil, Vertical en PC) */}
+            <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200 sm:bg-slate-300"></div>
+
+            {/* Fecha Hasta */}
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
               <span className="text-xs font-bold text-slate-400 uppercase">Hasta</span>
               <input 
                 type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} min={fechaInicio}
-                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer w-[110px]"
+                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer"
               />
             </div>
           </div>
 
           <div className="w-px h-8 bg-slate-200 hidden xl:block mx-1"></div>
 
-          <button onClick={exportarExcel} disabled={cargando || datos.length === 0} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm">
-            <FileText size={18} /> Excel
-          </button>
-          <button onClick={exportarPDF} disabled={cargando || datos.length === 0} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium text-sm">
-            <Download size={18} /> PDF
-          </button>
+          {/* Botones de Exportación (Se dividen 50/50 en celular) */}
+          <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+            <button onClick={exportarExcel} disabled={cargando || datos.length === 0} className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm">
+              <FileText size={18} /> Excel
+            </button>
+            <button onClick={exportarPDF} disabled={cargando || datos.length === 0} className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium text-sm">
+              <Download size={18} /> PDF
+            </button>
+          </div>
+
         </div>
       </div>
 
@@ -162,20 +262,18 @@ const ReportePerfectos = () => {
 
       {error && <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-200 text-center">{error}</div>}
 
-      {/* ================= SECCIÓN DE GRÁFICAS (SIEMPRE VISIBLE) ================= */}
+      {/* ================= SECCIÓN DE GRÁFICAS ================= */}
       {!cargando && !error && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in-up">
           
-          {/* TARJETA 1: SCORE GLOBAL OTIF (DONUT CHART) */}
+          {/* TARJETA 1: SCORE GLOBAL OTIF */}
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-white relative overflow-hidden group">
             <div className="absolute inset-0 bg-[radial-gradient(#fff_1px,transparent_1px)] opacity-10 [background-size:10px_10px]"></div>
-            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 z-10">Score Global (OTIF)</h3>
+            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 z-10 text-center">Score Global (OTIF)</h3>
             
             <div className="relative flex items-center justify-center z-10 hover:scale-105 transition-transform duration-500">
               <svg className="w-32 h-32 transform -rotate-90">
-                {/* Círculo de fondo */}
                 <circle cx="64" cy="64" r={radio} stroke="rgba(255,255,255,0.1)" strokeWidth="12" fill="transparent" />
-                {/* Círculo animado (Progreso) - Si no hay datos, se pinta gris neutro */}
                 <circle 
                   cx="64" cy="64" r={radio} 
                   stroke={totalPedidos === 0 ? "#475569" : (animacionOtif >= 90 ? "#4ade80" : animacionOtif >= 70 ? "#facc15" : "#f87171")} 
@@ -258,7 +356,7 @@ const ReportePerfectos = () => {
               <tr className="bg-slate-50 text-slate-600 text-sm uppercase tracking-wider border-b border-slate-200">
                 <th className="p-4 font-semibold rounded-tl-lg">Factura</th>
                 <th className="p-4 font-semibold">Cliente</th>
-                <th className="p-4 font-semibold">Estado Actual</th>
+                <th className="p-4 font-semibold text-center">Estado Actual</th>
                 <th className="p-4 font-semibold text-center">Hora Límite</th>
                 <th className="p-4 font-semibold text-center">Entrega Real</th>
                 <th className="p-4 font-semibold text-center rounded-tr-lg">Calificación OTIF</th>
@@ -266,33 +364,55 @@ const ReportePerfectos = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {datos.length > 0 ? (
-                datos.map((fila, index) => (
-                  <tr key={index} className="hover:bg-slate-50 transition-colors text-sm">
-                    <td className="p-4 font-bold text-slate-800 flex items-center gap-2">
-                      <FileText size={14} className="text-slate-400" />
-                      {fila.id_factura}
-                    </td>
-                    <td className="p-4 text-slate-600 truncate max-w-[200px]" title={fila.cliente}>{fila.cliente}</td>
-                    <td className="p-4 text-slate-600">
-                      <span className={`px-2 py-1 rounded text-xs font-bold ${
-                        fila.estado_entrega === 'Entregado' ? 'text-green-700 bg-green-50' : 
-                        fila.estado_entrega === 'Devolución' ? 'text-red-700 bg-red-50' : 'text-orange-700 bg-orange-50'
-                      }`}>
-                        {fila.estado_entrega}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center text-slate-600 font-medium">{fila.hora_limite}</td>
-                    <td className="p-4 text-center text-slate-600 font-bold">{fila.fecha_real_entrega || '-- : --'}</td>
-                    <td className="p-4 text-center">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border shadow-sm transition-transform hover:scale-105 ${
-                        fila.calificacion === 'Perfecto' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
-                      }`}>
-                        {fila.calificacion === 'Perfecto' ? <CheckCircle size={14} /> : <AlertOctagon size={14} />}
-                        {fila.calificacion}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                datos.map((fila, index) => {
+                  const notaCruda = fila.observaciones_entrega || fila.nota_manual;
+                  
+                  return (
+                    <tr key={index} className="hover:bg-slate-50 transition-colors text-sm">
+                      <td className="p-4 font-bold text-slate-800 flex items-center gap-2">
+                        <FileText size={14} className="text-slate-400" />
+                        {fila.id_factura}
+                      </td>
+                      <td className="p-4 text-slate-600 truncate max-w-[200px]" title={fila.cliente}>{fila.cliente}</td>
+                      
+                      {/* 👇 AQUÍ ESTÁ LA NOTA INCRUSTADA EXACTAMENTE COMO LA PEDISTE 👇 */}
+                      <td className="p-4">
+                        <div className="flex flex-col items-center justify-center gap-1 w-full">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            fila.estado_entrega === 'Entregado' ? 'text-green-700 bg-green-50' : 
+                            fila.estado_entrega === 'Devolución' ? 'text-red-700 bg-red-50' : 'text-orange-700 bg-orange-50'
+                          }`}>
+                            {fila.estado_entrega}
+                          </span>
+                          
+                          {notaCruda && (
+                            <span 
+                              className={`text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded w-full max-w-[200px] truncate block mt-1 ${
+                                fila.estado_entrega === 'Devolución' 
+                                  ? 'text-red-700 bg-red-50 border border-red-100' 
+                                  : 'text-orange-700 bg-orange-50 border border-orange-100'
+                              }`} 
+                              title={notaCruda}
+                            >
+                              Nota: {notaCruda}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      
+                      <td className="p-4 text-center text-slate-600 font-medium">{fila.hora_limite}</td>
+                      <td className="p-4 text-center text-slate-600 font-bold">{fila.fecha_real_entrega || '-- : --'}</td>
+                      <td className="p-4 text-center">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border shadow-sm transition-transform hover:scale-105 ${
+                          fila.calificacion === 'Perfecto' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                          {fila.calificacion === 'Perfecto' ? <CheckCircle size={14} /> : <AlertOctagon size={14} />}
+                          {fila.calificacion}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="6" className="p-12 text-center text-slate-500 flex flex-col items-center justify-center">

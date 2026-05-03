@@ -181,7 +181,6 @@ const PedidosAdmin = () => {
     } catch (error) { alert("Error al cargar datos"); }
   };
 
-  // 👇 NUEVA LÓGICA DE ELIMINACIÓN TIPO "GOD MODE" 👇
   const handleDelete = async (pedidoFila) => {
     const estaBloqueado = ['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedidoFila.estado_entrega);
     
@@ -421,18 +420,33 @@ const PedidosAdmin = () => {
           )}
         </div>
 
-        {/* ================= TABLA DE PEDIDOS ================= */}
+        {/* ================= TABLA DE PEDIDOS Y FILTRO DE FECHAS RESPONSIVO ================= */}
         <div className="space-y-4 md:space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 pb-2 border-b border-slate-300">
              <div>
               <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2"><FileText className="text-slate-600" /> Historial</h2>
             </div>
-            <div className="flex w-full md:w-auto items-center gap-2 bg-white p-1.5 md:p-2 rounded-lg shadow-sm border">
-              <Calendar size={14} className="text-slate-400 ml-1"/>
-              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="text-xs md:text-sm w-full sm:w-auto border-none outline-none text-slate-600 font-medium bg-transparent"/>
-              <span className="text-slate-300 hidden sm:inline">/</span>
-              <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="text-xs md:text-sm w-full sm:w-auto border-none outline-none text-slate-600 font-medium bg-transparent"/>
-              <button onClick={fetchPedidos} className="bg-slate-100 hover:bg-slate-200 p-1.5 rounded ml-1 transition-colors"><Search size={16} className="text-slate-600"/></button>
+            
+            {/* Contenedor responsivo para el filtro de fechas */}
+            <div className="flex flex-col sm:flex-row w-full md:w-auto items-stretch sm:items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-slate-400 hidden sm:block ml-1"/>
+                <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Desde</span>
+                <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
+              </div>
+              
+              <span className="text-slate-300 hidden sm:inline px-1">|</span>
+              <div className="h-px w-full bg-slate-100 sm:hidden"></div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Hasta</span>
+                <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
+              </div>
+              
+              <button onClick={fetchPedidos} className="mt-2 sm:mt-0 w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 sm:py-1.5 rounded-md transition-colors font-bold text-sm">
+                <Search size={16} /> 
+                <span className="sm:hidden">Buscar Pedidos</span>
+              </button>
             </div>
           </div>
 

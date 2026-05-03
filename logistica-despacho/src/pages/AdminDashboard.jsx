@@ -23,11 +23,10 @@ const AdminDashboard = () => {
   const [indicadores, setIndicadores] = useState({ otif: 0, prod: 0, fin: 0, flota: 0 });
   const [animVal, setAnimVal] = useState({ otif: 0, prod: 0, fin: 0, flota: 0 });
 
-  // 👇 MODIFICACIÓN: Se agregó el parámetro mostrarCarga para la actualización silenciosa 👇
   const fetchDashboard = async (mostrarCarga = true) => {
     if (mostrarCarga) {
       setLoading(true);
-      setAnimVal({ otif: 0, prod: 0, fin: 0, flota: 0 }); // Reiniciar animación solo en carga manual
+      setAnimVal({ otif: 0, prod: 0, fin: 0, flota: 0 }); 
     }
     setError(null);
 
@@ -81,11 +80,69 @@ const AdminDashboard = () => {
         valProd = asignados > 0 ? Math.round((completas / asignados) * 100) : 0;
       }
 
-      // Financiero
+      // Financiero (Cruce inteligente de padres e hijos replicado del reporte financiero)
       if (dataFin.length > 0) {
-        const facturado = dataFin.reduce((acc, curr) => acc + Number(curr.valor_factura || 0), 0);
-        const recaudado = dataFin.reduce((acc, curr) => acc + Number(curr.valor_recaudado || 0), 0);
+        const facturasRaw = dataFin.map(f => ({
+          ...f,
+          id_factura_raw: f.id_factura ? String(f.id_factura).trim().toUpperCase() : 'SIN-FACTURA',
+          valFac: Number(f.valor_factura || 0),
+          valRec: Number(f.valor_recaudado || 0)
+        }));
+
+        const allIds = new Set(facturasRaw.map(f => f.id_factura_raw));
+        const facturasMap = {};
+
+        facturasRaw.forEach(fila => {
+          let idFacRaw = fila.id_factura_raw;
+          let idFacBase = idFacRaw;
+
+          if (idFacBase.includes('-')) {
+            let partes = idFacBase.split('-');
+            while (partes.length > 1) {
+              partes.pop(); 
+              let posibleBase = partes.join('-');
+              if (allIds.has(posibleBase)) idFacBase = posibleBase; 
+            }
+          }
+
+          if (!facturasMap[idFacBase]) {
+            facturasMap[idFacBase] = {
+              estado_entrega: fila.estado_entrega,
+              max_positivo: fila.valFac > 0 ? fila.valFac : 0,
+              suma_negativos: fila.valFac < 0 ? fila.valFac : 0, 
+              valor_recaudado_cruzado: fila.valRec
+            };
+          } else {
+            if (fila.valFac > 0) {
+              facturasMap[idFacBase].max_positivo = Math.max(facturasMap[idFacBase].max_positivo, fila.valFac);
+            } else {
+              facturasMap[idFacBase].suma_negativos += fila.valFac;
+            }
+            facturasMap[idFacBase].valor_recaudado_cruzado += fila.valRec;
+          }
+        });
+
+        // Extraemos las facturas netas reales después de aplicar devoluciones
+        const datosCruzados = Object.values(facturasMap).map(fac => {
+          return {
+            estado_entrega: fac.estado_entrega,
+            valor_factura: fac.max_positivo + fac.suma_negativos,
+            valor_recaudado: fac.valor_recaudado_cruzado
+          };
+        });
+
+        // Filtramos solo las entregas que ya cerraron su ciclo logístico
+        const facturasCerradas = datosCruzados.filter(f => 
+          !['Pendiente', 'Asignado', 'En Ruta'].includes(f.estado_entrega)
+        );
+
+        const facturado = facturasCerradas.reduce((acc, curr) => acc + curr.valor_factura, 0);
+        const recaudado = facturasCerradas.reduce((acc, curr) => acc + curr.valor_recaudado, 0);
+        
         valFin = facturado > 0 ? Math.round((recaudado / facturado) * 100) : 0;
+        
+        // Evitamos que supere el 100% en caso de propinas o descuadres menores
+        if(valFin > 100) valFin = 100;
       }
 
       // Flota
@@ -99,7 +156,6 @@ const AdminDashboard = () => {
 
       setIndicadores({ otif: valOtif, prod: valProd, fin: valFin, flota: valFlota });
 
-      // Si es recarga manual dispara con delay, si es actualización en tiempo real lo inyecta directo
       if (mostrarCarga) {
         setTimeout(() => {
           setAnimVal({ otif: valOtif, prod: valProd, fin: valFin, flota: valFlota });
@@ -116,20 +172,17 @@ const AdminDashboard = () => {
     }
   };
 
-  // 👇 MODIFICACIÓN: Motor de Tiempo Real (Polling cada 5 segundos) 👇
   useEffect(() => {
-    fetchDashboard(true); // Primera carga con pantalla de loading
+    fetchDashboard(true); 
     
-    // Intervalo de actualización silenciosa
     const intervalId = setInterval(() => { 
       fetchDashboard(false); 
     }, 5000);
 
-    return () => clearInterval(intervalId); // Limpiar al salir
+    return () => clearInterval(intervalId); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fechaInicio, fechaFin]);
 
-  // Variables para la animación SVG
   const radio = 36;
   const circunferencia = 2 * Math.PI * radio;
 
@@ -157,7 +210,6 @@ const AdminDashboard = () => {
             <label className="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1">Hasta</label>
             <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 transition-colors font-medium"/>
           </div>
-          {/* Al hacer clic manualmente, sí muestra la pantalla de carga */}
           <button onClick={() => fetchDashboard(true)} className="w-full sm:w-auto mt-2 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-xl flex justify-center items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95">
             <Search size={18} /> <span className="sm:hidden font-bold">Analizar Periodo</span>
           </button>

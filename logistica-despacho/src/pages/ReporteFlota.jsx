@@ -9,7 +9,6 @@ const ReporteFlota = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   
-  // 👇 LÓGICA DE FECHAS: Desde el día 1 del mes hasta hoy 👇
   const fechaActual = new Date();
   const hoyStr = fechaActual.toISOString().split('T')[0];
   const primerDiaMesStr = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1).toISOString().split('T')[0];
@@ -49,6 +48,16 @@ const ReporteFlota = () => {
     obtenerDatos();
   }, [fechaInicio, fechaFin]); 
 
+  // Calculamos totales de forma global para usarlos en UI y PDF
+  const totales = datos.reduce((acc, curr) => ({
+    kilos: acc.kilos + Number(curr.kilos_reales_cargados || 0),
+    pedidos: acc.pedidos + Number(curr.total_pedidos_cargados || 0)
+  }), { kilos: 0, pedidos: 0 });
+
+  const vehiculosActivos = datos.filter(d => Number(d.total_pedidos_cargados) > 0).length;
+  const totalVehiculos = datos.length;
+  const sinDatos = totalVehiculos === 0 || totales.pedidos === 0;
+
   const exportarExcel = () => {
     const datosFormateados = datos.map(fila => ({
       'Placa': fila.placa,
@@ -66,31 +75,115 @@ const ReporteFlota = () => {
     XLSX.writeFile(libro, `Ocupacion_Flota_${fechaInicio}_al_${fechaFin}.xlsx`);
   };
 
+  // 👇 PDF REDISEÑADO CON TARJETAS ESTILO DASHBOARD 👇
   const exportarPDF = () => {
     const doc = new jsPDF('landscape'); 
     
-    doc.setFontSize(18);
-    doc.text(`Reporte de Ocupación de Flota`, 14, 22);
+    // 1. HEADER (Fondo Oscuro Corporativo)
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 300, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Ocupación de Flota", 14, 20);
+    doc.setTextColor(148, 163, 184); // slate-400
     doc.setFontSize(11);
-    doc.text(`Rango evaluado: ${fechaInicio} al ${fechaFin}`, 14, 30);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Rango evaluado: ${fechaInicio} hasta ${fechaFin}`, 14, 30);
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
+    // 2. TARJETAS DE INDICADORES (KPIs)
+    let startY = 48;
+    const pUsoFlota = totalVehiculos > 0 ? Math.round((vehiculosActivos/totalVehiculos)*100) : 0;
+    
+    // Tarjeta 1: Ocupación Promedio (Oscura)
+    doc.setFillColor(30, 41, 59); // slate-800
+    doc.roundedRect(14, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("OCUPACIÓN PROMEDIO", 20, startY + 8);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.text(`${animacionOcupacion}%`, 20, startY + 22);
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`De la flota que estuvo en ruta`, 20, startY + 30);
+
+    // Tarjeta 2: Volumen Total (Azul Claro)
+    doc.setFillColor(238, 242, 255); // indigo-50
+    doc.roundedRect(105, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(79, 70, 229); // indigo-600
+    doc.setFontSize(10);
+    doc.text("VOLUMEN TOTAL", 111, startY + 8);
+    doc.setFontSize(24);
+    doc.setTextColor(30, 41, 59); // slate-800
+    doc.text(`${Number(totales.kilos).toLocaleString()} kg`, 111, startY + 22);
+    doc.setFontSize(9);
+    doc.setTextColor(99, 102, 241); // indigo-500
+    doc.text(`Movilizados en ${totales.pedidos} pedidos`, 111, startY + 30);
+
+    // Tarjeta 3: Uso de Flota (Verde Teal)
+    doc.setFillColor(240, 253, 250); // teal-50
+    doc.roundedRect(196, startY, 85, 35, 3, 3, 'F');
+    doc.setTextColor(13, 148, 136); // teal-600
+    doc.setFontSize(10);
+    doc.text("USO DE FLOTA", 202, startY + 8);
+    doc.setFontSize(24);
+    doc.setTextColor(30, 41, 59); // slate-800
+    doc.text(`${vehiculosActivos} / ${totalVehiculos}`, 202, startY + 22);
+    doc.setFontSize(9);
+    doc.setTextColor(20, 184, 166); // teal-500
+    doc.text(`Vehículos Activos: ${pUsoFlota}%`, 202, startY + 30);
+
+    // 3. TABLA DE DATOS
     const columnas = ["Placa", "Modelo", "Capacidad", "Días Activo", "Pedidos", "Total Cargado", "Ocupación Promedio"];
     const filas = datos.map(fila => [
       fila.placa,
       fila.modelo || 'N/A',
-      `${fila.capacidad_kg} kg`,
+      `${Number(fila.capacidad_kg).toLocaleString()} kg`,
       fila.dias_trabajados,
       fila.total_pedidos_cargados,
-      `${fila.kilos_reales_cargados} kg`,
+      `${Number(fila.kilos_reales_cargados).toLocaleString()} kg`,
       `${fila.porcentaje_ocupacion}%`
     ]);
 
     autoTable(doc, {
-      startY: 40,
+      startY: startY + 45,
       head: [columnas],
       body: filas,
       theme: 'grid',
-      headStyles: { fillColor: [71, 179, 168] },
+      headStyles: { fillColor: [71, 179, 168], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 8, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      didParseCell: function(data) {
+        if (data.section === 'body') {
+          // Si no trabajó (0 días) ponemos la fila gris
+          if (data.row.raw[3] === 0 || data.row.raw[3] === '0') {
+             data.cell.styles.textColor = [148, 163, 184]; // slate-400
+          } else {
+            // Columna Días (Índigo)
+            if (data.column.index === 3) {
+              data.cell.styles.textColor = [79, 70, 229]; // indigo-600
+              data.cell.styles.fontStyle = 'bold';
+            }
+            // Columna Cargado (Teal)
+            if (data.column.index === 5) {
+              data.cell.styles.textColor = [13, 148, 136]; // teal-600
+              data.cell.styles.fontStyle = 'bold';
+            }
+            // Columna Ocupación
+            if (data.column.index === 6) {
+              const valor = Number(data.cell.raw.replace('%', ''));
+              data.cell.styles.fontStyle = 'bold';
+              if (valor > 90) data.cell.styles.textColor = [239, 68, 68]; // rojo
+              else if (valor >= 70) data.cell.styles.textColor = [34, 197, 94]; // verde
+              else if (valor >= 40) data.cell.styles.textColor = [245, 158, 11]; // ambar
+              else data.cell.styles.textColor = [148, 163, 184]; // gris
+            }
+          }
+        }
+      }
     });
 
     doc.save(`Ocupacion_Flota_${fechaInicio}_al_${fechaFin}.pdf`);
@@ -103,63 +196,83 @@ const ReporteFlota = () => {
     return 'bg-slate-400'; // Vacío o muy bajo
   };
 
-  // --- CÁLCULOS DEL DASHBOARD ---
-  const totales = datos.reduce((acc, curr) => ({
-    kilos: acc.kilos + Number(curr.kilos_reales_cargados || 0),
-    pedidos: acc.pedidos + Number(curr.total_pedidos_cargados || 0)
-  }), { kilos: 0, pedidos: 0 });
-
-  const vehiculosActivos = datos.filter(d => Number(d.total_pedidos_cargados) > 0).length;
-  const totalVehiculos = datos.length;
-  const sinDatos = totalVehiculos === 0 || totales.pedidos === 0;
-
   const radio = 40;
   const circunferencia = 2 * Math.PI * radio;
   const strokeOffset = circunferencia - ((animacionOcupacion / 100) * circunferencia);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[80vh] overflow-x-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[80vh] overflow-x-hidden">
       
-      {/* ================= ENCABEZADO Y FILTROS ================= */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-100">
+      {/* ================= ENCABEZADO Y EXPORTACIÓN RESPONSIVO ================= */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6 pb-6 border-b border-slate-100">
+        
+        {/* Título y Logo */}
         <div className="flex items-center gap-3">
-          <div className="bg-teal-100 p-3 rounded-lg text-[#47B3A8]">
+          <div className="bg-teal-100 p-3 rounded-lg text-[#47B3A8] shrink-0">
             <BarChart2 size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Ocupación de Flota</h1>
-            <p className="text-sm text-slate-500">Optimización de capacidad y volumen de carga</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 leading-tight">Ocupación de Flota</h1>
+            <p className="text-xs sm:text-sm text-slate-500">Optimización de capacidad y volumen de carga</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors">
-            <Calendar size={18} className="text-[#47B3A8]" />
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase">Desde</span>
+        {/* Controles: Fechas y Exportación (Adaptable a Móvil) */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch lg:items-center gap-3 w-full lg:w-auto">
+          
+          {/* Caja de Fechas */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 sm:px-4 sm:py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors w-full sm:w-auto">
+            
+            {/* Fecha Desde */}
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-[#47B3A8]" />
+                <span className="text-xs font-bold text-slate-400 uppercase">Desde</span>
+              </div>
               <input 
-                type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}
-                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer w-[110px]"
+                type="date" 
+                value={fechaInicio} 
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer"
               />
             </div>
-            <div className="w-px h-5 bg-slate-300"></div>
-            <div className="flex items-center gap-2">
+
+            {/* Separador */}
+            <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200 sm:bg-slate-300"></div>
+
+            {/* Fecha Hasta */}
+            <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
               <span className="text-xs font-bold text-slate-400 uppercase">Hasta</span>
               <input 
-                type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} min={fechaInicio}
-                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer w-[110px]"
+                type="date" 
+                value={fechaFin} 
+                onChange={(e) => setFechaFin(e.target.value)} 
+                min={fechaInicio}
+                className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer"
               />
             </div>
           </div>
 
           <div className="w-px h-8 bg-slate-200 hidden xl:block mx-1"></div>
 
-          <button onClick={exportarExcel} disabled={cargando || totalVehiculos === 0} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm">
-            <FileText size={18} /> Excel
-          </button>
-          <button onClick={exportarPDF} disabled={cargando || totalVehiculos === 0} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium text-sm">
-            <Download size={18} /> PDF
-          </button>
+          {/* Botones de Exportación */}
+          <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
+            <button 
+              onClick={exportarExcel} 
+              disabled={cargando || totalVehiculos === 0} 
+              className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm"
+            >
+              <FileText size={18} /> Excel
+            </button>
+            <button 
+              onClick={exportarPDF} 
+              disabled={cargando || totalVehiculos === 0} 
+              className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 font-medium text-sm"
+            >
+              <Download size={18} /> PDF
+            </button>
+          </div>
+
         </div>
       </div>
 
