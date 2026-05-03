@@ -26,7 +26,7 @@ const login = async (req, res) => {
       return res.status(403).json({ error: "Acceso denegado: Tu cuenta está inactiva. Comunícate con el administrador." });
     }
 
-    // 👇 4. VERIFICACIÓN HÍBRIDA (EL SALVAVIDAS DE TRANSICIÓN) 👇
+    // 4. VERIFICACIÓN HÍBRIDA (EL SALVAVIDAS DE TRANSICIÓN)
     let passwordValida = false;
     
     // Primero, miramos si la base de datos tiene la contraseña vieja en texto plano ("123456")
@@ -41,7 +41,22 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Contraseña incorrecta" });
     }
 
-    // 5. Crear el Token JWT (Dura 8 horas)
+    // 👇 5. CANDADO DE SESIÓN ÚNICA 👇
+    if (usuario.session_token) {
+      try {
+        // Verificamos si el token viejo guardado en BD aún está vivo
+        jwt.verify(usuario.session_token, SECRET_KEY);
+        // Si no lanza error, significa que el token es válido y hay sesión activa
+        return res.status(403).json({ 
+          error: "Ya tienes una sesión activa en otro dispositivo o navegador. Cierra sesión allí primero." 
+        });
+      } catch (error) {
+        // Si entra aquí (error), significa que el token guardado ya expiró (pasaron las 8h), 
+        // así que lo ignoramos y le permitimos entrar.
+      }
+    }
+
+    // 6. Crear el Token JWT (Dura 8 horas)
     const tokenPayload = {
       id: usuario.id,
       role: usuario.rol_id,
@@ -50,14 +65,17 @@ const login = async (req, res) => {
     
     const token = jwt.sign(tokenPayload, SECRET_KEY, { expiresIn: '8h' });
 
-    // 6. Enviamos la respuesta exitosa manteniendo tu estructura frontal, pero inyectando el token
+    // 👇 7. GUARDAR EL NUEVO TOKEN EN LA BD PARA BLOQUEAR OTROS INGRESOS 👇
+    await db.query("UPDATE usuarios SET session_token = ? WHERE id = ?", [token, usuario.id]);
+
+    // 8. Enviamos la respuesta exitosa
     res.json({
       id: usuario.id,
       nombre_completo: usuario.nombre_completo,
       role: usuario.rol_id,      
       rol_nombre: usuario.rol_nombre,
       estado: usuario.estado,
-      token: token // <--- AÑADIMOS EL TOKEN AQUÍ
+      token: token 
     });
 
   } catch (error) {
@@ -66,4 +84,28 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login };
+// 👇 NUEVA FUNCIÓN PARA CERRAR SESIÓN Y LIBERAR EL CANDADO 👇
+const logout = async (req, res) => {
+  try {
+    // Extraemos el token de los headers (formato: "Bearer eyJhb...")
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(400).json({ error: "No se proporcionó token para cerrar sesión" });
+
+    // Decodificamos el token (sin verificar firma) solo para saber de qué ID de usuario es
+    const decoded = jwt.decode(token);
+    
+    if (decoded && decoded.id) {
+      // Borramos el token de la base de datos para este usuario
+      await db.query("UPDATE usuarios SET session_token = NULL WHERE id = ?", [decoded.id]);
+    }
+    
+    res.json({ message: "Sesión cerrada y liberada correctamente" });
+  } catch (error) {
+    console.error("Error al cerrar sesión:", error);
+    res.status(500).json({ error: "Error interno al cerrar sesión" });
+  }
+};
+
+module.exports = { login, logout };

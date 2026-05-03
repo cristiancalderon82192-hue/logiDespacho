@@ -5,7 +5,10 @@ const router = express.Router();
 // Importamos el controlador (el cerebro)
 const authController = require('../controllers/authController');
 
-// Definimos la ruta: Cuando alguien haga POST a /, ejecuta authController.login
+// Definimos la ruta de Login
 router.post('/login', authController.login);
+
+// 👇 DEFINIMOS LA NUEVA RUTA DE LOGOUT 👇
+router.post('/logout', authController.logout);
 
 module.exports = router;
