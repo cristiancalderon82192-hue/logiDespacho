@@ -1,7 +1,8 @@
 # LogiDespacho
 
 > Sistema web de gestión logística para el control integral de despachos, rutas, conductores y reportes operativos.
-> 
+
+
 ## Tabla de Contenidos
 
 - [Descripción](#descripción)
@@ -20,7 +21,7 @@
 
 **LogiDespacho** es una plataforma full-stack diseñada para empresas de distribución y logística. Permite gestionar el ciclo completo de un pedido: desde su registro por el líder de zona, pasando por la asignación de rutas por logística, la ejecución del conductor en campo, hasta la generación de reportes gerenciales.
 
-El sistema maneja múltiples roles de usuario con vistas y permisos diferenciados, control de bodegas, seguimiento de flota vehicular y recaudo en tiempo real.
+El sistema maneja múltiples roles de usuario con vistas y permisos diferenciados, control de bodegas, seguimiento de flota vehicular, rastreo GPS en tiempo real de conductores y recaudo en campo.
 
 ---
 
@@ -91,6 +92,8 @@ El sistema maneja múltiples roles de usuario con vistas y permisos diferenciado
 ---
 
 ## Arquitectura del Proyecto
+
+El proyecto está dividido en dos aplicaciones independientes: el cliente React (`LOGISTICA-DESPACHO`) y el servidor Express (`SERVER`).
 
 ```
 LogiDespacho/
