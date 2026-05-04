@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, FileText, MapPin, DollarSign, Calendar, CheckCircle, Truck, User, X, Edit, Weight, Building2, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, FileText, MapPin, DollarSign, Calendar, CheckCircle, Truck, User, X, Edit, Weight, Building2, Plus, Trash2, Clock } from 'lucide-react';
 
 const ReporteParciales = () => {
   const obtenerFechaLocal = () => {
@@ -24,6 +24,7 @@ const ReporteParciales = () => {
   const [asignacion, setAsignacion] = useState({ 
     conductor_id: '', vehiculo_id: '', valor_despachar: '', observaciones_entrega: '', 
     fecha_agendada: hoyLocal,
+    hora_limite: '18:00', // <-- NUEVO ESTADO PARA LA HORA LÍMITE
     detalles: [{ bodega_id: '', peso: '' }],
     nota_despacho: ''
   });
@@ -31,7 +32,6 @@ const ReporteParciales = () => {
   const fetchParciales = async () => {
     setLoading(true);
     try {
-      // CORREGIDO: Uso de backticks
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales`);
       if (response.ok) setPedidos(await response.json());
     } catch (error) { console.error("Error:", error); } 
@@ -41,7 +41,6 @@ const ReporteParciales = () => {
   const fetchCatalogos = async () => {
     try {
       const [resC, resV, resB] = await Promise.all([
-        // CORREGIDOS: Uso de backticks en todos los catálogos
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/conductores`), 
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/vehiculos`),
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/bodegas`) 
@@ -85,16 +84,17 @@ const ReporteParciales = () => {
       valor_despachar: pedido.valor_factura_pendiente, 
       observaciones_entrega: '', 
       fecha_agendada: hoyLocal, 
+      hora_limite: '18:00', // <-- RESETEO DE LA HORA AL ABRIR
       detalles: [{ bodega_id: '', peso: '' }],
-      nota_despacho: ''
+      nota_despacho: `[SALDO] `
     });
     setShowModal(true);
   };
 
   const handleAsignarSaldo = async (e) => {
     e.preventDefault();
-    if (!asignacion.conductor_id || !asignacion.vehiculo_id || !asignacion.valor_despachar || !asignacion.fecha_agendada || !asignacion.nota_despacho) {
-      return alert("Por favor completa todos los campos, incluyendo la Nota de Despacho.");
+    if (!asignacion.conductor_id || !asignacion.vehiculo_id || !asignacion.valor_despachar || !asignacion.fecha_agendada || !asignacion.hora_limite || !asignacion.nota_despacho) {
+      return alert("Por favor completa todos los campos, incluyendo la Hora Límite y la Nota de Despacho.");
     }
     const detallesValidos = asignacion.detalles.every(d => d.bodega_id !== '' && d.peso !== '' && Number(d.peso) > 0);
     if (!detallesValidos) {
@@ -141,7 +141,7 @@ const ReporteParciales = () => {
           </div>
         </div>
 
-        {/* TABLA DE RESULTADOS (SCROLL HORIZONTAL) */}
+        {/* TABLA DE RESULTADOS */}
         <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden w-full">
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left table-fixed min-w-[950px]">
@@ -216,7 +216,7 @@ const ReporteParciales = () => {
                   <div className="bg-[#47B3A8] p-1.5 md:p-2 rounded-lg"><Truck size={18} className="text-white"/></div>
                   <div>
                     <h3 className="font-bold text-base md:text-lg leading-none">Generar Viaje de Saldo</h3>
-                    <p className="text-[10px] md:text-xs text-slate-400 mt-1">Pedido: {pedidoSeleccionado.id_factura}</p>
+                    <p className="text-[10px] md:text-xs text-slate-400 mt-1">Pedido: {pedidoSeleccionado.id_factura}-S</p>
                   </div>
                 </div>
                 <button onClick={() => setShowModal(false)} className="p-1.5 rounded-full hover:bg-white/20 transition-colors"><X size={18}/></button>
@@ -229,11 +229,35 @@ const ReporteParciales = () => {
                   <p className="text-lg md:text-xl font-extrabold text-red-600">${Number(pedidoSeleccionado.valor_factura_pendiente).toLocaleString('es-CO')}</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><Calendar size={12} className="text-[#47B3A8]"/> Fecha de Salida</label>
-                    <input type="date" value={asignacion.fecha_agendada} onChange={(e) => setAsignacion({...asignacion, fecha_agendada: e.target.value})} className="w-full border-2 border-slate-200 p-2 md:p-2.5 rounded-lg md:rounded-xl text-sm font-bold bg-white outline-none focus:border-[#47B3A8]" required />
+                {/* 👇 MODIFICACIÓN: FECHA Y HORA LÍMITE 👇 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5">
+                      <Calendar size={12} className="text-[#47B3A8]"/> Fecha Salida
+                    </label>
+                    <input 
+                      type="date" 
+                      value={asignacion.fecha_agendada} 
+                      onChange={(e) => setAsignacion({...asignacion, fecha_agendada: e.target.value})} 
+                      className="w-full border-2 border-slate-200 p-2 md:p-2.5 rounded-lg md:rounded-xl text-sm font-bold bg-white outline-none focus:border-[#47B3A8]" 
+                      required 
+                    />
                   </div>
+                  <div>
+                    <label className="text-[10px] md:text-xs font-bold text-blue-600 uppercase flex items-center gap-2 mb-1.5">
+                      <Clock size={12} /> Hora Límite
+                    </label>
+                    <input 
+                      type="time" 
+                      value={asignacion.hora_limite} 
+                      onChange={(e) => setAsignacion({...asignacion, hora_limite: e.target.value})} 
+                      className="w-full border-2 border-blue-200 bg-blue-50 p-2 md:p-2.5 rounded-lg md:rounded-xl text-blue-900 font-bold text-sm outline-none focus:border-blue-500" 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><User size={12} /> Conductor</label>
                     <select value={asignacion.conductor_id} onChange={(e) => setAsignacion({ ...asignacion, conductor_id: e.target.value })} className="w-full border-2 border-slate-200 p-2 md:p-2.5 rounded-lg text-sm bg-white outline-none focus:border-[#47B3A8]" required>
@@ -243,8 +267,6 @@ const ReporteParciales = () => {
                   </div>
                   <div>
                     <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><Truck size={12} /> Vehículo</label>
-                    
-                    {/* 👇 VALIDACIÓN DEL VEHÍCULO INACTIVO 👇 */}
                     <select 
                       value={asignacion.vehiculo_id} 
                       onChange={(e) => setAsignacion({...asignacion, vehiculo_id: e.target.value})} 
