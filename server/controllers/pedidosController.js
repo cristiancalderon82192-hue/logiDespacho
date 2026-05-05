@@ -108,6 +108,7 @@ const listarPedidosRango = async (req, res) => {
         p.id, p.id_factura, p.prioridad, p.estado_entrega,
         p.observaciones_entrega, p.valor_factura_pendiente,
         p.firma_cliente, /* 👇 AQUÍ AGREGAMOS LA FIRMA 👇 */
+        u.nombre_completo AS conductor_nombre, /* 👇 AGREGADO PARA LEAD TIME 👇 */
         td.nombre as tipo_documento,
         DATE_FORMAT(p.fecha_facturacion, '%Y-%m-%d') as fecha_facturacion,
         DATE_FORMAT(p.fecha_agendada, '%Y-%m-%d') as fecha_agendada,
@@ -119,6 +120,7 @@ const listarPedidosRango = async (req, res) => {
       JOIN clientes c ON p.cliente_id = c.id
       JOIN destinos d ON p.destino_id = d.id  
       LEFT JOIN zonas z ON d.zona_id = z.id 
+      LEFT JOIN usuarios u ON p.conductor_id = u.id /* 👇 AGREGADO PARA LEAD TIME 👇 */
       LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
       LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
       WHERE p.fecha_agendada BETWEEN ? AND ? 

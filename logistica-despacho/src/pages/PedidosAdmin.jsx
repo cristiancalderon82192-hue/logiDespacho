@@ -218,8 +218,19 @@ const PedidosAdmin = () => {
 
       const doc = new jsPDF();
       
-      doc.setFillColor(71, 179, 168); 
+      // 👇 LÓGICA DE COLORES DINÁMICOS SEGÚN EL ESTADO 👇
+      let colorHeader = [71, 179, 168]; // Verde por defecto (Entregado / Normal)
+      
+      if (data.estado_entrega === 'Entregado Incompleto') {
+        colorHeader = [245, 158, 11]; // Amarillo/Naranja (Amber 500)
+      } else if (data.estado_entrega === 'Devolución') {
+        colorHeader = [239, 68, 68]; // Rojo (Red 500)
+      }
+
+      // Aplicar color dinámico al banner principal
+      doc.setFillColor(colorHeader[0], colorHeader[1], colorHeader[2]); 
       doc.rect(0, 0, 210, 30, 'F');
+      
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
@@ -231,8 +242,12 @@ const PedidosAdmin = () => {
       doc.setFont("helvetica", "normal");
       doc.text(`Fecha Agendada: ${data.fecha_agendada || 'N/A'}`, 14, 52);
       doc.setFont("helvetica", "bold");
+      
+      // Aplicar color dinámico al texto del estado
+      doc.setTextColor(colorHeader[0], colorHeader[1], colorHeader[2]);
       doc.text(`Estado Actual: ${data.estado_entrega}`, 14, 59);
 
+      // Tabla de cliente con el color dinámico en la cabecera
       autoTable(doc, {
           startY: 65,
           head: [['Datos del Cliente', 'Ubicación']],
@@ -240,7 +255,7 @@ const PedidosAdmin = () => {
               [`Nombre: ${data.nombre_cliente}\nTeléfono: ${data.telefono || 'N/A'}`, `Destino: ${data.destino}\nZona: ${data.zona_envio || 'N/A'}`]
           ],
           theme: 'grid',
-          headStyles: { fillColor: [71, 179, 168] }
+          headStyles: { fillColor: colorHeader } // 👈 COLOR DINÁMICO AQUÍ
       });
 
       const bodegas = [];
@@ -489,14 +504,19 @@ const PedidosAdmin = () => {
                           <td className="p-3 md:p-4 align-middle text-center font-extrabold text-slate-800">{Number(p.total_peso).toLocaleString()} kg</td>
                           
                           <td className="p-3 md:p-4 align-middle text-center">
-                            <div className="flex flex-col items-center gap-1 w-full">
+                            <div className="flex flex-col items-center gap-1 w-full max-w-[140px] md:max-w-[160px] mx-auto">
                               {p.estado_entrega === 'Pendiente' && <span className="bg-slate-100 text-slate-600 px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-slate-200">Pendiente</span>}
                               {p.estado_entrega === 'Asignado' && <span className="bg-blue-50 text-blue-700 px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-blue-200">Asignado</span>}
                               {p.estado_entrega === 'En Ruta' && <span className="bg-blue-100 text-blue-700 px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-blue-300 flex items-center gap-1"><Truck size={10} className="md:w-3 md:h-3"/> En Ruta</span>}
                               {p.estado_entrega === 'Entregado' && <span className="bg-green-100 text-green-700 px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-green-300 flex items-center gap-1"><CheckCircle size={10} className="md:w-3 md:h-3"/> Entregado</span>}
                               {p.estado_entrega === 'Entregado Incompleto' && <span className="bg-orange-100 text-orange-700 px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-orange-300 flex items-center gap-1"><AlertTriangle size={10} className="md:w-3 md:h-3"/> Incompleto</span>}
                               {p.estado_entrega === 'Devolución' && <span className="bg-red-100 text-red-700 px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border border-red-300 flex items-center gap-1"><X size={10} className="md:w-3 md:h-3"/> Devolución</span>}
-                              {p.observaciones_entrega && <span className={`text-[8px] md:text-[9px] px-1.5 py-0.5 rounded w-full truncate block mt-1 ${p.estado_entrega === 'Devolución' ? 'text-red-700 bg-red-50 border border-red-100' : 'text-orange-700 bg-orange-50 border border-orange-100'}`} title={p.observaciones_entrega}>Nota: {p.observaciones_entrega}</span>}
+                              
+                              {p.observaciones_entrega && (
+                                <div className={`mt-1 text-[9px] md:text-[10px] px-2 py-1 rounded-lg border leading-tight text-center w-full shadow-sm whitespace-normal break-words line-clamp-3 ${p.estado_entrega === 'Devolución' ? 'text-red-700 bg-red-50 border-red-200' : 'text-orange-700 bg-orange-50 border-orange-200'}`} title={p.observaciones_entrega}>
+                                  <b>Nota:</b> {p.observaciones_entrega}
+                                </div>
+                              )}
                             </div>
                           </td>
                           
@@ -510,7 +530,6 @@ const PedidosAdmin = () => {
                                   <button onClick={() => generarComprobantePDF(p)} className="flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-1.5 bg-teal-100 text-teal-700 hover:bg-teal-200 rounded-lg text-[10px] md:text-xs font-bold transition-colors" title="Descargar Comanda">
                                     <Printer size={12} className="md:w-[14px] md:h-[14px]" /> PDF
                                   </button>
-                                  {/* 👇 BOTÓN ELIMINAR PARA ADMIN (SIEMPRE VISIBLE) 👇 */}
                                   <button onClick={() => handleDelete(p)} className="p-1.5 md:p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors" title="Eliminar (Modo Admin)">
                                     <Trash2 size={14} className="md:w-[16px] md:h-[16px]" />
                                   </button>

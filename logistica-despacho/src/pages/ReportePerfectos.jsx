@@ -51,7 +51,7 @@ const ReportePerfectos = () => {
       'Cliente': fila.cliente,
       'Conductor': fila.conductor,
       'Estado Entrega': fila.estado_entrega,
-      'Fecha Agendada': fila.fecha_agendada,
+      'Fecha Agendada': fila.fecha_agendada, // Añadido
       'Hora Límite': fila.hora_limite,
       'Entrega Real': fila.fecha_real_entrega || 'N/A',
       'Calificación': fila.calificacion,
@@ -64,12 +64,11 @@ const ReportePerfectos = () => {
     XLSX.writeFile(libro, `OTIF_${fechaInicio}_al_${fechaFin}.xlsx`);
   };
 
-  // 👇 FUNCIÓN DE PDF REDISEÑADA ESTILO DASHBOARD 👇
   const exportarPDF = () => {
     const doc = new jsPDF('landscape');
     
     // 1. HEADER (Fondo Oscuro Corporativo)
-    doc.setFillColor(15, 23, 42); // slate-900
+    doc.setFillColor(15, 23, 42); 
     doc.rect(0, 0, 300, 40, 'F');
     
     doc.setTextColor(255, 255, 255);
@@ -77,7 +76,7 @@ const ReportePerfectos = () => {
     doc.setFont("helvetica", "bold");
     doc.text("Reporte de Nivel de Servicio (OTIF)", 14, 20);
     
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setTextColor(148, 163, 184); 
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text(`Rango evaluado: ${fechaInicio} hasta ${fechaFin}`, 14, 30);
@@ -90,11 +89,11 @@ const ReportePerfectos = () => {
     const pExito = tPedidos > 0 ? Math.round((tPerfectos / tPedidos) * 100) : 0;
     const pError = 100 - pExito;
 
-    // 3. TARJETAS DE INDICADORES (KPIs visuales)
+    // 3. TARJETAS DE INDICADORES
     let startY = 48;
     
     // Tarjeta 1: Score Global
-    doc.setFillColor(30, 41, 59); // slate-800
+    doc.setFillColor(30, 41, 59); 
     doc.roundedRect(14, startY, 85, 35, 3, 3, 'F');
     doc.setTextColor(148, 163, 184);
     doc.setFontSize(10);
@@ -108,9 +107,9 @@ const ReportePerfectos = () => {
     doc.text(`De ${tPedidos} pedidos evaluados`, 20, startY + 30);
 
     // Tarjeta 2: Pedidos Perfectos
-    doc.setFillColor(240, 253, 244); // green-50
+    doc.setFillColor(240, 253, 244); 
     doc.roundedRect(105, startY, 85, 35, 3, 3, 'F');
-    doc.setTextColor(22, 163, 74); // green-600
+    doc.setTextColor(22, 163, 74); 
     doc.setFontSize(10);
     doc.text("PEDIDOS PERFECTOS", 111, startY + 8);
     doc.setFontSize(24);
@@ -119,9 +118,9 @@ const ReportePerfectos = () => {
     doc.text(`Tasa de éxito: ${pExito}%`, 111, startY + 30);
 
     // Tarjeta 3: Entregas Fallidas
-    doc.setFillColor(254, 242, 242); // red-50
+    doc.setFillColor(254, 242, 242); 
     doc.roundedRect(196, startY, 85, 35, 3, 3, 'F');
-    doc.setTextColor(220, 38, 38); // red-600
+    doc.setTextColor(220, 38, 38); 
     doc.setFontSize(10);
     doc.text("ENTREGAS FALLIDAS", 202, startY + 8);
     doc.setFontSize(24);
@@ -129,20 +128,20 @@ const ReportePerfectos = () => {
     doc.setFontSize(9);
     doc.text(`Margen de error: ${pError}%`, 202, startY + 30);
 
-    // 4. TABLA DE DATOS (Con colores intercalados)
-    const columnas = ["Factura", "Cliente", "Estado", "Límite", "Real", "OTIF", "Observaciones"];
+    // 4. TABLA DE DATOS (Actualizada con Fecha Agendada)
+    const columnas = ["Factura", "Cliente", "Estado", "F. Agendada", "Límite", "Real", "OTIF", "Observaciones"];
     const filas = datos.map(fila => {
       const nota = fila.observaciones_entrega || fila.nota_manual || 'N/A';
-      const notaCorta = nota.length > 40 ? nota.substring(0, 40) + '...' : nota;
       
       return [
         fila.id_factura,
         fila.cliente,
         fila.estado_entrega,
+        fila.fecha_agendada, // Añadido
         fila.hora_limite,
         fila.fecha_real_entrega || 'N/A',
         fila.calificacion,
-        notaCorta
+        nota
       ];
     });
 
@@ -152,25 +151,29 @@ const ReportePerfectos = () => {
       body: filas,
       theme: 'grid',
       headStyles: { 
-        fillColor: [71, 179, 168], // Tu color verde principal
+        fillColor: [71, 179, 168], 
         textColor: 255,
         fontStyle: 'bold' 
       },
       styles: { 
         fontSize: 8,
-        cellPadding: 3
+        cellPadding: 3,
+        overflow: 'linebreak' 
+      },
+      columnStyles: {
+        7: { cellWidth: 55 } // Ajustado para hacer espacio
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252] // slate-50 (Ligero gris para lectura fácil)
+        fillColor: [248, 250, 252] 
       },
-      // Pintar la celda de OTIF según sea Perfecto o No
       didParseCell: function(data) {
-        if (data.section === 'body' && data.column.index === 5) { // Columna "OTIF"
+        // La columna OTIF ahora es el índice 6
+        if (data.section === 'body' && data.column.index === 6) { 
           if (data.cell.raw === 'Perfecto') {
-            data.cell.styles.textColor = [22, 163, 74]; // green-600
+            data.cell.styles.textColor = [22, 163, 74]; 
             data.cell.styles.fontStyle = 'bold';
           } else {
-            data.cell.styles.textColor = [220, 38, 38]; // red-600
+            data.cell.styles.textColor = [220, 38, 38]; 
             data.cell.styles.fontStyle = 'bold';
           }
         }
@@ -207,13 +210,11 @@ const ReportePerfectos = () => {
           </div>
         </div>
 
-        {/* Controles: Fechas y Exportación (Adaptable a Móvil) */}
+        {/* Controles: Fechas y Exportación */}
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch lg:items-center gap-3 w-full lg:w-auto">
           
-          {/* Caja de Fechas (En móvil se apila, en PC se alinea) */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 sm:px-4 sm:py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors w-full sm:w-auto">
             
-            {/* Fecha Desde */}
             <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
                 <Calendar size={18} className="text-[#47B3A8]" />
@@ -225,10 +226,8 @@ const ReportePerfectos = () => {
               />
             </div>
 
-            {/* Separador (Línea Horizontal en móvil, Vertical en PC) */}
             <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200 sm:bg-slate-300"></div>
 
-            {/* Fecha Hasta */}
             <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
               <span className="text-xs font-bold text-slate-400 uppercase">Hasta</span>
               <input 
@@ -240,7 +239,6 @@ const ReportePerfectos = () => {
 
           <div className="w-px h-8 bg-slate-200 hidden xl:block mx-1"></div>
 
-          {/* Botones de Exportación (Se dividen 50/50 en celular) */}
           <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
             <button onClick={exportarExcel} disabled={cargando || datos.length === 0} className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium text-sm">
               <FileText size={18} /> Excel
@@ -266,7 +264,6 @@ const ReportePerfectos = () => {
       {!cargando && !error && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in-up">
           
-          {/* TARJETA 1: SCORE GLOBAL OTIF */}
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 shadow-lg flex flex-col items-center justify-center text-white relative overflow-hidden group">
             <div className="absolute inset-0 bg-[radial-gradient(#fff_1px,transparent_1px)] opacity-10 [background-size:10px_10px]"></div>
             <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 z-10 text-center">Score Global (OTIF)</h3>
@@ -293,7 +290,6 @@ const ReportePerfectos = () => {
             <p className="text-xs text-slate-400 mt-4 z-10 text-center">De <span className="font-bold text-white">{totalPedidos}</span> pedidos evaluados</p>
           </div>
 
-          {/* TARJETA 2: PEDIDOS PERFECTOS */}
           <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-100 flex flex-col justify-between hover:shadow-lg transition-shadow relative overflow-hidden">
             <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full -z-0 ${totalPedidos === 0 ? 'bg-slate-50' : 'bg-green-50'}`}></div>
             <div className="relative z-10 flex justify-between items-start mb-4">
@@ -319,7 +315,6 @@ const ReportePerfectos = () => {
             </div>
           </div>
 
-          {/* TARJETA 3: PEDIDOS NO PERFECTOS */}
           <div className="bg-white rounded-2xl p-6 shadow-md border border-slate-100 flex flex-col justify-between hover:shadow-lg transition-shadow relative overflow-hidden">
             <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full -z-0 ${totalPedidos === 0 ? 'bg-slate-50' : 'bg-red-50'}`}></div>
             <div className="relative z-10 flex justify-between items-start mb-4">
@@ -357,6 +352,8 @@ const ReportePerfectos = () => {
                 <th className="p-4 font-semibold rounded-tl-lg">Factura</th>
                 <th className="p-4 font-semibold">Cliente</th>
                 <th className="p-4 font-semibold text-center">Estado Actual</th>
+                {/* 👇 NUEVA COLUMNA AÑADIDA 👇 */}
+                <th className="p-4 font-semibold text-center">F. Agendada</th>
                 <th className="p-4 font-semibold text-center">Hora Límite</th>
                 <th className="p-4 font-semibold text-center">Entrega Real</th>
                 <th className="p-4 font-semibold text-center rounded-tr-lg">Calificación OTIF</th>
@@ -375,31 +372,34 @@ const ReportePerfectos = () => {
                       </td>
                       <td className="p-4 text-slate-600 truncate max-w-[200px]" title={fila.cliente}>{fila.cliente}</td>
                       
-                      {/* 👇 AQUÍ ESTÁ LA NOTA INCRUSTADA EXACTAMENTE COMO LA PEDISTE 👇 */}
-                      <td className="p-4">
-                        <div className="flex flex-col items-center justify-center gap-1 w-full">
-                          <span className={`px-2 py-1 rounded text-xs font-bold ${
-                            fila.estado_entrega === 'Entregado' ? 'text-green-700 bg-green-50' : 
-                            fila.estado_entrega === 'Devolución' ? 'text-red-700 bg-red-50' : 'text-orange-700 bg-orange-50'
+                      <td className="p-4 align-middle text-center">
+                        <div className="flex flex-col items-center gap-1.5 w-full max-w-[160px] md:max-w-[180px] mx-auto">
+                          <span className={`px-2 py-1 md:px-3 md:py-1 rounded-full text-[9px] md:text-xs font-bold border ${
+                            fila.estado_entrega === 'Entregado' ? 'text-green-700 bg-green-100 border-green-300' : 
+                            fila.estado_entrega === 'Devolución' ? 'text-red-700 bg-red-100 border-red-300' : 'text-orange-700 bg-orange-100 border-orange-300'
                           }`}>
                             {fila.estado_entrega}
                           </span>
                           
                           {notaCruda && (
-                            <span 
-                              className={`text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded w-full max-w-[200px] truncate block mt-1 ${
-                                fila.estado_entrega === 'Devolución' 
-                                  ? 'text-red-700 bg-red-50 border border-red-100' 
-                                  : 'text-orange-700 bg-orange-50 border border-orange-100'
-                              }`} 
-                              title={notaCruda}
-                            >
-                              Nota: {notaCruda}
-                            </span>
+                            <div className={`w-full p-1.5 md:p-2 rounded-lg border shadow-sm overflow-hidden ${
+                              fila.estado_entrega === 'Devolución' 
+                                ? 'bg-red-50 border-red-200 text-red-700' 
+                                : 'bg-orange-50 border-orange-200 text-orange-700'
+                            }`} title={notaCruda}>
+                              <div className="text-[9px] md:text-[10px] leading-snug text-center whitespace-normal break-words">
+                                <b>Nota:</b> {notaCruda}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </td>
                       
+                      {/* 👇 NUEVA CELDA AÑADIDA 👇 */}
+                      <td className="p-4 text-center text-slate-500 font-medium">
+                        {fila.fecha_agendada}
+                      </td>
+
                       <td className="p-4 text-center text-slate-600 font-medium">{fila.hora_limite}</td>
                       <td className="p-4 text-center text-slate-600 font-bold">{fila.fecha_real_entrega || '-- : --'}</td>
                       <td className="p-4 text-center">
@@ -415,7 +415,7 @@ const ReportePerfectos = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="p-12 text-center text-slate-500 flex flex-col items-center justify-center">
+                  <td colSpan="7" className="p-12 text-center text-slate-500 flex flex-col items-center justify-center">
                     <TrendingUp size={48} className="text-slate-200 mb-4" />
                     <p className="text-lg font-bold">No hay datos para analizar</p>
                     <p className="text-sm">Ajusta el rango de fechas para ver las estadísticas.</p>

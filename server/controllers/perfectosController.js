@@ -10,12 +10,13 @@ const getReportePerfectos = async (req, res) => {
         p.id_factura,
         c.nombre AS cliente,
         u.nombre_completo AS conductor,
+        -- 👇 ASEGURAMOS QUE LA FECHA VENGA FORMATEADA CORRECTAMENTE 👇
         DATE_FORMAT(p.fecha_agendada, '%Y-%m-%d') AS fecha_agendada,
         p.hora_registro AS hora_limite,
         DATE_FORMAT(p.fecha_entrega_conductor, '%Y-%m-%d %H:%i') AS fecha_real_entrega,
         p.estado_entrega,
-        p.observaciones_entrega,  -- AQUI ESTÁ EL CAMBIO
-        p.nota_manual,            -- AQUI ESTÁ EL CAMBIO
+        p.observaciones_entrega,
+        p.nota_manual,
         CASE 
           WHEN p.estado_entrega = 'Entregado' 
                AND DATE(p.fecha_entrega_conductor) = p.fecha_agendada

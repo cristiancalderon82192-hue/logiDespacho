@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, FileText, MapPin, DollarSign, Calendar, CheckCircle, Truck, User, X, Edit, Weight, Building2, Plus, Trash2, Clock } from 'lucide-react';
+import { AlertCircle, FileText, MapPin, Calendar, CheckCircle, Truck, User, X, Weight, Building2, Plus, Trash2, CheckSquare, Square } from 'lucide-react';
 
 const ReporteParciales = () => {
   const obtenerFechaLocal = () => {
@@ -18,16 +18,13 @@ const ReporteParciales = () => {
   const [bodegas, setBodegas] = useState([]); 
   const [loading, setLoading] = useState(true);
 
-  const [showModal, setShowModal] = useState(false);
-  const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  
-  const [asignacion, setAsignacion] = useState({ 
-    conductor_id: '', vehiculo_id: '', valor_despachar: '', observaciones_entrega: '', 
-    fecha_agendada: hoyLocal,
-    hora_limite: '18:00', // <-- NUEVO ESTADO PARA LA HORA LÍMITE
-    detalles: [{ bodega_id: '', peso: '' }],
-    nota_despacho: ''
+  // ESTADOS PARA SELECCIÓN MÚLTIPLE (LOTES DE SALDOS)
+  const [pedidosSeleccionados, setPedidosSeleccionados] = useState([]);
+  const [showModalLote, setShowModalLote] = useState(false);
+  const [asignacionLote, setAsignacionLote] = useState({ 
+    conductor_id: '', vehiculo_id: '', fecha_agendada: hoyLocal 
   });
+  const [detallesLote, setDetallesLote] = useState({});
 
   const fetchParciales = async () => {
     setLoading(true);
@@ -62,69 +59,132 @@ const ReporteParciales = () => {
     return fechaStr.split('T')[0];
   };
 
-  const handleAddDetalle = () => {
-    setAsignacion({ ...asignacion, detalles: [...asignacion.detalles, { bodega_id: '', peso: '' }] });
+  // ================= LÓGICA DE SELECCIÓN MÚLTIPLE (LOTES DE SALDOS) =================
+  const toggleSeleccion = (id) => {
+    setPedidosSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    );
   };
 
-  const handleRemoveDetalle = (index) => {
-    const nuevosDetalles = asignacion.detalles.filter((_, i) => i !== index);
-    setAsignacion({ ...asignacion, detalles: nuevosDetalles });
-  };
-
-  const handleDetalleChange = (index, field, value) => {
-    const nuevosDetalles = [...asignacion.detalles];
-    nuevosDetalles[index][field] = value;
-    setAsignacion({ ...asignacion, detalles: nuevosDetalles });
-  };
-
-  const handleAbrirAsignacion = (pedido) => {
-    setPedidoSeleccionado(pedido);
-    setAsignacion({ 
-      conductor_id: '', vehiculo_id: '',
-      valor_despachar: pedido.valor_factura_pendiente, 
-      observaciones_entrega: '', 
-      fecha_agendada: hoyLocal, 
-      hora_limite: '18:00', // <-- RESETEO DE LA HORA AL ABRIR
-      detalles: [{ bodega_id: '', peso: '' }],
-      nota_despacho: `[SALDO] `
-    });
-    setShowModal(true);
-  };
-
-  const handleAsignarSaldo = async (e) => {
-    e.preventDefault();
-    if (!asignacion.conductor_id || !asignacion.vehiculo_id || !asignacion.valor_despachar || !asignacion.fecha_agendada || !asignacion.hora_limite || !asignacion.nota_despacho) {
-      return alert("Por favor completa todos los campos, incluyendo la Hora Límite y la Nota de Despacho.");
-    }
-    const detallesValidos = asignacion.detalles.every(d => d.bodega_id !== '' && d.peso !== '' && Number(d.peso) > 0);
-    if (!detallesValidos) {
-      return alert("Todas las filas de mercancía deben tener una bodega seleccionada y un peso mayor a 0.");
-    }
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/despachar-saldo`, {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(asignacion) 
+  const handleAbrirModalLote = () => {
+    const valoresIniciales = {};
+    pedidos
+      .filter(p => pedidosSeleccionados.includes(p.id))
+      .forEach(p => {
+        valoresIniciales[p.id] = {
+          valor_despachar: p.valor_factura_pendiente || 0,
+          observacion: '',
+          detalles: [{ bodega_id: '', peso: '' }] // Bodegas individuales por factura en el lote
+        };
       });
+    setDetallesLote(valoresIniciales);
+    setAsignacionLote({ conductor_id: '', vehiculo_id: '', fecha_agendada: hoyLocal });
+    setShowModalLote(true);
+  };
+
+  const handleDetalleLoteChange = (pId, index, field, value) => {
+    setDetallesLote(prev => {
+      const pedidoInfo = prev[pId];
+      const nuevosDetalles = [...pedidoInfo.detalles];
+      nuevosDetalles[index][field] = value;
+      return { ...prev, [pId]: { ...pedidoInfo, detalles: nuevosDetalles } };
+    });
+  };
+
+  const handleAddDetalleLote = (pId) => {
+    setDetallesLote(prev => {
+      const pedidoInfo = prev[pId];
+      return { 
+        ...prev, 
+        [pId]: { ...pedidoInfo, detalles: [...pedidoInfo.detalles, { bodega_id: '', peso: '' }] } 
+      };
+    });
+  };
+
+  const handleRemoveDetalleLote = (pId, index) => {
+    setDetallesLote(prev => {
+      const pedidoInfo = prev[pId];
+      const nuevosDetalles = pedidoInfo.detalles.filter((_, i) => i !== index);
+      return { ...prev, [pId]: { ...pedidoInfo, detalles: nuevosDetalles } };
+    });
+  };
+
+  const handleAsignarLoteSaldos = async (e) => {
+    e.preventDefault();
+    if (!asignacionLote.conductor_id || !asignacionLote.vehiculo_id || !asignacionLote.fecha_agendada) {
+      return alert("Debes seleccionar conductor, vehículo y fecha de salida.");
+    }
+
+    const payloadDetalles = [];
+
+    // Validaciones estrictas por cada saldo del lote
+    for (const pId of pedidosSeleccionados) {
+      const pedidoOriginal = pedidos.find(p => p.id === pId);
+      const det = detallesLote[pId];
+      
+      if (Number(det.valor_despachar) > Number(pedidoOriginal.valor_factura_pendiente)) {
+        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede despachar más de lo que debe ($${Number(pedidoOriginal.valor_factura_pendiente).toLocaleString()}).`);
+      }
+
+      if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura_pendiente) && det.observacion.trim() === '') {
+        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} sigue incompleta. Es OBLIGATORIO escribir una justificación.`);
+      }
+
+      const detallesValidos = det.detalles.every(d => d.bodega_id !== '' && d.peso !== '' && Number(d.peso) > 0);
+      if (!detallesValidos) {
+        return alert(`❌ ALERTA: Verifica las bodegas y pesos de la factura ${pedidoOriginal.id_factura}. Deben ser válidos.`);
+      }
+
+      // Agrupamos la info de esta factura
+      payloadDetalles.push({
+        id: pId,
+        valor_despachar: det.valor_despachar,
+        observaciones_entrega: det.observacion,
+        detalles: det.detalles,
+        nota_despacho: "(LOTE SALDOS)" 
+      });
+    }
+
+    try {
+      // ENVIAMOS UN SOLO REQUEST CON TODOS LOS DATOS AGRUPADOS
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/despachar-lote-saldos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conductor_id: asignacionLote.conductor_id,
+          vehiculo_id: asignacionLote.vehiculo_id,
+          fecha_agendada: asignacionLote.fecha_agendada,
+          detalles_lote: payloadDetalles
+        })
+      });
+
       if (res.ok) {
-        alert("✅ Viaje de saldo agendado exitosamente.");
-        setShowModal(false);
-        fetchParciales(); 
+        alert("✅ Lote de saldos agrupado en un solo viaje exitosamente.");
+        setShowModalLote(false);
+        setPedidosSeleccionados([]);
+        fetchParciales();
       } else {
         const errorData = await res.json();
         alert(`❌ Error: ${errorData.error}`);
       }
-    } catch (error) { alert("Error de conexión"); }
+
+    } catch (error) {
+      alert("Error de conexión al asignar el lote de saldos.");
+    }
   };
 
+  // ================= CÁLCULOS UI =================
   const totalPendientePlata = pedidos.reduce((acc, p) => acc + Number(p.valor_factura_pendiente || 0), 0);
-  const esEnvioParcial = showModal && pedidoSeleccionado && Number(asignacion.valor_despachar) > 0 && Number(asignacion.valor_despachar) < Number(pedidoSeleccionado.valor_factura_pendiente);
+  
+  // Cálculos Modal Lote
+  const pedidosSeleccionadosObj = pedidos.filter(p => pedidosSeleccionados.includes(p.id));
+  const valorDeudaLoteTotal = pedidosSeleccionadosObj.reduce((acc, p) => acc + Number(p.valor_factura_pendiente || 0), 0);
 
   return (
-    <div className="bg-slate-50 min-h-screen p-3 md:p-8 w-full max-w-full overflow-x-hidden">
+    <div className="bg-slate-50 min-h-screen p-3 md:p-8 w-full max-w-full overflow-x-hidden pb-24">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* ENCABEZADO RESPONSIVO */}
+        {/* ENCABEZADO */}
         <div className="bg-white rounded-xl shadow-sm border border-red-200 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto text-center md:text-left flex-col md:flex-row">
             <div className="bg-red-100 p-3 rounded-full text-red-600 shrink-0">
@@ -132,7 +192,7 @@ const ReporteParciales = () => {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-bold text-slate-800 leading-tight">Envíos Parciales</h1>
-              <p className="text-slate-500 text-[10px] md:text-sm mt-1">Mercancía pendiente por facturas iniciadas.</p>
+              <p className="text-slate-500 text-[10px] md:text-sm mt-1">Selecciona la mercancía pendiente para enviarla en lote.</p>
             </div>
           </div>
           <div className="bg-red-50 border border-red-200 px-4 py-3 md:px-6 md:py-3 rounded-xl text-center w-full md:w-auto">
@@ -147,12 +207,12 @@ const ReporteParciales = () => {
             <table className="w-full text-left table-fixed min-w-[950px]">
               <thead className="bg-slate-900 text-white text-[10px] md:text-xs uppercase tracking-wider">
                 <tr>
-                  <th className="p-3 md:p-4 w-[20%] font-bold text-center md:text-left">Doc / Nota</th>
+                  <th className="p-3 md:p-4 w-[5%] text-center"></th>
+                  <th className="p-3 md:p-4 w-[25%] font-bold text-center md:text-left">Doc / Nota</th>
                   <th className="p-3 md:p-4 w-[15%] font-bold">Fecha / Sala</th>
                   <th className="p-3 md:p-4 w-[20%] font-bold">Cliente / Destino</th>
-                  <th className="p-3 md:p-4 w-[12%] font-bold text-right">V. Factura</th>
+                  <th className="p-3 md:p-4 w-[10%] font-bold text-right">V. Factura</th>
                   <th className="p-3 md:p-4 w-[15%] font-extrabold text-right bg-red-900/50">DEUDA</th>
-                  <th className="p-3 md:p-4 w-[18%] font-bold text-center">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs md:text-sm text-slate-700">
@@ -166,179 +226,217 @@ const ReporteParciales = () => {
                     </td>
                   </tr>
                 ) : (
-                  pedidos.map((p) => (
-                    <tr key={p.id} className="hover:bg-red-50/30 transition-colors">
-                      <td className="p-3 md:p-4 align-middle">
-                        <div className="font-bold text-blue-600 font-mono text-base md:text-lg">{p.id_factura}</div>
-                        <div className="text-[9px] text-slate-400 font-bold">{p.tipo_documento}</div>
-                        {p.observaciones_entrega && (
-                          <div className="mt-1 text-[9px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded line-clamp-2" title={p.observaciones_entrega}>
-                            <b>Falta:</b> {p.observaciones_entrega}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3 md:p-4 align-middle">
-                        <div className="flex items-center gap-1 text-slate-600 mb-1"><Calendar size={12}/> {formatFecha(p.fecha_agendada)}</div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase">{p.bodega}</div>
-                      </td>
-                      <td className="p-3 md:p-4 align-middle">
-                        <p className="font-bold text-slate-800 truncate">{p.nombre_cliente}</p>
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1"><MapPin size={10} className="text-orange-500"/> {p.destino}</p>
-                      </td>
-                      <td className="p-3 md:p-4 align-middle text-right font-medium text-slate-600">
-                        ${Number(p.valor_factura || 0).toLocaleString('es-CO')}
-                      </td>
-                      <td className="p-3 md:p-4 align-middle text-right font-extrabold text-red-600 text-sm md:text-lg bg-red-50/50">
-                        ${Number(p.valor_factura_pendiente || 0).toLocaleString('es-CO')}
-                      </td>
-                      <td className="p-3 md:p-4 align-middle text-center">
-                        <button 
-                          onClick={() => handleAbrirAsignacion(p)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg font-bold text-[10px] md:text-xs shadow-md active:scale-95 flex items-center justify-center gap-1 md:gap-2 w-full transition-transform"
-                        >
-                          <Truck size={14} /> Agendar Saldo
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  pedidos.map((p) => {
+                    const estaSeleccionado = pedidosSeleccionados.includes(p.id);
+
+                    return (
+                      <tr key={p.id} className={`transition-colors ${estaSeleccionado ? 'bg-red-50/50' : 'hover:bg-slate-50'}`}>
+                        <td className="p-3 md:p-4 align-middle text-center">
+                          <button 
+                            onClick={() => toggleSeleccion(p.id)}
+                            className={`p-1 rounded ${estaSeleccionado ? 'text-red-600' : 'text-slate-300 hover:text-slate-400'}`}
+                          >
+                            {estaSeleccionado ? <CheckSquare size={20} /> : <Square size={20} />}
+                          </button>
+                        </td>
+                        <td className="p-3 md:p-4 align-middle">
+                          <div className="font-bold text-blue-600 font-mono text-base md:text-lg">{p.id_factura}</div>
+                          <div className="text-[9px] text-slate-400 font-bold mb-1.5">{p.tipo_documento}</div>
+                          
+                          {/* 👇 CONTENEDOR SEPARADO PARA EVITAR DESBORDAMIENTO VERTICAL Y HORIZONTAL 👇 */}
+                          {p.observaciones_entrega && (
+                            <div className="w-full max-w-[180px] p-1.5 md:p-2 rounded-lg border shadow-sm bg-red-50 border-red-200 text-red-700 overflow-hidden" title={p.observaciones_entrega}>
+                              <div className="text-[9px] md:text-[10px] leading-snug whitespace-normal break-words">
+                                <b>Falta:</b> {p.observaciones_entrega}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 md:p-4 align-middle">
+                          <div className="flex items-center gap-1 text-slate-600 mb-1"><Calendar size={12}/> {formatFecha(p.fecha_agendada)}</div>
+                          <div className="text-[10px] font-bold text-slate-500 uppercase">{p.bodega}</div>
+                        </td>
+                        <td className="p-3 md:p-4 align-middle">
+                          <p className="font-bold text-slate-800 truncate">{p.nombre_cliente}</p>
+                          <p className="text-[10px] text-slate-500 flex items-center gap-1"><MapPin size={10} className="text-orange-500"/> {p.destino}</p>
+                        </td>
+                        <td className="p-3 md:p-4 align-middle text-right font-medium text-slate-600">
+                          ${Number(p.valor_factura || 0).toLocaleString('es-CO')}
+                        </td>
+                        <td className="p-3 md:p-4 align-middle text-right font-extrabold text-red-600 text-sm md:text-lg bg-red-50/50">
+                          ${Number(p.valor_factura_pendiente || 0).toLocaleString('es-CO')}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* MODAL RESPONSIVO (SCROLL INTERNO Y VALIDACIÓN DE TALLER) */}
-        {showModal && pedidoSeleccionado && (
-          <div className="fixed inset-0 bg-slate-900/80 z-[70] flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh]">
-              <div className="bg-slate-900 p-4 md:p-5 flex justify-between items-center text-white shrink-0">
+        {/* ================= BARRA FLOTANTE DE ASIGNACIÓN DE SALDOS POR LOTE ================= */}
+        {pedidosSeleccionados.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-700 p-4 rounded-2xl shadow-2xl z-40 flex items-center gap-6 animate-fadeIn">
+            <div className="text-white hidden sm:block">
+              <p className="font-bold text-lg leading-tight">{pedidosSeleccionados.length} Saldos</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Seleccionados</p>
+            </div>
+            <div className="h-10 w-px bg-slate-700 hidden sm:block"></div>
+            <div className="text-white">
+              <p className="font-extrabold text-red-500 text-xl leading-tight">${valorDeudaLoteTotal.toLocaleString('es-CO')}</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Deuda Acumulada</p>
+            </div>
+            <button onClick={handleAbrirModalLote} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95 ml-4">
+              Armar Ruta de Saldos <Truck size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* ================= MODAL LOTE DE SALDOS ================= */}
+        {showModalLote && (
+          <div className="fixed inset-0 bg-slate-900/80 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[95vh]">
+              
+              <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="bg-[#47B3A8] p-1.5 md:p-2 rounded-lg"><Truck size={18} className="text-white"/></div>
+                  <div className="bg-red-600 p-2 rounded-lg"><Truck size={20} className="text-white"/></div>
                   <div>
-                    <h3 className="font-bold text-base md:text-lg leading-none">Generar Viaje de Saldo</h3>
-                    <p className="text-[10px] md:text-xs text-slate-400 mt-1">Pedido: {pedidoSeleccionado.id_factura}-S</p>
+                    <h3 className="font-bold text-lg leading-tight">Ruta de Saldos</h3>
+                    <p className="text-xs text-slate-300 mt-0.5">Lote de: {pedidosSeleccionados.length} facturas incompletas</p>
                   </div>
                 </div>
-                <button onClick={() => setShowModal(false)} className="p-1.5 rounded-full hover:bg-white/20 transition-colors"><X size={18}/></button>
+                <button onClick={() => setShowModalLote(false)} className="hover:bg-white/10 p-1.5 rounded-full transition-colors"><X size={20}/></button>
               </div>
 
-              <form onSubmit={handleAsignarSaldo} className="p-4 md:p-6 space-y-4 md:space-y-5 overflow-y-auto flex-1 custom-scrollbar">
+              <form onSubmit={handleAsignarLoteSaldos} className="p-6 flex flex-col md:flex-row gap-6 overflow-y-auto custom-scrollbar">
                 
-                <div className="bg-red-50 p-3 md:p-4 rounded-xl border border-red-200 shadow-sm flex justify-between items-center">
-                  <p className="text-[10px] md:text-sm font-medium text-red-800 uppercase">Por despachar:</p>
-                  <p className="text-lg md:text-xl font-extrabold text-red-600">${Number(pedidoSeleccionado.valor_factura_pendiente).toLocaleString('es-CO')}</p>
-                </div>
-
-                {/* 👇 MODIFICACIÓN: FECHA Y HORA LÍMITE 👇 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5">
-                      <Calendar size={12} className="text-[#47B3A8]"/> Fecha Salida
-                    </label>
-                    <input 
-                      type="date" 
-                      value={asignacion.fecha_agendada} 
-                      onChange={(e) => setAsignacion({...asignacion, fecha_agendada: e.target.value})} 
-                      className="w-full border-2 border-slate-200 p-2 md:p-2.5 rounded-lg md:rounded-xl text-sm font-bold bg-white outline-none focus:border-[#47B3A8]" 
-                      required 
-                    />
+                {/* COLUMNA IZQUIERDA: CONFIGURACIÓN DEL VIAJE */}
+                <div className="w-full md:w-1/3 space-y-4 border-r border-slate-200 pr-0 md:pr-6">
+                  
+                  <div className="bg-red-50 border border-red-200 p-3 rounded-xl shadow-sm text-center">
+                    <p className="text-[10px] font-bold text-red-600 uppercase">Deuda Total del Lote</p>
+                    <p className="text-2xl font-black text-red-700">${valorDeudaLoteTotal.toLocaleString('es-CO')}</p>
                   </div>
-                  <div>
-                    <label className="text-[10px] md:text-xs font-bold text-blue-600 uppercase flex items-center gap-2 mb-1.5">
-                      <Clock size={12} /> Hora Límite
-                    </label>
-                    <input 
-                      type="time" 
-                      value={asignacion.hora_limite} 
-                      onChange={(e) => setAsignacion({...asignacion, hora_limite: e.target.value})} 
-                      className="w-full border-2 border-blue-200 bg-blue-50 p-2 md:p-2.5 rounded-lg md:rounded-xl text-blue-900 font-bold text-sm outline-none focus:border-blue-500" 
-                      required 
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><User size={12} /> Conductor</label>
-                    <select value={asignacion.conductor_id} onChange={(e) => setAsignacion({ ...asignacion, conductor_id: e.target.value })} className="w-full border-2 border-slate-200 p-2 md:p-2.5 rounded-lg text-sm bg-white outline-none focus:border-[#47B3A8]" required>
-                      <option value="">Selecciona...</option>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><Calendar size={14} className="text-blue-500"/> FECHA DE SALIDA</label>
+                    <input type="date" value={asignacionLote.fecha_agendada} onChange={(e) => setAsignacionLote({...asignacionLote, fecha_agendada: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg focus:border-blue-500 outline-none text-slate-700 font-bold bg-white" required />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><User size={14} /> CONDUCTOR</label>
+                    <select value={asignacionLote.conductor_id} onChange={(e) => setAsignacionLote({...asignacionLote, conductor_id: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg focus:border-blue-500 outline-none text-slate-700 bg-white text-sm" required>
+                      <option value="">-- Elige conductor --</option>
                       {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
                     </select>
                   </div>
+                  
                   <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><Truck size={12} /> Vehículo</label>
-                    <select 
-                      value={asignacion.vehiculo_id} 
-                      onChange={(e) => setAsignacion({...asignacion, vehiculo_id: e.target.value})} 
-                      className="w-full border-2 border-slate-200 p-2 md:p-2.5 rounded-lg text-sm bg-white outline-none focus:border-[#47B3A8]" 
-                      required
-                    >
-                      <option value="">Selecciona...</option>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><Truck size={14} /> VEHÍCULO</label>
+                    <select value={asignacionLote.vehiculo_id} onChange={(e) => setAsignacionLote({...asignacionLote, vehiculo_id: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg focus:border-blue-500 outline-none text-slate-700 bg-white text-sm" required>
+                      <option value="">-- Elige vehículo --</option>
                       {vehiculos.map(v => (
-                        <option 
-                          key={v.id} 
-                          value={v.id} 
-                          disabled={Number(v.estado) === 0}
-                        >
-                          {v.placa} {Number(v.estado) === 0 ? ' 🚫 (TALLER)' : ''}
+                        <option key={v.id} value={v.id} disabled={Number(v.estado) === 0}>
+                          {v.placa} {Number(v.estado) === 0 ? '🚫 TALLER' : ''}
                         </option>
                       ))}
                     </select>
-
                   </div>
                 </div>
 
-                <div className="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><Building2 size={14} className="text-orange-500"/> Origen Mercancía</label>
-                    <button type="button" onClick={handleAddDetalle} className="text-[9px] bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"><Plus size={10}/> Agregar</button>
+                {/* COLUMNA DERECHA: DESGLOSE POR FACTURA Y BODEGAS */}
+                <div className="w-full md:w-2/3 space-y-4">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 border-b border-slate-200 pb-2"><FileText size={14} /> DESGLOSE DE MERCANCÍA POR FACTURA</label>
+                  
+                  <div className="space-y-4">
+                    {pedidosSeleccionadosObj.map(p => {
+                      const det = detallesLote[p.id] || { valor_despachar: 0, observacion: '', detalles: [] };
+                      const esParcial = Number(det.valor_despachar) < Number(p.valor_factura_pendiente);
+                      
+                      return (
+                        <div key={p.id} className="bg-slate-50 border border-slate-200 p-3 rounded-xl animate-fadeIn shadow-sm">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1 pr-2">
+                              <span className="font-bold text-blue-600 text-sm md:text-base block">{p.id_factura}</span>
+                              <span className="text-[10px] text-slate-500 block mb-1.5">{p.destino}</span>
+                              
+                              {/* 👇 AQUÍ APARECE LA NOTA DE LA NOVEDAD EN EL MODAL 👇 */}
+                              {p.observaciones_entrega && (
+                                <div className="w-full mt-1.5 p-1.5 md:p-2 rounded-lg border shadow-sm bg-red-50 border-red-200 text-red-700 overflow-hidden">
+                                  <div className="text-[9px] md:text-[10px] leading-snug whitespace-normal break-words">
+                                    <b>Falta:</b> {p.observaciones_entrega}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0 ml-2">
+                              <span className="text-[10px] font-bold text-slate-400 block uppercase">Deuda Original</span>
+                              <span className="text-sm font-bold text-red-600">${Number(p.valor_factura_pendiente).toLocaleString()}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Control de Bodegas por Factura */}
+                          <div className="space-y-2 mb-3 bg-white p-2 rounded border border-slate-200">
+                             <div className="flex justify-between items-center mb-1">
+                                <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Building2 size={10} className="text-orange-500"/> Origen</label>
+                                <button type="button" onClick={() => handleAddDetalleLote(p.id)} className="text-[9px] text-blue-600 font-bold hover:underline">+ Fila</button>
+                             </div>
+                             {det.detalles.map((filaBodega, iBod) => (
+                               <div key={iBod} className="flex gap-2">
+                                 <select value={filaBodega.bodega_id} onChange={(e) => handleDetalleLoteChange(p.id, iBod, 'bodega_id', e.target.value)} className="flex-1 border border-slate-300 p-1.5 rounded text-xs outline-none bg-slate-50" required>
+                                   <option value="">Bodega...</option>
+                                   {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
+                                 </select>
+                                 <div className="w-20 relative">
+                                   <input type="number" value={filaBodega.peso} onChange={(e) => handleDetalleLoteChange(p.id, iBod, 'peso', e.target.value)} className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none bg-slate-50 text-center" placeholder="Kg" required />
+                                 </div>
+                                 {det.detalles.length > 1 && (
+                                   <button type="button" onClick={() => handleRemoveDetalleLote(p.id, iBod)} className="text-red-500"><Trash2 size={12}/></button>
+                                 )}
+                               </div>
+                             ))}
+                          </div>
+
+                          {/* Valor a Despachar de esta factura */}
+                          <div className="relative mb-2">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold pointer-events-none">$</span>
+                            <input 
+                              type="number" step="0.01" min="0" max={p.valor_factura_pendiente}
+                              value={det.valor_despachar} 
+                              onChange={(e) => setDetallesLote({...detallesLote, [p.id]: {...det, valor_despachar: e.target.value}})}
+                              className="w-full pl-8 py-2 border border-slate-300 rounded bg-white text-slate-700 font-bold outline-none focus:border-blue-500 text-sm" 
+                              required
+                            />
+                          </div>
+
+                          {esParcial && (
+                            <div className="mt-2 animate-fadeIn">
+                              <textarea 
+                                value={det.observacion}
+                                onChange={(e) => setDetallesLote({...detallesLote, [p.id]: {...det, observacion: e.target.value}})}
+                                placeholder={`Aún falta mercancía de la factura ${p.id_factura}...`}
+                                className="w-full border border-red-300 bg-red-50 p-2 rounded text-xs outline-none focus:border-red-500 text-slate-800 resize-none"
+                                rows="2" required={esParcial}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  {asignacion.detalles.map((det, index) => (
-                    <div key={index} className="flex gap-2 items-center animate-fadeIn">
-                      <select value={det.bodega_id} onChange={(e) => handleDetalleChange(index, 'bodega_id', e.target.value)} className="flex-1 border-2 border-slate-200 p-1.5 md:p-2 rounded-lg text-[11px] md:text-sm font-medium bg-white outline-none focus:border-[#47B3A8]" required>
-                        <option value="">-- Bodega --</option>
-                        {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
-                      </select>
-                      <div className="w-24 md:w-28 relative">
-                        <input type="number" step="0.1" value={det.peso} onChange={(e) => handleDetalleChange(index, 'peso', e.target.value)} className="w-full border-2 border-slate-200 p-1.5 md:p-2 pl-6 md:pl-7 rounded-lg font-bold bg-white text-[11px] md:text-sm outline-none focus:border-[#47B3A8]" placeholder="Kg" required />
-                        <Weight size={12} className="absolute left-1.5 md:left-2 top-2 md:top-2.5 text-teal-600"/>
-                      </div>
-                      {asignacion.detalles.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveDetalle(index)} className="p-1.5 md:p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={14} /></button>
-                      )}
-                    </div>
-                  ))}
                 </div>
 
-                <div>
-                  <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5">Valor del Viaje actual</label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold text-sm">$</span>
-                    <input type="number" step="0.01" min="0" max={pedidoSeleccionado.valor_factura_pendiente} value={asignacion.valor_despachar} onChange={(e) => setAsignacion({...asignacion, valor_despachar: e.target.value})} className="w-full pl-7 md:pl-8 border-2 border-blue-300 bg-blue-50 p-2 md:p-2.5 rounded-lg md:rounded-xl text-blue-900 font-bold text-base md:text-lg outline-none focus:ring-2 focus:ring-blue-400" required />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><FileText size={12} className="text-blue-500"/> Nota del Despacho (Planilla)</label>
-                  <textarea value={asignacion.nota_despacho} onChange={(e) => setAsignacion({...asignacion, nota_despacho: e.target.value})} className="w-full border-2 border-slate-200 p-2 md:p-3 rounded-lg md:rounded-xl text-xs md:text-sm bg-white outline-none focus:border-[#47B3A8]" placeholder="Ej: Se envía 1 inodoro..." rows="2" required />
-                </div>
-
-                {esEnvioParcial && (
-                  <div className="animate-fadeIn p-3 md:p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <label className="text-[10px] md:text-xs font-bold text-red-700 uppercase flex items-center gap-2 mb-1.5"><AlertCircle size={14} /> Sigue faltando:</label>
-                    <textarea value={asignacion.observaciones_entrega} onChange={(e) => setAsignacion({...asignacion, observaciones_entrega: e.target.value})} className="w-full border border-red-300 p-2 md:p-3 rounded-lg text-[11px] md:text-sm text-slate-800 bg-white outline-none focus:border-red-500" placeholder="Ej: Queda pendiente cerámica..." rows="2" required={esEnvioParcial} />
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row justify-end gap-2 md:gap-3 pt-4 border-t border-slate-100 shrink-0">
-                  <button type="button" onClick={() => setShowModal(false)} className="px-5 py-2 md:py-2.5 text-slate-500 font-bold text-xs md:text-sm hover:bg-slate-100 rounded-lg order-2 sm:order-1 transition-colors">Cancelar</button>
-                  <button type="submit" className="bg-[#47B3A8] hover:bg-[#3A948C] text-white px-6 py-2.5 md:py-3 rounded-lg font-bold text-xs md:text-sm shadow-lg flex items-center justify-center gap-2 order-1 sm:order-2 transition-transform active:scale-95">Generar Viaje <CheckCircle size={16} /></button>
-                </div>
               </form>
+
+              <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-end items-center gap-4 shrink-0">
+                <button type="button" onClick={() => setShowModalLote(false)} className="text-slate-500 font-bold text-sm hover:text-slate-700 transition-colors">Cancelar</button>
+                <button onClick={handleAsignarLoteSaldos} className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 transition-transform active:scale-95">Asignar Lote <CheckCircle size={16} /></button>
+              </div>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

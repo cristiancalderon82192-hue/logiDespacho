@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, MapPin, Calendar, CheckCircle, X, User, Edit, Search, Filter, Trash2, Printer, AlertCircle, XCircle, Lock, AlertTriangle } from 'lucide-react';
+import { Truck, MapPin, Calendar, CheckCircle, X, User, Edit, Search, Filter, Trash2, Printer, AlertCircle, XCircle, Lock, AlertTriangle, ListChecks, CheckSquare, Square, FileText } from 'lucide-react';
 
 const AsignacionLogistica = () => {
   
@@ -21,13 +21,20 @@ const AsignacionLogistica = () => {
   const [conductores, setConductores] = useState([]);
   const [vehiculos, setVehiculos] = useState([]);
   
-  const [showModal, setShowModal] = useState(false);
-  const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  
-  const [asignacion, setAsignacion] = useState({ 
+  const [loading, setLoading] = useState(false);
+
+  // ESTADOS PARA SELECCIÓN MÚLTIPLE (LOTES)
+  const [pedidosSeleccionados, setPedidosSeleccionados] = useState([]);
+  const [showModalLote, setShowModalLote] = useState(false);
+  const [asignacionLote, setAsignacionLote] = useState({ conductor_id: '', vehiculo_id: '' });
+  const [detallesLote, setDetallesLote] = useState({});
+
+  // ESTADOS PARA ASIGNACIÓN INDIVIDUAL (Edición)
+  const [showModalIndividual, setShowModalIndividual] = useState(false);
+  const [pedidoIndividual, setPedidoIndividual] = useState(null);
+  const [asignacionIndividual, setAsignacionIndividual] = useState({ 
     conductor_id: '', vehiculo_id: '', total_despachado: '', observaciones_entrega: '' 
   });
-  const [loading, setLoading] = useState(false);
 
   const fetchData = async (mostrarPantallaCarga = true) => {
     if (mostrarPantallaCarga) setLoading(true);
@@ -51,86 +58,185 @@ const AsignacionLogistica = () => {
 
   useEffect(() => {
     fetchData(true);
+    setPedidosSeleccionados([]); 
     const intervalId = setInterval(() => { fetchData(false); }, 5000);
     return () => clearInterval(intervalId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fechaFiltro]);
 
-  const handleAbrirAsignacion = (pedido) => {
-    if (['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedido.estado_entrega)) return;
-
-    setPedidoSeleccionado(pedido);
-    setAsignacion({ 
-      conductor_id: pedido.conductor_id || '', 
-      vehiculo_id: pedido.vehiculo_id || '',
-      total_despachado: pedido.total_despachado || '',
-      observaciones_entrega: pedido.observaciones_entrega || '' 
-    });
-    setShowModal(true);
+  // ================= LÓGICA DE SELECCIÓN MÚLTIPLE (LOTES) =================
+  const toggleSeleccion = (id) => {
+    setPedidosSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+    );
   };
 
-  const handleAsignar = async (e) => {
+  const handleAbrirModalLote = () => {
+    const valoresIniciales = {};
+    pedidosFiltrados
+      .filter(p => pedidosSeleccionados.includes(p.id))
+      .forEach(p => {
+        valoresIniciales[p.id] = {
+          valor_despachar: p.valor_factura || 0,
+          observacion: ''
+        };
+      });
+    setDetallesLote(valoresIniciales);
+    setAsignacionLote({ conductor_id: '', vehiculo_id: '' });
+    setShowModalLote(true);
+  };
+
+  const handleAsignarLote = async (e) => {
     e.preventDefault();
-    if (!asignacion.conductor_id || !asignacion.vehiculo_id || asignacion.total_despachado === '') {
+    if (!asignacionLote.conductor_id || !asignacionLote.vehiculo_id) {
+      return alert("Debes seleccionar conductor y vehículo.");
+    }
+
+    const payloadDetalles = [];
+    for (const pId of pedidosSeleccionados) {
+      const pedidoOriginal = pedidos.find(p => p.id === pId);
+      const det = detallesLote[pId];
+      
+      if (Number(det.valor_despachar) > Number(pedidoOriginal.valor_factura)) {
+        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor de la factura original.`);
+      }
+
+      if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura) && det.observacion.trim() === '') {
+        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación del envío parcial.`);
+      }
+
+      payloadDetalles.push({
+        id: pId,
+        total_despachado: det.valor_despachar,
+        observaciones_entrega: det.observacion
+      });
+    }
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/asignar-lote`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          detalles_lote: payloadDetalles,
+          conductor_id: asignacionLote.conductor_id,
+          vehiculo_id: asignacionLote.vehiculo_id,
+          fecha: fechaFiltro
+        })
+      });
+
+      if (res.ok) {
+        alert("✅ Ruta por Lote generada exitosamente.");
+        setShowModalLote(false);
+        setPedidosSeleccionados([]);
+        fetchData(true);
+      }
+    } catch (error) {
+      alert("Error de conexión al asignar el lote.");
+    }
+  };
+
+  // ================= LÓGICA DE ASIGNACIÓN INDIVIDUAL (EDICIÓN PARCIALES) =================
+  const handleAbrirAsignacionIndividual = (pedido) => {
+    if (['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedido.estado_entrega)) return;
+
+    setPedidoIndividual(pedido);
+    setAsignacionIndividual({ 
+      conductor_id: pedido.conductor_id || '', 
+      vehiculo_id: pedido.vehiculo_id || '',
+      total_despachado: pedido.total_despachado || pedido.valor_factura || '',
+      observaciones_entrega: pedido.observaciones_entrega || '' 
+    });
+    setShowModalIndividual(true);
+  };
+
+  const handleAsignarIndividual = async (e) => {
+    e.preventDefault();
+    if (!asignacionIndividual.conductor_id || !asignacionIndividual.vehiculo_id || asignacionIndividual.total_despachado === '') {
       return alert("Debes seleccionar un conductor, un vehículo y el valor despachado.");
     }
 
-    // VALIDACIÓN ESTRICTA DE VALOR DESPACHADO vs VALOR FACTURA
-    const valorIngresado = Number(asignacion.total_despachado);
-    const valorFactura = Number(pedidoSeleccionado.valor_factura || 0);
+    const valorIngresado = Number(asignacionIndividual.total_despachado);
+    const valorFactura = Number(pedidoIndividual.valor_factura || 0);
 
     if (valorIngresado > valorFactura) {
-      return alert(`❌ ALERTA DE SEGURIDAD:\n\nEl valor a despachar ($${valorIngresado.toLocaleString('es-CO')}) NO puede superar el valor total de la factura ($${valorFactura.toLocaleString('es-CO')}).`);
+      return alert(`❌ ALERTA:\nEl valor a despachar no puede superar la factura.`);
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/asignar`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoIndividual.id}/asignar`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(asignacion)
+        body: JSON.stringify(asignacionIndividual)
       });
       if (res.ok) {
-        alert("✅ Ruta asignada exitosamente");
-        setShowModal(false);
+        alert("✅ Ruta actualizada exitosamente");
+        setShowModalIndividual(false);
         fetchData(true); 
       }
     } catch (error) { alert("Error de conexión"); }
   };
 
-  const handleQuitarAsignacion = async () => {
+  const handleQuitarAsignacion = async (pedidoId) => {
     if (!window.confirm("¿Estás seguro de quitar la asignación?")) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoSeleccionado.id}/desasignar`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoId}/desasignar`, {
         method: 'PUT'
       });
       if (res.ok) {
-        setShowModal(false);
+        setShowModalIndividual(false);
         fetchData(true); 
       }
     } catch (error) { alert("Error de conexión"); }
   };
 
+  // ================= UTILIDADES Y ORDENAMIENTO (NUEVO) =================
   const obtenerPesoFormateado = (p) => Number(p.total_peso || p.peso || 0).toLocaleString();
   const obtenerPesoNumerico = (p) => Number(p.total_peso || p.peso || 0);
 
   const destinosUnicos = [...new Set(pedidos.map(p => p.destino))].sort();
   
-  const pedidosFiltrados = pedidos.filter(p => {
-    const matchDestino = destinoFiltro ? p.destino === destinoFiltro : true;
-    const matchConductor = conductorFiltro ? String(p.conductor_id) === conductorFiltro : true;
-    return matchDestino && matchConductor;
-  });
+  // 👉 AQUÍ ESTÁ LA MAGIA DEL ORDENAMIENTO AGRUPADO POR LOTES 👈
+  const pedidosFiltrados = pedidos
+    .filter(p => {
+      const matchDestino = destinoFiltro ? p.destino === destinoFiltro : true;
+      const matchConductor = conductorFiltro ? String(p.conductor_id) === conductorFiltro : true;
+      return matchDestino && matchConductor;
+    })
+    .sort((a, b) => {
+      // 1. Prioridad: "Pendientes" siempre arriba (0 va antes que 1)
+      const prioridadA = a.estado_entrega === 'Pendiente' ? 0 : 1;
+      const prioridadB = b.estado_entrega === 'Pendiente' ? 0 : 1;
+      
+      if (prioridadA !== prioridadB) {
+        return prioridadA - prioridadB;
+      }
+
+      // 2. Si ambos están asignados, ordenar por numero_viaje DESCENDENTE (más reciente primero)
+      const viajeA = Number(a.numero_viaje || 0);
+      const viajeB = Number(b.numero_viaje || 0);
+
+      if (viajeA !== viajeB) {
+        return viajeB - viajeA; 
+      }
+
+      // 3. Desempate: Si están en el mismo viaje (lote), ordenarlos por número de factura
+      return String(a.id_factura).localeCompare(String(b.id_factura));
+    });
 
   const conductorSeleccionadoInfo = conductores.find(c => String(c.id) === conductorFiltro);
   const vehiculoPlanilla = pedidosFiltrados.length > 0 && pedidosFiltrados[0].vehiculo_placa ? pedidosFiltrados[0].vehiculo_placa : 'Múltiples / Sin asignar';
   const totalPesoPlanilla = pedidosFiltrados.reduce((acc, p) => acc + obtenerPesoNumerico(p), 0);
   const totalValorPlanilla = pedidosFiltrados.reduce((acc, p) => acc + Number(p.total_despachado || 0), 0);
 
-  const vehiculoPreasignado = (showModal && pedidoSeleccionado && asignacion.conductor_id)
-    ? pedidos.find(p => String(p.conductor_id) === String(asignacion.conductor_id) && p.vehiculo_id && p.id !== pedidoSeleccionado.id)?.vehiculo_id
-    : null;
-
-  const esEnvioParcial = showModal && pedidoSeleccionado && Number(asignacion.total_despachado) > 0 && Number(asignacion.total_despachado) < Number(pedidoSeleccionado.valor_factura);
+  // Cálculos precisos para el Modal del Lote
+  const pedidosSeleccionadosObj = pedidosFiltrados.filter(p => pedidosSeleccionados.includes(p.id));
+  const pesoLoteTotal = pedidosSeleccionadosObj.reduce((acc, p) => acc + obtenerPesoNumerico(p), 0);
+  const valorLoteTotal = pedidosSeleccionadosObj.reduce((acc, p) => acc + Number(p.valor_factura || 0), 0);
+  const destinosUnicosLote = [...new Set(pedidosSeleccionadosObj.map(p => p.destino))];
+  const zonasUnicasLote = [...new Set(pedidosSeleccionadosObj.map(p => p.zona_envio))];
+  
+  const vehiculoLoteSelec = vehiculos.find(v => String(v.id) === String(asignacionLote.vehiculo_id));
+  const excedeCapacidadLote = vehiculoLoteSelec && pesoLoteTotal > Number(vehiculoLoteSelec.capacidad_kg);
 
   const handleImprimir = () => {
     const tituloOriginal = document.title; 
@@ -156,14 +262,14 @@ const AsignacionLogistica = () => {
         `}
       </style>
 
-      <div className="ocultar-al-imprimir bg-slate-50 min-h-screen space-y-4 md:space-y-8 p-3 md:p-6 w-full max-w-full overflow-x-hidden">
+      <div className="ocultar-al-imprimir bg-slate-50 min-h-screen space-y-4 md:space-y-8 p-3 md:p-6 w-full max-w-full overflow-x-hidden pb-24">
         
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col xl:flex-row justify-between xl:items-center gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2 md:gap-3">
-              <Truck className="text-[#47B3A8]" size={24} /> Programación de Rutas
+              <ListChecks className="text-[#47B3A8]" size={28} /> Programación de Rutas
             </h1>
-            <p className="text-slate-500 text-xs md:text-sm mt-1">Monitoreo en tiempo real de operaciones</p>
+            <p className="text-slate-500 text-xs md:text-sm mt-1">Selecciona pedidos para asignar lotes o modifícalos individualmente.</p>
           </div>
           
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full xl:w-auto">
@@ -198,26 +304,39 @@ const AsignacionLogistica = () => {
             <table className="w-full text-left min-w-[900px]">
               <thead className="bg-slate-900 text-white text-[10px] md:text-xs uppercase tracking-wider">
                 <tr>
+                  <th className="p-3 md:p-4 w-[5%] text-center"></th>
                   <th className="p-3 md:p-4 w-[15%]">Documento</th>
                   <th className="p-3 md:p-4 w-[20%]">Destino / Cliente</th>
                   <th className="p-3 md:p-4 w-[10%] text-center">Peso (Kg)</th>
                   <th className="p-3 md:p-4 w-[15%] text-center">Estado</th>
-                  <th className="p-3 md:p-4 w-[25%]">Asignación Actual</th>
+                  <th className="p-3 md:p-4 w-[20%]">Asignación Actual</th>
                   <th className="p-3 md:p-4 w-[15%] text-center">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs md:text-sm text-slate-700">
                 {loading ? (
-                  <tr><td colSpan="6" className="p-8 text-center text-slate-400">Buscando despachos...</td></tr>
+                  <tr><td colSpan="7" className="p-8 text-center text-slate-400">Buscando despachos...</td></tr>
                 ) : pedidosFiltrados.length === 0 ? (
-                  <tr><td colSpan="6" className="p-8 md:p-12 text-center text-slate-400">No hay resultados.</td></tr>
+                  <tr><td colSpan="7" className="p-8 md:p-12 text-center text-slate-400">No hay resultados.</td></tr>
                 ) : (
                   pedidosFiltrados.map((p) => {
                     const estaBloqueado = ['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(p.estado_entrega);
                     const esIncompleto = p.estado_entrega === 'Entregado' && parseFloat(p.valor_factura_pendiente) > 0;
-                    
+                    const estaSeleccionado = pedidosSeleccionados.includes(p.id);
+
                     return (
-                      <tr key={p.id} className={`transition-colors ${estaBloqueado ? 'bg-slate-50 opacity-75' : 'bg-white'}`}>
+                      <tr key={p.id} className={`transition-colors ${estaSeleccionado ? 'bg-teal-50/50' : estaBloqueado ? 'bg-slate-50 opacity-75' : 'bg-white hover:bg-slate-50'}`}>
+                        
+                        <td className="p-3 md:p-4 align-middle text-center">
+                          <button 
+                            disabled={estaBloqueado || p.conductor_id} 
+                            onClick={() => toggleSeleccion(p.id)}
+                            className={`p-1 rounded ${(estaBloqueado || p.conductor_id) ? 'text-slate-300 cursor-not-allowed' : estaSeleccionado ? 'text-[#47B3A8]' : 'text-slate-300 hover:text-slate-400'}`}
+                          >
+                            {estaSeleccionado ? <CheckSquare size={20} /> : <Square size={20} />}
+                          </button>
+                        </td>
+
                         <td className="p-3 md:p-4 align-middle font-bold text-blue-600 font-mono text-base md:text-lg">{p.id_factura}</td>
                         <td className="p-3 md:p-4 align-middle">
                           <div className="flex items-start gap-2">
@@ -231,17 +350,28 @@ const AsignacionLogistica = () => {
                         <td className="p-3 md:p-4 align-middle text-center font-extrabold text-slate-800 text-base md:text-lg">{obtenerPesoFormateado(p)}</td>
                         
                         <td className="p-3 md:p-4 align-middle text-center">
-                          <div className="flex flex-col items-center gap-1.5 w-full">
-                            {p.estado_entrega === 'Pendiente' && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold border border-orange-200 animate-pulse">Pendiente</span>}
-                            {p.estado_entrega === 'Asignado' && <span className="bg-slate-100 text-slate-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold border border-slate-300">Asignado</span>}
-                            {p.estado_entrega === 'En Ruta' && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold border border-blue-300 flex items-center gap-1 shadow-sm"><Truck size={10}/> En Ruta</span>}
+                          <div className="flex flex-col items-center gap-1 w-full max-w-[150px] mx-auto">
+                            {p.estado_entrega === 'Pendiente' && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold border border-orange-200 animate-pulse">Pendiente</span>}
+                            {p.estado_entrega === 'Asignado' && <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold border border-slate-300">Asignado</span>}
+                            {p.estado_entrega === 'En Ruta' && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold border border-blue-300 flex items-center gap-1 shadow-sm"><Truck size={10}/> En Ruta</span>}
                             
-                            {p.estado_entrega === 'Entregado' && !esIncompleto && <span className="bg-green-100 text-green-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold border border-green-300 flex items-center gap-1 shadow-sm"><CheckCircle size={10}/> Entregado</span>}
-                            {p.estado_entrega === 'Entregado Incompleto' && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold border border-orange-300 flex items-center gap-1 shadow-sm"><AlertTriangle size={10}/> Incompleto</span>}
-                            {p.estado_entrega === 'Devolución' && <span className="bg-red-100 text-red-700 px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold border border-red-300 flex items-center gap-1 shadow-sm"><X size={10}/> Devolución</span>}
+                            {p.estado_entrega === 'Entregado' && !esIncompleto && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold border border-green-300 flex items-center gap-1 shadow-sm"><CheckCircle size={10}/> Entregado</span>}
+                            
+                            {(p.estado_entrega === 'Entregado Incompleto' || esIncompleto) && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold border border-orange-300 flex items-center gap-1 shadow-sm"><AlertTriangle size={10}/> Incompleto</span>}
+                            
+                            {p.estado_entrega === 'Devolución' && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-[10px] md:text-xs font-bold border border-red-300 flex items-center gap-1 shadow-sm"><X size={10}/> Devolución</span>}
 
-                            {p.estado_entrega !== 'Devolución' && parseFloat(p.valor_factura_pendiente) > 0 && <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 italic mt-0.5">Parcial</span>}
-                            {p.observaciones_entrega && <span className="text-[8px] md:text-[9px] text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded w-full truncate block mt-0.5" title={p.observaciones_entrega}>Nota: {p.observaciones_entrega}</span>}
+                            {p.observaciones_entrega && (
+                              <div className={`mt-1 text-[9px] md:text-[10px] px-2 py-1 rounded border leading-tight text-center w-full shadow-sm ${
+                                p.estado_entrega === 'Devolución' 
+                                  ? 'text-red-700 bg-red-50 border-red-200' 
+                                  : 'text-orange-700 bg-orange-50 border-orange-200'
+                              }`}
+                              title={p.observaciones_entrega}
+                              >
+                                <b>Nota:</b> {p.observaciones_entrega}
+                              </div>
+                            )}
                           </div>
                         </td>
                         
@@ -249,20 +379,25 @@ const AsignacionLogistica = () => {
                           {p.conductor_id && (
                             <div className={`text-[10px] md:text-xs p-2 rounded border shadow-sm ${p.estado_entrega === 'Devolución' ? 'border-red-200 bg-red-50/50' : 'border-slate-200 bg-white'}`}>
                               <p className="flex items-center gap-1.5 font-medium text-slate-700 mb-1"><User size={10}/> {p.conductor_nombre}</p>
-                              <p className="flex items-center gap-1.5 font-bold text-slate-800"><Truck size={10}/> {p.vehiculo_placa}</p>
+                              <p className="flex items-center justify-between font-bold text-slate-800">
+                                <span className="flex items-center gap-1.5"><Truck size={10}/> {p.vehiculo_placa}</span>
+                                <span className="text-[9px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded">Viaje #{p.numero_viaje || 1}</span>
+                              </p>
                             </div>
                           )}
                         </td>
                         <td className="p-3 md:p-4 align-middle text-center">
-                          <button onClick={() => handleAbrirAsignacion(p)} disabled={estaBloqueado} className={`px-2 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-[10px] md:text-xs transition-all flex items-center justify-center gap-1.5 w-full ${estaBloqueado ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 shadow-none' : p.conductor_id ? 'bg-slate-900 text-white hover:bg-black shadow-sm' : 'bg-[#47B3A8] text-white hover:bg-[#3A948C] shadow-sm'}`}>
-                            {estaBloqueado ? (
-                              <>{p.estado_entrega === 'En Ruta' ? <Lock size={12}/> : p.estado_entrega === 'Devolución' ? <XCircle size={12}/> : <CheckCircle size={12}/>} Cerrado</>
-                            ) : p.conductor_id ? (
-                              <><Edit size={12} /> Modificar</>
-                            ) : (
-                              <><Truck size={12} /> Asignar</>
-                            )}
-                          </button>
+                          {estaBloqueado ? (
+                            <button disabled className="px-2 py-1.5 md:px-3 md:py-2 rounded-lg font-bold text-[10px] md:text-xs bg-slate-100 text-slate-400 cursor-not-allowed w-full flex justify-center items-center gap-1.5 border border-slate-200">
+                              <CheckCircle size={12}/> Cerrado
+                            </button>
+                          ) : p.conductor_id ? (
+                            <button onClick={() => handleAbrirAsignacionIndividual(p)} className="px-2 py-1.5 md:px-3 md:py-2 rounded-lg font-bold text-[10px] md:text-xs bg-slate-50 text-slate-600 border border-slate-300 hover:bg-slate-200 shadow-sm w-full flex justify-center items-center gap-1.5">
+                              <Edit size={12} /> Editar
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-medium italic">Seleccione para agrupar</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -273,113 +408,230 @@ const AsignacionLogistica = () => {
           </div>
         </div>
 
-        {showModal && pedidoSeleccionado && (
+        {/* ================= BARRA FLOTANTE DE ASIGNACIÓN POR LOTE ================= */}
+        {pedidosSeleccionados.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-700 p-4 rounded-2xl shadow-2xl z-40 flex items-center gap-6 animate-fadeIn">
+            <div className="text-white hidden sm:block">
+              <p className="font-bold text-lg leading-tight">{pedidosSeleccionados.length} Pedidos</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Seleccionados</p>
+            </div>
+            <div className="h-10 w-px bg-slate-700 hidden sm:block"></div>
+            <div className="text-white">
+              <p className="font-extrabold text-[#47B3A8] text-xl leading-tight">{pesoLoteTotal.toLocaleString()} Kg</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Carga Total</p>
+            </div>
+            <button onClick={handleAbrirModalLote} className="bg-[#47B3A8] hover:bg-[#3A948C] text-white px-6 py-3 rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95 ml-4">
+              Armar Ruta <Truck size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* ================= MODAL LOTE CON DESGLOSE POR FACTURA ================= */}
+        {showModalLote && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh]">
               
-              <div className="bg-slate-900 p-4 md:p-5 flex justify-between items-center text-white shrink-0">
+              <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="bg-[#47B3A8] p-1.5 md:p-2 rounded-lg"><Truck size={18} className="text-white"/></div>
+                  <div className="bg-[#47B3A8] p-2 rounded-lg"><Truck size={20} className="text-white"/></div>
                   <div>
-                    <h3 className="font-bold text-base md:text-lg leading-none">Asignar Ruta</h3>
-                    <p className="text-[10px] md:text-xs text-slate-400 mt-1">Pedido: {pedidoSeleccionado.id_factura}</p>
+                    <h3 className="font-bold text-lg leading-tight">Asignar Ruta</h3>
+                    <p className="text-xs text-slate-300 mt-0.5">Lote de: {pedidosSeleccionados.length} pedidos</p>
                   </div>
                 </div>
-                <button onClick={() => setShowModal(false)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                <button onClick={() => setShowModalLote(false)} className="hover:bg-white/10 p-1.5 rounded-full transition-colors"><X size={20}/></button>
               </div>
 
-              <form onSubmit={handleAsignar} className="flex flex-col flex-1 overflow-hidden">
+              <form onSubmit={handleAsignarLote} className="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
                 
-                <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+                  <p className="text-sm font-medium text-slate-600 mb-2">Destino:</p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <MapPin size={18} className="text-orange-500" />
+                    <span className="text-lg font-bold text-slate-800">
+                      {destinosUnicosLote.length === 1 ? destinosUnicosLote[0] : 'Múltiples Destinos'}
+                    </span>
+                    <span className="text-sm text-slate-400">
+                      ({zonasUnicasLote.length === 1 ? zonasUnicasLote[0] : 'Varias'})
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-slate-600">Peso: <span className="font-bold text-slate-800">{pesoLoteTotal.toLocaleString()} Kg</span></p>
+                    <div className="bg-[#D1FAE5] text-[#065F46] px-3 py-1.5 rounded-md font-bold text-sm">
+                      V. Factura: ${valorLoteTotal.toLocaleString('es-CO')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><User size={14} /> SELECCIONAR CONDUCTOR</label>
+                    <select value={asignacionLote.conductor_id} onChange={(e) => setAsignacionLote({...asignacionLote, conductor_id: e.target.value})} className="w-full border border-slate-300 p-3 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 bg-white" required>
+                      <option value="">-- Elige un conductor --</option>
+                      {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                    </select>
+                  </div>
                   
-                  <div className="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs md:text-sm font-medium text-slate-700 mb-1">Destino:</p>
-                    <p className="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <MapPin size={16} className="text-orange-500" /> {pedidoSeleccionado.destino} <span className="font-normal text-sm text-slate-500">({pedidoSeleccionado.zona_envio})</span>
-                    </p>
-                    <div className="mt-3 flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs md:text-sm text-slate-500">
-                      <span>Peso: <span className="font-bold text-slate-700">{obtenerPesoFormateado(pedidoSeleccionado)} Kg</span></span>
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md font-bold">
-                        V. Factura: ${Number(pedidoSeleccionado.valor_factura || 0).toLocaleString('es-CO')}
-                      </span>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><Truck size={14} /> VEHÍCULO (PLACA)</label>
+                    <select value={asignacionLote.vehiculo_id} onChange={(e) => setAsignacionLote({...asignacionLote, vehiculo_id: e.target.value})} className={`w-full border p-3 rounded-lg outline-none transition-colors ${excedeCapacidadLote ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-300 bg-white text-slate-700 focus:border-[#47B3A8]'}`} required>
+                      <option value="">-- Elige un vehículo --</option>
+                      {vehiculos.map(v => (
+                        <option key={v.id} value={v.id} disabled={Number(v.estado) === 0}>
+                          {v.placa} ({v.capacidad_kg} Kg) {Number(v.estado) === 0 ? '🚫 TALLER' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {excedeCapacidadLote && (
+                      <p className="mt-2 text-[10px] text-red-600 font-bold flex items-center gap-1"><AlertTriangle size={12}/> Supera la capacidad del camión.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-3"><FileText size={14} /> VALOR A DESPACHAR POR FACTURA</label>
+                  <div className="space-y-3">
+                    {pedidosSeleccionadosObj.map(p => {
+                      const det = detallesLote[p.id] || { valor_despachar: 0, observacion: '' };
+                      const esParcial = Number(det.valor_despachar) < Number(p.valor_factura);
+                      
+                      return (
+                        <div key={p.id} className="bg-slate-50 border border-slate-200 p-3 rounded-xl animate-fadeIn">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-bold text-blue-600 text-sm">{p.id_factura}</span>
+                            <span className="text-[10px] font-bold text-slate-500">Max: ${Number(p.valor_factura).toLocaleString()}</span>
+                          </div>
+                          
+                          <div className="relative mb-2">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold pointer-events-none">$</span>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              min="0" 
+                              max={p.valor_factura}
+                              value={det.valor_despachar} 
+                              onChange={(e) => setDetallesLote({...detallesLote, [p.id]: {...det, valor_despachar: e.target.value}})}
+                              className="w-full pl-8 py-2 border border-slate-300 rounded-lg bg-white text-slate-700 font-bold outline-none focus:border-[#47B3A8] text-sm" 
+                              required
+                            />
+                          </div>
+
+                          {esParcial && (
+                            <div className="mt-2 animate-fadeIn">
+                              <textarea 
+                                value={det.observacion}
+                                onChange={(e) => setDetallesLote({...detallesLote, [p.id]: {...det, observacion: e.target.value}})}
+                                placeholder={`Falta mercancía de la factura ${p.id_factura}...`}
+                                className="w-full border border-red-300 bg-red-50 p-2 rounded-lg text-xs outline-none focus:border-red-500 text-slate-800 resize-none"
+                                rows="2"
+                                required={esParcial}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-4 flex justify-end items-center gap-4 mt-2 shrink-0">
+                  <button type="button" onClick={() => setShowModalLote(false)} className="text-slate-500 font-bold text-sm hover:text-slate-700 transition-colors">Cancelar</button>
+                  <button type="submit" className="bg-[#47B3A8] hover:bg-[#3A948C] text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 transition-transform active:scale-95">Asignar <CheckCircle size={16} /></button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODAL DE EDICIÓN INDIVIDUAL ================= */}
+        {showModalIndividual && pedidoIndividual && (
+          <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] overflow-hidden flex flex-col">
+              
+              <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="bg-[#47B3A8] p-2 rounded-lg"><Edit size={20} className="text-white"/></div>
+                  <div>
+                    <h3 className="font-bold text-lg leading-tight">Editar Asignación</h3>
+                    <p className="text-xs text-slate-300 mt-0.5">Pedido: {pedidoIndividual.id_factura}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowModalIndividual(false)} className="hover:bg-white/10 p-1.5 rounded-full transition-colors"><X size={20}/></button>
+              </div>
+
+              <form onSubmit={handleAsignarIndividual} className="p-6 space-y-6 flex-1 overflow-y-auto">
+                <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+                  <p className="text-sm font-medium text-slate-600 mb-2">Destino:</p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <MapPin size={18} className="text-orange-500" />
+                    <span className="text-lg font-bold text-slate-800">{pedidoIndividual.destino}</span>
+                    <span className="text-sm text-slate-400">({pedidoIndividual.zona_envio})</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-slate-600">Peso: <span className="font-bold text-slate-800">{obtenerPesoFormateado(pedidoIndividual)} Kg</span></p>
+                    <div className="bg-[#D1FAE5] text-[#065F46] px-3 py-1.5 rounded-md font-bold text-sm">
+                      V. Factura: ${Number(pedidoIndividual.valor_factura || 0).toLocaleString('es-CO')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><User size={14} /> SELECCIONAR CONDUCTOR</label>
+                    <select value={asignacionIndividual.conductor_id} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, conductor_id: e.target.value})} className="w-full border border-slate-300 p-3 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 bg-white" required>
+                      <option value="">-- Elige un conductor --</option>
+                      {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2"><Truck size={14} /> VEHÍCULO (PLACA)</label>
+                    <select value={asignacionIndividual.vehiculo_id} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, vehiculo_id: e.target.value})} className="w-full border border-slate-300 p-3 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 bg-white" required>
+                      <option value="">-- Elige un vehículo --</option>
+                      {vehiculos.map(v => (
+                        <option key={v.id} value={v.id} disabled={Number(v.estado) === 0}>
+                          {v.placa} ({v.capacidad_kg} Kg) {Number(v.estado) === 0 ? ' 🚫' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">VALOR A DESPACHAR</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold pointer-events-none">$</span>
+                      <input type="number" step="0.01" min="0" max={pedidoIndividual.valor_factura || ''} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white" required />
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><User size={14} /> Seleccionar Conductor</label>
-                      <select value={asignacion.conductor_id} onChange={(e) => { const n = e.target.value; const v = pedidos.find(p => String(p.conductor_id) === String(n) && p.vehiculo_id && p.id !== pedidoSeleccionado.id)?.vehiculo_id; setAsignacion({...asignacion, conductor_id: n, vehiculo_id: v || '' }); }} className="w-full border-2 border-slate-200 p-2.5 md:p-3 rounded-xl focus:border-[#47B3A8] outline-none text-slate-700 font-medium bg-white text-sm" required>
-                        <option value="">-- Elige un conductor --</option>
-                        {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><Truck size={14} /> Vehículo (Placa)</label>
-                      <select 
-                        value={asignacion.vehiculo_id} 
-                        onChange={(e) => setAsignacion({...asignacion, vehiculo_id: e.target.value})} 
-                        className={`w-full border-2 p-2.5 md:p-3 rounded-xl outline-none font-medium text-sm transition-colors ${vehiculoPreasignado ? 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed' : 'bg-white border-slate-200 focus:border-[#47B3A8] text-slate-700'}`} 
+                  {Number(asignacionIndividual.total_despachado) < Number(pedidoIndividual.valor_factura) && (
+                    <div className="animate-fadeIn">
+                      <textarea 
+                        value={asignacionIndividual.observaciones_entrega} 
+                        onChange={(e) => setAsignacionIndividual({...asignacionIndividual, observaciones_entrega: e.target.value})} 
+                        className="w-full border border-red-300 bg-red-50 p-3 rounded-lg focus:border-red-500 outline-none text-sm text-slate-800 resize-none" 
+                        placeholder="Justifica el envío parcial..." 
+                        rows="2" 
                         required 
-                        disabled={!!vehiculoPreasignado}
-                      >
-                        <option value="">-- Elige un vehículo --</option>
-                        {vehiculos.map(v => (
-                          <option key={v.id} value={v.id} disabled={Number(v.estado) === 0}>
-                            {v.placa} {v.modelo ? `- ${v.modelo}` : ''} ({v.capacidad_kg} Kg) {Number(v.estado) === 0 ? ' 🚫 (EN TALLER)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                      {vehiculoPreasignado && (
-                        <p className="mt-1.5 text-[10px] md:text-xs text-orange-600 font-bold flex items-center gap-1">* Vehículo ya asignado a este conductor hoy.</p>
-                      )}
+                      />
                     </div>
-                    
-                    <div className="pb-2">
-                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5">Valor a Despachar</label>
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold text-base pointer-events-none">$</span>
-                        <input 
-                          type="number" 
-                          step="0.01" 
-                          min="0" 
-                          max={pedidoSeleccionado.valor_factura || ''}
-                          value={asignacion.total_despachado} 
-                          onChange={(e) => setAsignacion({...asignacion, total_despachado: e.target.value})} 
-                          className="w-full pl-10 md:pl-12 py-2.5 pr-2.5 md:py-3 md:pr-3 border-2 border-slate-200 rounded-xl focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white text-sm" 
-                          placeholder="Ingresa el valor..." 
-                          required 
-                        />
-                      </div>
-                    </div>
-
-                    {esEnvioParcial && (
-                      <div className="animate-fadeIn p-4 bg-red-50 border border-red-200 rounded-xl">
-                        <label className="text-[10px] md:text-xs font-bold text-red-700 uppercase flex items-center gap-2 mb-2"><AlertCircle size={14} /> Observación Parcial Requerida</label>
-                        <textarea value={asignacion.observaciones_entrega} onChange={(e) => setAsignacion({...asignacion, observaciones_entrega: e.target.value})} className="w-full border border-red-300 p-2.5 rounded-lg focus:border-red-500 outline-none text-sm text-slate-800 bg-white" placeholder="Justifica el saldo pendiente..." rows="2" required={esEnvioParcial} />
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
 
-                <div className="bg-slate-50 border-t border-slate-200 p-4 md:p-5 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
-                  <div className="w-full sm:w-auto text-center sm:text-left">
-                    {pedidoSeleccionado.conductor_id && (
-                      <button type="button" onClick={handleQuitarAsignacion} className="text-red-500 hover:bg-red-100 px-3 py-2 rounded-lg font-bold text-xs md:text-sm transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"><Trash2 size={16} /> Quitar Asignación</button>
-                    )}
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 sm:flex-none px-4 py-2.5 text-slate-500 font-bold text-xs md:text-sm hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
-                    <button type="submit" className="flex-1 sm:flex-none bg-[#47B3A8] hover:bg-[#3A948C] text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-bold shadow-md hover:shadow-lg transition-all flex justify-center items-center gap-2">Asignar <CheckCircle size={16} /></button>
+                <div className="border-t border-slate-200 pt-4 flex justify-between items-center gap-4 mt-2">
+                  <button type="button" onClick={() => handleQuitarAsignacion(pedidoIndividual.id)} className="text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-1.5"><Trash2 size={16} /> Quitar</button>
+                  <div className="flex gap-4 items-center">
+                    <button type="button" onClick={() => setShowModalIndividual(false)} className="text-slate-500 font-bold text-sm hover:text-slate-700 transition-colors">Cancelar</button>
+                    <button type="submit" className="bg-[#47B3A8] hover:bg-[#3A948C] text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 transition-transform active:scale-95">Actualizar <CheckCircle size={16} /></button>
                   </div>
                 </div>
-
               </form>
             </div>
           </div>
         )}
       </div>
 
+      {/* PLANILLA DE IMPRESIÓN */}
       {conductorFiltro && (
         <div className="solo-impresion bg-white text-black p-4 font-sans w-full">
           <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-end">

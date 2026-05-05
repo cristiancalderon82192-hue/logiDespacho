@@ -63,7 +63,7 @@ const ReporteFlota = () => {
       'Placa': fila.placa,
       'Modelo': fila.modelo || 'N/A',
       'Capacidad Diaria (kg)': Number(fila.capacidad_kg),
-      'Días Trabajados': Number(fila.dias_trabajados),
+      'Viajes Realizados': Number(fila.viajes_realizados || 0),
       'Pedidos Cargados': fila.total_pedidos_cargados,
       'Kilos Totales Cargados': Number(fila.kilos_reales_cargados),
       'Ocupación Promedio (%)': Number(fila.porcentaje_ocupacion)
@@ -75,31 +75,30 @@ const ReporteFlota = () => {
     XLSX.writeFile(libro, `Ocupacion_Flota_${fechaInicio}_al_${fechaFin}.xlsx`);
   };
 
-  // 👇 PDF REDISEÑADO CON TARJETAS ESTILO DASHBOARD 👇
   const exportarPDF = () => {
     const doc = new jsPDF('landscape'); 
     
-    // 1. HEADER (Fondo Oscuro Corporativo)
-    doc.setFillColor(15, 23, 42); // slate-900
+    // 1. HEADER 
+    doc.setFillColor(15, 23, 42); 
     doc.rect(0, 0, 300, 40, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text("Ocupación de Flota", 14, 20);
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text("Ocupación de Flota (Por Rutas)", 14, 20);
+    doc.setTextColor(148, 163, 184); 
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text(`Rango evaluado: ${fechaInicio} hasta ${fechaFin}`, 14, 30);
     doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
-    // 2. TARJETAS DE INDICADORES (KPIs)
+    // 2. TARJETAS DE INDICADORES
     let startY = 48;
     const pUsoFlota = totalVehiculos > 0 ? Math.round((vehiculosActivos/totalVehiculos)*100) : 0;
     
-    // Tarjeta 1: Ocupación Promedio (Oscura)
-    doc.setFillColor(30, 41, 59); // slate-800
+    // Tarjeta 1
+    doc.setFillColor(30, 41, 59); 
     doc.roundedRect(14, startY, 85, 35, 3, 3, 'F');
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setTextColor(148, 163, 184); 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text("OCUPACIÓN PROMEDIO", 20, startY + 8);
@@ -108,41 +107,41 @@ const ReporteFlota = () => {
     doc.text(`${animacionOcupacion}%`, 20, startY + 22);
     doc.setFontSize(9);
     doc.setTextColor(148, 163, 184);
-    doc.text(`De la flota que estuvo en ruta`, 20, startY + 30);
+    doc.text(`De los viajes realizados`, 20, startY + 30);
 
-    // Tarjeta 2: Volumen Total (Azul Claro)
-    doc.setFillColor(238, 242, 255); // indigo-50
+    // Tarjeta 2
+    doc.setFillColor(238, 242, 255); 
     doc.roundedRect(105, startY, 85, 35, 3, 3, 'F');
-    doc.setTextColor(79, 70, 229); // indigo-600
+    doc.setTextColor(79, 70, 229); 
     doc.setFontSize(10);
     doc.text("VOLUMEN TOTAL", 111, startY + 8);
     doc.setFontSize(24);
-    doc.setTextColor(30, 41, 59); // slate-800
+    doc.setTextColor(30, 41, 59); 
     doc.text(`${Number(totales.kilos).toLocaleString()} kg`, 111, startY + 22);
     doc.setFontSize(9);
-    doc.setTextColor(99, 102, 241); // indigo-500
+    doc.setTextColor(99, 102, 241); 
     doc.text(`Movilizados en ${totales.pedidos} pedidos`, 111, startY + 30);
 
-    // Tarjeta 3: Uso de Flota (Verde Teal)
-    doc.setFillColor(240, 253, 250); // teal-50
+    // Tarjeta 3
+    doc.setFillColor(240, 253, 250); 
     doc.roundedRect(196, startY, 85, 35, 3, 3, 'F');
-    doc.setTextColor(13, 148, 136); // teal-600
+    doc.setTextColor(13, 148, 136); 
     doc.setFontSize(10);
     doc.text("USO DE FLOTA", 202, startY + 8);
     doc.setFontSize(24);
-    doc.setTextColor(30, 41, 59); // slate-800
+    doc.setTextColor(30, 41, 59); 
     doc.text(`${vehiculosActivos} / ${totalVehiculos}`, 202, startY + 22);
     doc.setFontSize(9);
-    doc.setTextColor(20, 184, 166); // teal-500
+    doc.setTextColor(20, 184, 166); 
     doc.text(`Vehículos Activos: ${pUsoFlota}%`, 202, startY + 30);
 
     // 3. TABLA DE DATOS
-    const columnas = ["Placa", "Modelo", "Capacidad", "Días Activo", "Pedidos", "Total Cargado", "Ocupación Promedio"];
+    const columnas = ["Placa", "Modelo", "Capacidad", "Viajes Realizados", "Pedidos", "Total Cargado", "Ocupación Promedio"];
     const filas = datos.map(fila => [
       fila.placa,
       fila.modelo || 'N/A',
       `${Number(fila.capacidad_kg).toLocaleString()} kg`,
-      fila.dias_trabajados,
+      fila.viajes_realizados || 0,
       fila.total_pedidos_cargados,
       `${Number(fila.kilos_reales_cargados).toLocaleString()} kg`,
       `${fila.porcentaje_ocupacion}%`
@@ -158,42 +157,39 @@ const ReporteFlota = () => {
       alternateRowStyles: { fillColor: [248, 250, 252] },
       didParseCell: function(data) {
         if (data.section === 'body') {
-          // Si no trabajó (0 días) ponemos la fila gris
           if (data.row.raw[3] === 0 || data.row.raw[3] === '0') {
-             data.cell.styles.textColor = [148, 163, 184]; // slate-400
+             data.cell.styles.textColor = [148, 163, 184]; 
           } else {
-            // Columna Días (Índigo)
+            // Columna Viajes
             if (data.column.index === 3) {
-              data.cell.styles.textColor = [79, 70, 229]; // indigo-600
+              data.cell.styles.textColor = [79, 70, 229]; 
               data.cell.styles.fontStyle = 'bold';
             }
-            // Columna Cargado (Teal)
             if (data.column.index === 5) {
-              data.cell.styles.textColor = [13, 148, 136]; // teal-600
+              data.cell.styles.textColor = [13, 148, 136]; 
               data.cell.styles.fontStyle = 'bold';
             }
-            // Columna Ocupación
             if (data.column.index === 6) {
               const valor = Number(data.cell.raw.replace('%', ''));
               data.cell.styles.fontStyle = 'bold';
-              if (valor > 90) data.cell.styles.textColor = [239, 68, 68]; // rojo
-              else if (valor >= 70) data.cell.styles.textColor = [34, 197, 94]; // verde
-              else if (valor >= 40) data.cell.styles.textColor = [245, 158, 11]; // ambar
-              else data.cell.styles.textColor = [148, 163, 184]; // gris
+              if (valor > 90) data.cell.styles.textColor = [239, 68, 68]; 
+              else if (valor >= 70) data.cell.styles.textColor = [34, 197, 94]; 
+              else if (valor >= 40) data.cell.styles.textColor = [245, 158, 11]; 
+              else data.cell.styles.textColor = [148, 163, 184]; 
             }
           }
         }
       }
     });
 
-    doc.save(`Ocupacion_Flota_${fechaInicio}_al_${fechaFin}.pdf`);
+    doc.save(`Ocupacion_Flota_Rutas_${fechaInicio}_al_${fechaFin}.pdf`);
   };
 
   const colorBarra = (porcentaje) => {
-    if (porcentaje > 90) return 'bg-red-500'; // Sobrecargado
-    if (porcentaje >= 70) return 'bg-green-500'; // Óptimo
-    if (porcentaje >= 40) return 'bg-amber-400'; // Regular
-    return 'bg-slate-400'; // Vacío o muy bajo
+    if (porcentaje > 90) return 'bg-red-500'; 
+    if (porcentaje >= 70) return 'bg-green-500'; 
+    if (porcentaje >= 40) return 'bg-amber-400'; 
+    return 'bg-slate-400'; 
   };
 
   const radio = 40;
@@ -213,17 +209,15 @@ const ReporteFlota = () => {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-800 leading-tight">Ocupación de Flota</h1>
-            <p className="text-xs sm:text-sm text-slate-500">Optimización de capacidad y volumen de carga</p>
+            <p className="text-xs sm:text-sm text-slate-500">Métricas consolidadas por rutas/viajes realizados</p>
           </div>
         </div>
 
-        {/* Controles: Fechas y Exportación (Adaptable a Móvil) */}
+        {/* Controles: Fechas y Exportación */}
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch lg:items-center gap-3 w-full lg:w-auto">
           
-          {/* Caja de Fechas */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 sm:px-4 sm:py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors w-full sm:w-auto">
             
-            {/* Fecha Desde */}
             <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
                 <Calendar size={18} className="text-[#47B3A8]" />
@@ -237,10 +231,8 @@ const ReporteFlota = () => {
               />
             </div>
 
-            {/* Separador */}
             <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200 sm:bg-slate-300"></div>
 
-            {/* Fecha Hasta */}
             <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
               <span className="text-xs font-bold text-slate-400 uppercase">Hasta</span>
               <input 
@@ -255,7 +247,6 @@ const ReporteFlota = () => {
 
           <div className="w-px h-8 bg-slate-200 hidden xl:block mx-1"></div>
 
-          {/* Botones de Exportación */}
           <div className="flex items-center gap-2 w-full sm:w-auto mt-1 sm:mt-0">
             <button 
               onClick={exportarExcel} 
@@ -279,7 +270,7 @@ const ReporteFlota = () => {
       {cargando && (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <Loader2 size={40} className="animate-spin text-[#47B3A8] mb-4" />
-          <p>Calculando volumetrías de flota...</p>
+          <p>Calculando volumetrías por ruta...</p>
         </div>
       )}
 
@@ -315,7 +306,7 @@ const ReporteFlota = () => {
                 </span>
               </div>
             </div>
-            <p className="text-xs text-indigo-200 mt-4 z-10 text-center">De la flota que estuvo en ruta</p>
+            <p className="text-xs text-indigo-200 mt-4 z-10 text-center">Calculado por viaje completado</p>
           </div>
 
           {/* TARJETA 2: VOLUMEN TOTAL */}
@@ -382,7 +373,7 @@ const ReporteFlota = () => {
               <tr className="bg-slate-50 text-slate-600 text-sm uppercase tracking-wider border-b border-slate-200">
                 <th className="p-4 font-semibold rounded-tl-lg">Vehículo</th>
                 <th className="p-4 font-semibold text-center">Capacidad Diaria</th>
-                <th className="p-4 font-semibold text-center text-indigo-600 bg-indigo-50/50">Días Activo</th>
+                <th className="p-4 font-semibold text-center text-indigo-600 bg-indigo-50/50">Viajes Realizados</th>
                 <th className="p-4 font-semibold text-center">Pedidos</th>
                 <th className="p-4 font-semibold text-center">Volumen Total Cargado</th>
                 <th className="p-4 font-semibold rounded-tr-lg min-w-[200px]">Ocupación Promedio</th>
@@ -391,7 +382,7 @@ const ReporteFlota = () => {
             <tbody className="divide-y divide-slate-100">
               {datos.length > 0 ? (
                 datos.map((fila, index) => {
-                  const noTrabajo = Number(fila.dias_trabajados) === 0;
+                  const noTrabajo = Number(fila.viajes_realizados || 0) === 0;
 
                   return (
                     <tr key={index} className={`transition-colors text-sm ${noTrabajo ? 'bg-slate-50 opacity-70' : 'hover:bg-slate-50'}`}>
@@ -407,7 +398,7 @@ const ReporteFlota = () => {
                       <td className="p-4 text-center text-slate-600">{Number(fila.capacidad_kg).toLocaleString()} kg</td>
                       
                       <td className="p-4 text-center font-bold text-indigo-600 bg-indigo-50/30">
-                        {fila.dias_trabajados} <span className="text-[10px] text-indigo-400 font-normal">días</span>
+                        {fila.viajes_realizados || 0} <span className="text-[10px] text-indigo-400 font-normal">viajes</span>
                       </td>
                       
                       <td className="p-4 text-center font-medium text-slate-700">{fila.total_pedidos_cargados}</td>

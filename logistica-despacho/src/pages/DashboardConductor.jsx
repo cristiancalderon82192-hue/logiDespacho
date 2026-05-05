@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SignatureCanvas from 'react-signature-canvas';
-import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign } from 'lucide-react';
+import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 
 // Importamos el socket
@@ -20,6 +20,7 @@ const DashboardConductor = () => {
 
   const [fechaFiltro] = useState(obtenerFechaLocal()); 
   const [rutas, setRutas] = useState([]);
+  const [bodegas, setBodegas] = useState([]); // 👈 ESTADO PARA BODEGAS
   const [loading, setLoading] = useState(true);
 
   // Estados para Modal de Entrega Exitosa
@@ -32,9 +33,50 @@ const DashboardConductor = () => {
   const [pedidoDevolucion, setPedidoDevolucion] = useState(null);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [valorDevolucion, setValorDevolucion] = useState('');
-  // 👇 NUEVOS ESTADOS PARA EL FLUJO DE 2 PASOS EN DEVOLUCIÓN
+  
+  // 👇 NUEVOS ESTADOS PARA BODEGA Y PESO DE LA DEVOLUCIÓN
+  const [bodegaDevolucion, setBodegaDevolucion] = useState('');
+  const [pesoDevolucion, setPesoDevolucion] = useState('');
+
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
   const sigCanvasDev = useRef({}); 
+
+  // =========================================================================
+  // 📍 CARGA INICIAL DE BODEGAS Y RUTAS
+  // =========================================================================
+  useEffect(() => {
+    const fetchBodegas = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/bodegas`);
+        if (res.ok) setBodegas(await res.json());
+      } catch (error) { console.error("Error cargando bodegas:", error); }
+    };
+    fetchBodegas();
+  }, []);
+
+  const fetchRutas = async (mostrarCarga = true) => {
+    if (!user) return;
+    if (mostrarCarga) setLoading(true);
+    try {
+      const timestamp = new Date().getTime();
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}`, {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      });
+      if (response.ok) {
+        setRutas(await response.json());
+      }
+    } catch (error) {
+      console.error("Error al cargar rutas:", error);
+    } finally {
+      if (mostrarCarga) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRutas(true);
+    const intervalId = setInterval(() => { fetchRutas(false); }, 5000);
+    return () => clearInterval(intervalId);
+  }, [fechaFiltro, user]);
 
   // =========================================================================
   // 📍 LÓGICA DE RASTREO GPS BLINDADA
@@ -92,30 +134,6 @@ const DashboardConductor = () => {
   }, [user]);
   // =========================================================================
 
-  const fetchRutas = async (mostrarCarga = true) => {
-    if (!user) return;
-    if (mostrarCarga) setLoading(true);
-    try {
-      const timestamp = new Date().getTime();
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}`, {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-      });
-      if (response.ok) {
-        setRutas(await response.json());
-      }
-    } catch (error) {
-      console.error("Error al cargar rutas:", error);
-    } finally {
-      if (mostrarCarga) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRutas(true);
-    const intervalId = setInterval(() => { fetchRutas(false); }, 5000);
-    return () => clearInterval(intervalId);
-  }, [fechaFiltro, user]);
-
   const handleCambiarEstado = async (pedidoId, nuevoEstado) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoId}/estado`, {
@@ -164,27 +182,31 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión."); }
   };
 
-  // ---- LÓGICA DE DEVOLUCIÓN / NOVEDAD (AHORA CON FIRMA) ----
+  // ---- LÓGICA DE DEVOLUCIÓN / NOVEDAD (EN 2 PASOS) ----
   const abrirModalDevolucion = (pedido) => {
     setPedidoDevolucion(pedido);
     setMotivoDevolucion('');
     setValorDevolucion(''); 
-    setPasoDevolucion(1); // Siempre arranca en el paso 1 (Formulario)
+    setBodegaDevolucion(''); // Resetear bodega
+    setPesoDevolucion('');   // Resetear peso
+    setPasoDevolucion(1); 
     setShowModalDevolucion(true);
   };
 
   // PASO 1: Valida los datos y pasa a la firma
   const validarDatosDevolucion = (e) => {
     e.preventDefault();
-    if (!motivoDevolucion.trim()) return alert("Debes escribir el motivo.");
+    if (!bodegaDevolucion) return alert("Debes seleccionar la bodega asociada a la mercancía faltante o devuelta.");
+    if (!pesoDevolucion || Number(pesoDevolucion) <= 0) return alert("Debes indicar el peso de la mercancía faltante o devuelta.");
+    if (!motivoDevolucion.trim()) return alert("Debes escribir el motivo de la novedad.");
     
     let cargaEnCamion = parseFloat(pedidoDevolucion.total_despachado);
     if (isNaN(cargaEnCamion) || cargaEnCamion <= 0) cargaEnCamion = parseFloat(pedidoDevolucion.valor_factura || 0);
     
     const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
 
-    if (valorD <= 0) return alert("El valor de la devolución no puede ser cero. Digita el valor correctamente.");
-    if (valorD > cargaEnCamion) return alert(`Estás devolviendo $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
+    if (valorD <= 0) return alert("El valor de la novedad no puede ser cero. Digita el valor correctamente.");
+    if (valorD > cargaEnCamion) return alert(`Estás reportando $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
 
     // Si todo está bien, pasamos a capturar la firma
     setPasoDevolucion(2);
@@ -207,17 +229,21 @@ const DashboardConductor = () => {
     const valorRecaudado = cargaEnCamion - valorD;
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
+    // 👈 CONSTRUIMOS LA NOTA ENRIQUECIDA PARA QUE LOGÍSTICA LA VEA DE INMEDIATO
+    const nombreBodega = bodegas.find(b => String(b.id) === String(bodegaDevolucion))?.nombre || 'Bodega';
+    const notaEnriquecida = `[${nombreBodega} | Faltan ${pesoDevolucion} Kg] ${motivoDevolucion}`;
+
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           estado: estadoReal, 
-          observaciones_entrega: motivoDevolucion,
-          observacion_devolucion: motivoDevolucion, 
+          observaciones_entrega: notaEnriquecida,
+          observacion_devolucion: notaEnriquecida, 
           valor_devolucion: valorD,
           valor_recaudado: valorRecaudado,
-          firma_cliente: firmaBase64 // Aquí enviamos la firma de la novedad al backend
+          firma_cliente: firmaBase64 
         })
       });
       if (response.ok) {
@@ -459,10 +485,10 @@ const DashboardConductor = () => {
       {/* ================= MODAL INTELIGENTE DE NOVEDADES Y DEVOLUCIONES (EN 2 PASOS) ================= */}
       {showModalDevolucion && pedidoDevolucion && (
         <div className="fixed inset-0 bg-slate-900/80 z-[100] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
             
             {/* Cabecera dinámica según el paso */}
-            <div className={`${pasoDevolucion === 1 ? 'bg-red-600' : 'bg-orange-600'} p-4 flex justify-between items-center text-white transition-colors`}>
+            <div className={`${pasoDevolucion === 1 ? 'bg-red-600' : 'bg-orange-600'} p-4 flex justify-between items-center text-white transition-colors shrink-0`}>
               <div className="flex items-center gap-2">
                 {pasoDevolucion === 1 ? <AlertCircle size={20} /> : <PenTool size={20} />}
                 <h3 className="font-bold text-lg">{pasoDevolucion === 1 ? 'Reportar Novedad' : 'Firma de Conformidad'}</h3>
@@ -470,11 +496,12 @@ const DashboardConductor = () => {
               <button onClick={() => setShowModalDevolucion(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20}/></button>
             </div>
 
-            {/* PASO 1: Llenar motivo y valor */}
+            {/* PASO 1: Llenar motivo, valor, bodega y peso */}
             {pasoDevolucion === 1 ? (
-              <form onSubmit={validarDatosDevolucion} className="p-5 overflow-y-auto">
-                <div className="bg-red-50 p-4 rounded-xl border border-red-200 mb-4 shadow-sm">
-                  <label className="text-[11px] font-bold text-red-800 uppercase mb-2 block">¿Cuánta plata en mercancía se está devolviendo?</label>
+              <form onSubmit={validarDatosDevolucion} className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                
+                <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
+                  <label className="text-[11px] font-bold text-red-800 uppercase mb-2 block">¿Cuánta plata en mercancía hizo falta o se devuelve?</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-red-700 font-bold"><DollarSign size={18}/></span>
                     <input 
@@ -492,13 +519,45 @@ const DashboardConductor = () => {
                   </div>
                 </div>
 
-                <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 mb-5 space-y-3">
+                {/* 👇 NUEVA SECCIÓN DE BODEGA Y PESO MUY VISIBLE 👇 */}
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
+                  <label className="text-[11px] font-bold text-orange-800 uppercase mb-3 block">Datos para Reenvío (Logística)</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Building2 size={12}/> Bodega</label>
+                      <select 
+                        value={bodegaDevolucion} 
+                        onChange={(e) => setBodegaDevolucion(e.target.value)} 
+                        className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold" 
+                        required
+                      >
+                        <option value="">Selecciona...</option>
+                        {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Weight size={12}/> Peso (Kg)</label>
+                      <input 
+                        type="number" 
+                        step="0.1" 
+                        min="0.1"
+                        value={pesoDevolucion} 
+                        onChange={(e) => setPesoDevolucion(e.target.value)} 
+                        className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold" 
+                        placeholder="Ej: 50" 
+                        required 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 space-y-3">
                   <div className="flex justify-between items-center text-slate-500 text-sm">
                     <span className="font-bold uppercase text-[11px]">Total Carga Llevada:</span>
                     <span className="font-bold">${totalModal.toLocaleString('es-CO')}</span>
                   </div>
                   <div className="flex justify-between items-center text-red-500 text-sm">
-                    <span className="font-bold uppercase text-[11px]">Se Devuelve:</span>
+                    <span className="font-bold uppercase text-[11px]">Se Devuelve / Faltó:</span>
                     <span className="font-bold">- ${devModal.toLocaleString('es-CO')}</span>
                   </div>
                   <div className="h-px w-full bg-slate-300"></div>
@@ -508,12 +567,19 @@ const DashboardConductor = () => {
                   </div>
                 </div>
 
-                <div className="mb-6">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block flex items-center gap-1.5"><FileText size={14}/> Motivo de la Novedad</label>
-                  <textarea value={motivoDevolucion} onChange={(e) => setMotivoDevolucion(e.target.value)} className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-red-500 outline-none text-slate-700 bg-white resize-none text-sm" rows="3" placeholder="Explica detalladamente por qué no se entregó todo..." required />
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 flex items-center gap-1.5"><FileText size={14}/> Motivo de la Novedad</label>
+                  <textarea 
+                    value={motivoDevolucion} 
+                    onChange={(e) => setMotivoDevolucion(e.target.value)} 
+                    className="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-red-500 outline-none text-slate-700 bg-white resize-none text-sm" 
+                    rows="2" 
+                    placeholder="Ej: La cerámica llegó quebrada..." 
+                    required 
+                  />
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 mt-2 shrink-0">
                   <button type="button" onClick={() => setShowModalDevolucion(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
                   <button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex justify-center items-center gap-2">
                     Siguiente <PlayCircle size={18}/>
@@ -537,7 +603,7 @@ const DashboardConductor = () => {
 
                 <div className="flex justify-between items-center mb-6">
                   <button onClick={() => setPasoDevolucion(1)} className="text-slate-500 text-xs font-bold flex items-center gap-1 hover:text-slate-800">
-                    &larr; Volver
+                    &larr; Volver al formulario
                   </button>
                   <button onClick={limpiarFirmaDevolucion} className="text-slate-500 text-xs font-bold flex items-center gap-1 hover:text-slate-800">
                     <Eraser size={14}/> Borrar firma
