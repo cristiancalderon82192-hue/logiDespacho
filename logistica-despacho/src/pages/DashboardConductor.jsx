@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SignatureCanvas from 'react-signature-canvas';
+import { registerPlugin } from '@capacitor/core'; // 👈 IMPORTACIÓN DEL PLUGIN
 import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 
 // Importamos el socket
 import { socket } from '../utils/socket'; 
+
+// 👈 REGISTRO DEL PLUGIN DE GPS EN SEGUNDO PLANO
+const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 const DashboardConductor = () => {
   const { user, logout } = useAuth();
@@ -20,7 +24,7 @@ const DashboardConductor = () => {
 
   const [fechaFiltro] = useState(obtenerFechaLocal()); 
   const [rutas, setRutas] = useState([]);
-  const [bodegas, setBodegas] = useState([]); // 👈 ESTADO PARA BODEGAS
+  const [bodegas, setBodegas] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Estados para Modal de Entrega Exitosa
@@ -34,7 +38,6 @@ const DashboardConductor = () => {
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [valorDevolucion, setValorDevolucion] = useState('');
   
-  // 👇 NUEVOS ESTADOS PARA BODEGA Y PESO DE LA DEVOLUCIÓN
   const [bodegaDevolucion, setBodegaDevolucion] = useState('');
   const [pesoDevolucion, setPesoDevolucion] = useState('');
 
@@ -79,7 +82,7 @@ const DashboardConductor = () => {
   }, [fechaFiltro, user]);
 
   // =========================================================================
-  // 📍 LÓGICA DE RASTREO GPS BLINDADA
+  // 📍 LÓGICA DE RASTREO GPS BLINDADA (SEGUNDO PLANO)
   // =========================================================================
   const ultimaPosicionRef = useRef(null);
 
@@ -94,41 +97,69 @@ const DashboardConductor = () => {
       role: user.role 
     });
 
-    let watchId;
-    let intervalId;
-    
-    if ("geolocation" in navigator) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          ultimaPosicionRef.current = position;
-        },
-        (error) => {
-          console.error("❌ Error obteniendo GPS:", error.message);
-        },
-        {
-          enableHighAccuracy: true, 
-          maximumAge: 0
-        }
-      );
+    let watcherId = null;
+    let intervalId = null;
 
-      intervalId = setInterval(() => {
-        if (ultimaPosicionRef.current) {
-          const datosGPS = {
-            id_conductor: conductorId,
-            nombre: user.nombre_completo || user.email, 
-            lat: ultimaPosicionRef.current.coords.latitude,
-            lng: ultimaPosicionRef.current.coords.longitude,
-            timestamp: new Date().toISOString()
-          };
-          
-          socket.emit('enviar_ubicacion', datosGPS);
-        }
-      }, 5000);
+    const iniciarRastreoNativo = async () => {
+      try {
+        // 1. Iniciamos el vigilante de fondo
+        watcherId = await BackgroundGeolocation.addWatcher(
+          {
+            backgroundMessage: "LogiDespacho está compartiendo tu ubicación en tiempo real.",
+            backgroundTitle: "Rastreo de Ruta Activo",
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: 15 // Actualiza automáticamente cada vez que se mueva 15 metros
+          },
+          function callback(location, error) {
+            if (error) {
+              console.error("Error en GPS de fondo:", error);
+              return;
+            }
+            if (location) {
+              ultimaPosicionRef.current = {
+                coords: { latitude: location.latitude, longitude: location.longitude }
+              };
 
-    }
+              // Emitimos al instante cuando detecta movimiento
+              const datosGPS = {
+                id_conductor: conductorId,
+                nombre: user.nombre_completo || user.email, 
+                lat: location.latitude,
+                lng: location.longitude,
+                timestamp: new Date().toISOString()
+              };
+              socket.emit('enviar_ubicacion', datosGPS);
+            }
+          }
+        );
+
+        // 2. Latido de seguridad: Si el conductor se detiene en un semáforo, 
+        // seguimos enviando la última posición conocida cada 5 segundos
+        intervalId = setInterval(() => {
+          if (ultimaPosicionRef.current) {
+            const datosGPS = {
+              id_conductor: conductorId,
+              nombre: user.nombre_completo || user.email, 
+              lat: ultimaPosicionRef.current.coords.latitude,
+              lng: ultimaPosicionRef.current.coords.longitude,
+              timestamp: new Date().toISOString()
+            };
+            socket.emit('enviar_ubicacion', datosGPS);
+          }
+        }, 5000);
+
+      } catch (error) {
+        console.error("No se pudo iniciar el rastreo de fondo:", error);
+      }
+    };
+
+    iniciarRastreoNativo();
 
     return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (watcherId) {
+        BackgroundGeolocation.removeWatcher({ id: watcherId });
+      }
       if (intervalId) clearInterval(intervalId);
     };
   }, [user]);
@@ -187,13 +218,12 @@ const DashboardConductor = () => {
     setPedidoDevolucion(pedido);
     setMotivoDevolucion('');
     setValorDevolucion(''); 
-    setBodegaDevolucion(''); // Resetear bodega
-    setPesoDevolucion('');   // Resetear peso
+    setBodegaDevolucion('');
+    setPesoDevolucion('');   
     setPasoDevolucion(1); 
     setShowModalDevolucion(true);
   };
 
-  // PASO 1: Valida los datos y pasa a la firma
   const validarDatosDevolucion = (e) => {
     e.preventDefault();
     if (!bodegaDevolucion) return alert("Debes seleccionar la bodega asociada a la mercancía faltante o devuelta.");
@@ -208,7 +238,6 @@ const DashboardConductor = () => {
     if (valorD <= 0) return alert("El valor de la novedad no puede ser cero. Digita el valor correctamente.");
     if (valorD > cargaEnCamion) return alert(`Estás reportando $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
 
-    // Si todo está bien, pasamos a capturar la firma
     setPasoDevolucion(2);
   };
 
@@ -216,7 +245,6 @@ const DashboardConductor = () => {
     sigCanvasDev.current.clear();
   };
 
-  // PASO 2: Guarda todo (Datos + Firma) en la Base de Datos
   const confirmarDevolucionConFirma = async () => {
     if (sigCanvasDev.current.isEmpty()) return alert("El cliente debe firmar la novedad para proceder.");
     
@@ -229,7 +257,6 @@ const DashboardConductor = () => {
     const valorRecaudado = cargaEnCamion - valorD;
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
-    // 👈 CONSTRUIMOS LA NOTA ENRIQUECIDA PARA QUE LOGÍSTICA LA VEA DE INMEDIATO
     const nombreBodega = bodegas.find(b => String(b.id) === String(bodegaDevolucion))?.nombre || 'Bodega';
     const notaEnriquecida = `[${nombreBodega} | Faltan ${pesoDevolucion} Kg] ${motivoDevolucion}`;
 
@@ -253,7 +280,6 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión."); }
   };
 
-  // Cálculos visuales
   let totalModal = parseFloat(pedidoDevolucion?.total_despachado);
   if (isNaN(totalModal) || totalModal <= 0) totalModal = parseFloat(pedidoDevolucion?.valor_factura || 0);
 
@@ -519,7 +545,6 @@ const DashboardConductor = () => {
                   </div>
                 </div>
 
-                {/* 👇 NUEVA SECCIÓN DE BODEGA Y PESO MUY VISIBLE 👇 */}
                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
                   <label className="text-[11px] font-bold text-orange-800 uppercase mb-3 block">Datos para Reenvío (Logística)</label>
                   <div className="grid grid-cols-2 gap-3">

@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ReCAPTCHA from "react-google-recaptcha";
+import { registerPlugin } from '@capacitor/core';
 import { 
   Mail, Lock, ArrowRight, Loader2, Truck, BarChart3, 
   User, Building, Phone, ArrowLeft, Send, CheckCircle2, Package
 } from 'lucide-react';
 import logoCliente from '../assets/logoitsoluciones.png'; 
+
+// Inicializamos el plugin de GPS
+const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 const Login = () => {
   const { login } = useAuth();
@@ -24,6 +28,19 @@ const Login = () => {
     nombre: '', correo: '', telefono: '', empresa: ''
   });
 
+  // FUNCIÓN PARA SOLICITAR PERMISOS DE GPS AL CONDUCTOR
+  const solicitarPermisosGPS = async () => {
+    try {
+      const status = await BackgroundGeolocation.requestPermissions();
+      console.log("Estado de permisos GPS:", status);
+      if (status.location !== 'granted') {
+        alert("Atención: Para el correcto funcionamiento del despacho, debes permitir el acceso a la ubicación 'Todo el tiempo' en la configuración de tu celular.");
+      }
+    } catch (err) {
+      console.error("Error solicitando permisos:", err);
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     
@@ -35,7 +52,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://logidespacho-1.onrender.com';
       const response = await fetch(`${apiUrl}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,10 +84,18 @@ const Login = () => {
 
         login(usuarioCorregido); 
         
-        if (rolNormalizado === 'admin') navigate('/admin-home'); 
-        else if (rolNormalizado === 'logistica') navigate('/dashboard-logistica'); 
-        else if (rolNormalizado === 'conductor') navigate('/conductor-home'); 
-        else navigate('/dashboard-lider'); 
+        // REDIRECCIÓN Y SOLICITUD DE PERMISOS SEGÚN ROL
+        if (rolNormalizado === 'admin') {
+          navigate('/admin-home'); 
+        } else if (rolNormalizado === 'logistica') {
+          navigate('/dashboard-logistica'); 
+        } else if (rolNormalizado === 'conductor') {
+          // Pedimos permisos de GPS antes de entrar a su panel
+          await solicitarPermisosGPS();
+          navigate('/conductor-home'); 
+        } else {
+          navigate('/dashboard-lider'); 
+        }
         
       } else {
         alert("Error: " + data.error);
@@ -98,7 +123,6 @@ const Login = () => {
   };
 
   return (
-    /* Cambiamos min-h-screen a h-screen para evitar el scroll y forzar adaptación */
     <div className="h-screen flex w-full bg-slate-50 font-sans overflow-hidden">
       
       {/* ================= SECCIÓN IZQUIERDA ================= */}
@@ -154,13 +178,11 @@ const Login = () => {
       <div className="w-full lg:w-[45%] flex flex-col items-center justify-between p-6 sm:p-8 relative bg-white h-full overflow-y-auto overflow-x-hidden no-scrollbar">
         <div className="lg:hidden absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#47B3A8]/20 to-transparent"></div>
 
-        {/* Espaciador superior para centrar */}
         <div className="flex-1"></div>
 
         <div className="w-full max-w-md relative z-10 flex flex-col justify-center">
           
           <div className="flex flex-col items-center text-center mb-6">
-            {/* Reducimos el logo y su padding para ganar espacio vertical */}
             <div className="p-4 bg-white rounded-2xl shadow-lg shadow-teal-900/5 mb-4 border border-slate-100 hover:scale-105 transition-transform duration-300">
               <img src={logoCliente} alt="Logo Empresa" className="h-16 sm:h-20 w-auto object-contain px-2" />
             </div>
@@ -177,7 +199,6 @@ const Login = () => {
             {/* ------------- LOGIN ------------- */}
             {vistaActual === 'login' && (
               <div className="animate-slide-in-right w-full">
-                {/* Reducimos el espaciado entre campos (space-y-4) */}
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-3">
                     <div className="group">
@@ -185,7 +206,6 @@ const Login = () => {
                         Correo Electrónico
                       </label>
                       <div className="relative">
-                        {/* Reducimos el padding vertical (py-2.5) */}
                         <input 
                           type="email" 
                           value={email} 
@@ -218,7 +238,6 @@ const Login = () => {
                     </div>
                   </div>
 
-                  {/* Reducimos el margen del CAPTCHA */}
                   <div className="flex justify-center my-3 transform scale-95 origin-center">
                     <ReCAPTCHA
                       sitekey="6LdYu9UsAAAAAELMz9XPG8O3lag1eIbZ3jPQMbjM"
@@ -226,7 +245,6 @@ const Login = () => {
                     />
                   </div>
 
-                  {/* Botón más compacto */}
                   <button 
                     type="submit" 
                     disabled={loading} 
@@ -299,10 +317,8 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Espaciador inferior para centrar */}
         <div className="flex-1"></div>
 
-        {/* Footer compactado */}
         <div className="w-full pt-4 flex flex-col items-center justify-center border-t border-slate-100 mt-2">
           <p className="text-slate-400 text-[10px] font-semibold mb-2">© {new Date().getFullYear()} Todos los derechos reservados.</p>
           <div className="flex items-center gap-1.5 text-slate-500 cursor-default">
@@ -346,7 +362,6 @@ const Login = () => {
           0% { transform: translateX(0); }
           100% { transform: translateX(65vw); }
         }
-        /* Ocultar barra de scroll interna si aparece */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
