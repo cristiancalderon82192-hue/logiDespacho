@@ -1,9 +1,9 @@
 import { io } from 'socket.io-client';
 
-// Se conecta automáticamente a tu URL de producción en Vercel/Render 
-// o al localhost si estás haciendo pruebas en tu PC.
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Forzamos a que si falla la variable de entorno, busque tu servidor real en Render
+const apiUrl = import.meta.env.VITE_API_URL || 'https://logidespacho-1.onrender.com';
 
 export const socket = io(apiUrl, {
-  autoConnect: true, // Se conecta apenas se importe el archivo
+  autoConnect: true,
+  transports: ['websocket', 'polling'] // Esto es CLAVE para que no falle en celulares o en Render
 });
