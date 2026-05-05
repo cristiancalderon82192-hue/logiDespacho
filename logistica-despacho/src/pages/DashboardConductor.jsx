@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SignatureCanvas from 'react-signature-canvas';
-import { registerPlugin } from '@capacitor/core'; // 👈 IMPORTACIÓN DEL PLUGIN
+import { registerPlugin } from '@capacitor/core'; 
 import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 
 // Importamos el socket
 import { socket } from '../utils/socket'; 
 
-// 👈 REGISTRO DEL PLUGIN DE GPS EN SEGUNDO PLANO
+// REGISTRO DEL PLUGIN DE GPS EN SEGUNDO PLANO
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 const DashboardConductor = () => {
@@ -26,6 +26,12 @@ const DashboardConductor = () => {
   const [rutas, setRutas] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 👇 ESTO ES NUEVO: Un Ref para que el GPS pueda leer las rutas en tiempo real sin romperse
+  const rutasRef = useRef([]);
+  useEffect(() => {
+    rutasRef.current = rutas;
+  }, [rutas]);
 
   // Estados para Modal de Entrega Exitosa
   const [showModalFirma, setShowModalFirma] = useState(false);
@@ -100,6 +106,31 @@ const DashboardConductor = () => {
     let watcherId = null;
     let intervalId = null;
 
+    // 👇 NUEVO: Función auxiliar para construir el paquete de datos completo con estadísticas
+    const generarDatosGPS = (lat, lng) => {
+      const rutasActuales = rutasRef.current;
+      const entregasTotales = rutasActuales.length;
+      const entregasPendientes = rutasActuales.filter(r => r.estado_entrega === 'Asignado' || r.estado_entrega === 'En Ruta').length;
+      const entregasRealizadas = entregasTotales - entregasPendientes;
+      const pedidoActual = rutasActuales.find(r => r.estado_entrega === 'En Ruta');
+
+      return {
+        id_conductor: conductorId,
+        nombre: user.nombre_completo || user.email, 
+        lat: lat,
+        lng: lng,
+        timestamp: new Date().toISOString(),
+        stats: {
+          totales: entregasTotales,
+          realizadas: entregasRealizadas,
+          pendientes: entregasPendientes,
+          factura_actual: pedidoActual ? pedidoActual.id_factura : null,
+          cliente_actual: pedidoActual ? pedidoActual.nombre_cliente : null,
+          destino_actual: pedidoActual ? pedidoActual.destino : null
+        }
+      };
+    };
+
     const iniciarRastreoNativo = async () => {
       try {
         // 1. Iniciamos el vigilante de fondo
@@ -122,14 +153,7 @@ const DashboardConductor = () => {
               };
 
               // Emitimos al instante cuando detecta movimiento
-              const datosGPS = {
-                id_conductor: conductorId,
-                nombre: user.nombre_completo || user.email, 
-                lat: location.latitude,
-                lng: location.longitude,
-                timestamp: new Date().toISOString()
-              };
-              socket.emit('enviar_ubicacion', datosGPS);
+              socket.emit('enviar_ubicacion', generarDatosGPS(location.latitude, location.longitude));
             }
           }
         );
@@ -138,14 +162,10 @@ const DashboardConductor = () => {
         // seguimos enviando la última posición conocida cada 5 segundos
         intervalId = setInterval(() => {
           if (ultimaPosicionRef.current) {
-            const datosGPS = {
-              id_conductor: conductorId,
-              nombre: user.nombre_completo || user.email, 
-              lat: ultimaPosicionRef.current.coords.latitude,
-              lng: ultimaPosicionRef.current.coords.longitude,
-              timestamp: new Date().toISOString()
-            };
-            socket.emit('enviar_ubicacion', datosGPS);
+            socket.emit('enviar_ubicacion', generarDatosGPS(
+              ultimaPosicionRef.current.coords.latitude,
+              ultimaPosicionRef.current.coords.longitude
+            ));
           }
         }, 5000);
 
