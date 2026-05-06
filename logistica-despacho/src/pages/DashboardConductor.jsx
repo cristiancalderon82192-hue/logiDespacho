@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SignatureCanvas from 'react-signature-canvas';
-import { registerPlugin } from '@capacitor/core'; 
-import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight } from 'lucide-react';
+import { registerPlugin, Capacitor } from '@capacitor/core'; 
+import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight, Plus } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 
 // Importamos el socket
@@ -27,7 +27,7 @@ const DashboardConductor = () => {
   const [bodegas, setBodegas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 👇 ESTO ES NUEVO: Un Ref para que el GPS pueda leer las rutas en tiempo real sin romperse
+  // Un Ref para que el GPS pueda leer las rutas en tiempo real sin romperse
   const rutasRef = useRef([]);
   useEffect(() => {
     rutasRef.current = rutas;
@@ -44,8 +44,8 @@ const DashboardConductor = () => {
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [valorDevolucion, setValorDevolucion] = useState('');
   
-  const [bodegaDevolucion, setBodegaDevolucion] = useState('');
-  const [pesoDevolucion, setPesoDevolucion] = useState('');
+  // 👇 ESTO ES NUEVO: Estado para múltiples bodegas
+  const [devolucionesBodegas, setDevolucionesBodegas] = useState([{ bodegaId: '', peso: '' }]);
 
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
   const sigCanvasDev = useRef({}); 
@@ -68,7 +68,7 @@ const DashboardConductor = () => {
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id}&fecha=${fechaFiltro}&_t=${timestamp}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id || user.id_usuario}&fecha=${fechaFiltro}&_t=${timestamp}`, {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       if (response.ok) {
@@ -88,7 +88,7 @@ const DashboardConductor = () => {
   }, [fechaFiltro, user]);
 
   // =========================================================================
-  // 📍 LÓGICA DE RASTREO GPS BLINDADA (SEGUNDO PLANO)
+  // 📍 LÓGICA DE RASTREO GPS BLINDADA (HÍBRIDA PC/CELULAR)
   // =========================================================================
   const ultimaPosicionRef = useRef(null);
 
@@ -106,7 +106,6 @@ const DashboardConductor = () => {
     let watcherId = null;
     let intervalId = null;
 
-    // 👇 NUEVO: Función auxiliar para construir el paquete de datos completo con estadísticas
     const generarDatosGPS = (lat, lng) => {
       const rutasActuales = rutasRef.current;
       const entregasTotales = rutasActuales.length;
@@ -131,35 +130,38 @@ const DashboardConductor = () => {
       };
     };
 
-    const iniciarRastreoNativo = async () => {
+    const iniciarRastreo = async () => {
       try {
-        // 1. Iniciamos el vigilante de fondo
-        watcherId = await BackgroundGeolocation.addWatcher(
-          {
-            backgroundMessage: "LogiDespacho está compartiendo tu ubicación en tiempo real.",
-            backgroundTitle: "Rastreo de Ruta Activo",
-            requestPermissions: true,
-            stale: false,
-            distanceFilter: 15 // Actualiza automáticamente cada vez que se mueva 15 metros
-          },
-          function callback(location, error) {
-            if (error) {
-              console.error("Error en GPS de fondo:", error);
-              return;
+        if (Capacitor.isNativePlatform()) {
+          // MODO CELULAR
+          watcherId = await BackgroundGeolocation.addWatcher(
+            {
+              backgroundMessage: "LogiDespacho está compartiendo tu ubicación en tiempo real.",
+              backgroundTitle: "Rastreo de Ruta Activo",
+              requestPermissions: true,
+              stale: false,
+              distanceFilter: 15 
+            },
+            function callback(location, error) {
+              if (error) return;
+              if (location) {
+                ultimaPosicionRef.current = { coords: { latitude: location.latitude, longitude: location.longitude } };
+                socket.emit('enviar_ubicacion', generarDatosGPS(location.latitude, location.longitude));
+              }
             }
-            if (location) {
-              ultimaPosicionRef.current = {
-                coords: { latitude: location.latitude, longitude: location.longitude }
-              };
+          );
+        } else {
+          // MODO PC
+          watcherId = navigator.geolocation.watchPosition(
+            (position) => {
+              ultimaPosicionRef.current = { coords: { latitude: position.coords.latitude, longitude: position.coords.longitude } };
+              socket.emit('enviar_ubicacion', generarDatosGPS(position.coords.latitude, position.coords.longitude));
+            },
+            (error) => console.error("Error GPS Navegador:", error),
+            { enableHighAccuracy: true }
+          );
+        }
 
-              // Emitimos al instante cuando detecta movimiento
-              socket.emit('enviar_ubicacion', generarDatosGPS(location.latitude, location.longitude));
-            }
-          }
-        );
-
-        // 2. Latido de seguridad: Si el conductor se detiene en un semáforo, 
-        // seguimos enviando la última posición conocida cada 5 segundos
         intervalId = setInterval(() => {
           if (ultimaPosicionRef.current) {
             socket.emit('enviar_ubicacion', generarDatosGPS(
@@ -170,19 +172,24 @@ const DashboardConductor = () => {
         }, 5000);
 
       } catch (error) {
-        console.error("No se pudo iniciar el rastreo de fondo:", error);
+        console.error("Error al iniciar rastreo:", error);
       }
     };
 
-    iniciarRastreoNativo();
+    iniciarRastreo();
 
     return () => {
-      if (watcherId) {
-        BackgroundGeolocation.removeWatcher({ id: watcherId });
+      if (watcherId !== null) {
+        if (Capacitor.isNativePlatform()) {
+          BackgroundGeolocation.removeWatcher({ id: watcherId });
+        } else {
+          navigator.geolocation.clearWatch(watcherId);
+        }
       }
       if (intervalId) clearInterval(intervalId);
     };
   }, [user]);
+
   // =========================================================================
 
   const handleCambiarEstado = async (pedidoId, nuevoEstado) => {
@@ -233,21 +240,41 @@ const DashboardConductor = () => {
     } catch (error) { alert("Error de conexión."); }
   };
 
-  // ---- LÓGICA DE DEVOLUCIÓN / NOVEDAD (EN 2 PASOS) ----
+  // ---- LÓGICA DE DEVOLUCIÓN / NOVEDAD MULTI-BODEGA ----
   const abrirModalDevolucion = (pedido) => {
     setPedidoDevolucion(pedido);
     setMotivoDevolucion('');
     setValorDevolucion(''); 
-    setBodegaDevolucion('');
-    setPesoDevolucion('');   
+    setDevolucionesBodegas([{ bodegaId: '', peso: '' }]); // Reinicia a 1 fila vacía
     setPasoDevolucion(1); 
     setShowModalDevolucion(true);
   };
 
+  const agregarBodegaDevolucion = () => {
+    setDevolucionesBodegas([...devolucionesBodegas, { bodegaId: '', peso: '' }]);
+  };
+
+  const eliminarBodegaDevolucion = (index) => {
+    const nuevoArreglo = devolucionesBodegas.filter((_, i) => i !== index);
+    setDevolucionesBodegas(nuevoArreglo);
+  };
+
+  const actualizarBodegaDevolucion = (index, campo, valor) => {
+    const nuevoArreglo = [...devolucionesBodegas];
+    nuevoArreglo[index][campo] = valor;
+    setDevolucionesBodegas(nuevoArreglo);
+  };
+
   const validarDatosDevolucion = (e) => {
     e.preventDefault();
-    if (!bodegaDevolucion) return alert("Debes seleccionar la bodega asociada a la mercancía faltante o devuelta.");
-    if (!pesoDevolucion || Number(pesoDevolucion) <= 0) return alert("Debes indicar el peso de la mercancía faltante o devuelta.");
+    
+    // Validar que todas las filas tengan bodega y peso
+    for (let i = 0; i < devolucionesBodegas.length; i++) {
+      const fila = devolucionesBodegas[i];
+      if (!fila.bodegaId) return alert(`Por favor selecciona la bodega en la fila ${i + 1}.`);
+      if (!fila.peso || Number(fila.peso) <= 0) return alert(`Por favor ingresa un peso válido en la fila ${i + 1}.`);
+    }
+
     if (!motivoDevolucion.trim()) return alert("Debes escribir el motivo de la novedad.");
     
     let cargaEnCamion = parseFloat(pedidoDevolucion.total_despachado);
@@ -277,8 +304,13 @@ const DashboardConductor = () => {
     const valorRecaudado = cargaEnCamion - valorD;
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
-    const nombreBodega = bodegas.find(b => String(b.id) === String(bodegaDevolucion))?.nombre || 'Bodega';
-    const notaEnriquecida = `[${nombreBodega} | Faltan ${pesoDevolucion} Kg] ${motivoDevolucion}`;
+    // Construir la nota enriquecida con TODAS las bodegas seleccionadas
+    const detallesBodegas = devolucionesBodegas.map(dev => {
+      const nombreBodega = bodegas.find(b => String(b.id) === String(dev.bodegaId))?.nombre || 'Bodega';
+      return `${nombreBodega}: ${dev.peso}Kg`;
+    }).join(' | ');
+
+    const notaEnriquecida = `[Retornos -> ${detallesBodegas}] ${motivoDevolucion}`;
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`, {
@@ -528,7 +560,7 @@ const DashboardConductor = () => {
         </div>
       )}
 
-      {/* ================= MODAL INTELIGENTE DE NOVEDADES Y DEVOLUCIONES (EN 2 PASOS) ================= */}
+      {/* ================= MODAL INTELIGENTE DE NOVEDADES MULTI-BODEGA ================= */}
       {showModalDevolucion && pedidoDevolucion && (
         <div className="fixed inset-0 bg-slate-900/80 z-[100] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -542,7 +574,7 @@ const DashboardConductor = () => {
               <button onClick={() => setShowModalDevolucion(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20}/></button>
             </div>
 
-            {/* PASO 1: Llenar motivo, valor, bodega y peso */}
+            {/* PASO 1: Llenar motivo, valor, y las bodegas */}
             {pasoDevolucion === 1 ? (
               <form onSubmit={validarDatosDevolucion} className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                 
@@ -565,34 +597,59 @@ const DashboardConductor = () => {
                   </div>
                 </div>
 
+                {/* 👇 CONTENEDOR DE MÚLTIPLES BODEGAS 👇 */}
                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
-                  <label className="text-[11px] font-bold text-orange-800 uppercase mb-3 block">Datos para Reenvío (Logística)</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Building2 size={12}/> Bodega</label>
-                      <select 
-                        value={bodegaDevolucion} 
-                        onChange={(e) => setBodegaDevolucion(e.target.value)} 
-                        className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold" 
-                        required
-                      >
-                        <option value="">Selecciona...</option>
-                        {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Weight size={12}/> Peso (Kg)</label>
-                      <input 
-                        type="number" 
-                        step="0.1" 
-                        min="0.1"
-                        value={pesoDevolucion} 
-                        onChange={(e) => setPesoDevolucion(e.target.value)} 
-                        className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold" 
-                        placeholder="Ej: 50" 
-                        required 
-                      />
-                    </div>
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="text-[11px] font-bold text-orange-800 uppercase block">Datos para Reenvío (Logística)</label>
+                    <button 
+                      type="button" 
+                      onClick={agregarBodegaDevolucion} 
+                      className="text-[10px] bg-orange-200 text-orange-800 px-2 py-1 rounded font-bold uppercase hover:bg-orange-300 transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      <Plus size={12}/> Agregar
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {devolucionesBodegas.map((dev, index) => (
+                      <div key={index} className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          {index === 0 && <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Building2 size={12}/> Bodega</label>}
+                          <select 
+                            value={dev.bodegaId} 
+                            onChange={(e) => actualizarBodegaDevolucion(index, 'bodegaId', e.target.value)} 
+                            className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold" 
+                            required
+                          >
+                            <option value="">Selecciona...</option>
+                            {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
+                          </select>
+                        </div>
+                        <div className="w-[70px] shrink-0">
+                          {index === 0 && <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Weight size={12}/> Kg</label>}
+                          <input 
+                            type="number" 
+                            step="0.1" 
+                            min="0.1"
+                            value={dev.peso} 
+                            onChange={(e) => actualizarBodegaDevolucion(index, 'peso', e.target.value)} 
+                            className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold px-1 text-center" 
+                            placeholder="Ej: 50" 
+                            required 
+                          />
+                        </div>
+                        {devolucionesBodegas.length > 1 && (
+                          <button 
+                            type="button" 
+                            onClick={() => eliminarBodegaDevolucion(index)} 
+                            className={`p-2 text-red-500 bg-red-100 hover:bg-red-200 rounded-lg shrink-0 border border-red-200 ${index === 0 ? 'mb-0' : ''}`}
+                            style={index === 0 ? { marginBottom: '2px' } : {}}
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
