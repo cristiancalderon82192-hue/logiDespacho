@@ -2,13 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SignatureCanvas from 'react-signature-canvas';
 import { registerPlugin, Capacitor } from '@capacitor/core'; 
-import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight, Plus } from 'lucide-react';
+import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight, Plus, WifiOff, CloudSync } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
-
-// Importamos el socket
 import { socket } from '../utils/socket'; 
 
-// REGISTRO DEL PLUGIN DE GPS EN SEGUNDO PLANO
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
 const DashboardConductor = () => {
@@ -27,37 +24,115 @@ const DashboardConductor = () => {
   const [bodegas, setBodegas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Un Ref para que el GPS pueda leer las rutas en tiempo real sin romperse
-  const rutasRef = useRef([]);
-  useEffect(() => {
-    rutasRef.current = rutas;
-  }, [rutas]);
+  // ESTADOS MODO OFFLINE
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [syncing, setSyncing] = useState(false);
 
-  // Estados para Modal de Entrega Exitosa
+  // 👇 NUEVOS ESTADOS PARA AVISO DE FIN DE JORNADA 👇
+  const [showModalTerminado, setShowModalTerminado] = useState(false);
+  const [modalTerminadoMostrado, setModalTerminadoMostrado] = useState(false);
+
+  const rutasRef = useRef([]);
+  useEffect(() => { rutasRef.current = rutas; }, [rutas]);
+
   const [showModalFirma, setShowModalFirma] = useState(false);
   const [pedidoFirma, setPedidoFirma] = useState(null);
   const sigCanvas = useRef({});
 
-  // Estados para Modal de Devolución/Novedad
   const [showModalDevolucion, setShowModalDevolucion] = useState(false);
   const [pedidoDevolucion, setPedidoDevolucion] = useState(null);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [valorDevolucion, setValorDevolucion] = useState('');
-  
-  // 👇 ESTO ES NUEVO: Estado para múltiples bodegas
   const [devolucionesBodegas, setDevolucionesBodegas] = useState([{ bodegaId: '', peso: '' }]);
-
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
   const sigCanvasDev = useRef({}); 
 
   // =========================================================================
-  // 📍 CARGA INICIAL DE BODEGAS Y RUTAS
+  // 📍 DETECCIÓN DE CONEXIÓN Y SINCRONIZACIÓN AUTOMÁTICA
+  // =========================================================================
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => {
+      setIsOffline(false);
+      sincronizarPendientes();
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    if (navigator.onLine) sincronizarPendientes();
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  const sincronizarPendientes = async () => {
+    const queue = JSON.parse(localStorage.getItem('offline_queue')) || [];
+    if (queue.length === 0) return;
+
+    setSyncing(true);
+    const failedQueue = [];
+
+    for (let item of queue) {
+      try {
+        const res = await fetch(item.url, {
+          method: item.method,
+          headers: item.headers,
+          body: item.body
+        });
+        if (!res.ok) throw new Error('Falló sync');
+      } catch (err) {
+        failedQueue.push(item); 
+      }
+    }
+
+    localStorage.setItem('offline_queue', JSON.stringify(failedQueue));
+    setSyncing(false);
+    fetchRutas(true); 
+  };
+
+  const procesarPeticion = async (url, method, body, pedidoId, nuevoEstadoLocal, recaudo = 0) => {
+    const guardarLocalmente = () => {
+      const queue = JSON.parse(localStorage.getItem('offline_queue')) || [];
+      queue.push({ url, method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), timestamp: new Date().getTime() });
+      localStorage.setItem('offline_queue', JSON.stringify(queue));
+      
+      setRutas(prev => {
+        const nuevasRutas = prev.map(r => r.id === pedidoId ? { ...r, estado_entrega: nuevoEstadoLocal, valor_recaudado: recaudo } : r);
+        localStorage.setItem('rutas_cache', JSON.stringify(nuevasRutas));
+        return nuevasRutas;
+      });
+    };
+
+    if (navigator.onLine) {
+      try {
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (res.ok) fetchRutas(false);
+        else alert("Error del servidor, inténtalo más tarde.");
+      } catch (error) { guardarLocalmente(); }
+    } else {
+      guardarLocalmente();
+    }
+  };
+
+  // =========================================================================
+  // 📍 CARGA INICIAL DE BODEGAS Y RUTAS CON CACHÉ
   // =========================================================================
   useEffect(() => {
     const fetchBodegas = async () => {
+      if (!navigator.onLine) {
+        setBodegas(JSON.parse(localStorage.getItem('bodegas_cache')) || []);
+        return;
+      }
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/bodegas`);
-        if (res.ok) setBodegas(await res.json());
+        if (res.ok) {
+          const data = await res.json();
+          setBodegas(data);
+          localStorage.setItem('bodegas_cache', JSON.stringify(data));
+        }
       } catch (error) { console.error("Error cargando bodegas:", error); }
     };
     fetchBodegas();
@@ -65,27 +140,31 @@ const DashboardConductor = () => {
 
   const fetchRutas = async (mostrarCarga = true) => {
     if (!user) return;
+    
+    if (!navigator.onLine) {
+      setRutas(JSON.parse(localStorage.getItem('rutas_cache')) || []);
+      setLoading(false);
+      return;
+    }
+
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id || user.id_usuario}&fecha=${fechaFiltro}&_t=${timestamp}`, {
-        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-      });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/mis-rutas?conductor_id=${user.id || user.id_usuario}&fecha=${fechaFiltro}&_t=${timestamp}`);
       if (response.ok) {
-        setRutas(await response.json());
+        const data = await response.json();
+        setRutas(data);
+        localStorage.setItem('rutas_cache', JSON.stringify(data)); 
       }
-    } catch (error) {
-      console.error("Error al cargar rutas:", error);
-    } finally {
-      if (mostrarCarga) setLoading(false);
-    }
+    } catch (error) { console.error("Error al cargar rutas:", error); } 
+    finally { if (mostrarCarga) setLoading(false); }
   };
 
   useEffect(() => {
     fetchRutas(true);
-    const intervalId = setInterval(() => { fetchRutas(false); }, 5000);
+    const intervalId = setInterval(() => { if (!syncing) fetchRutas(false); }, 5000);
     return () => clearInterval(intervalId);
-  }, [fechaFiltro, user]);
+  }, [fechaFiltro, user, syncing]);
 
   // =========================================================================
   // 📍 LÓGICA DE RASTREO GPS BLINDADA (HÍBRIDA PC/CELULAR)
@@ -94,14 +173,11 @@ const DashboardConductor = () => {
 
   useEffect(() => {
     if (!user) return;
-
     const conductorId = user.id || user.id_usuario || user.email;
 
-    socket.emit('registrar_usuario', { 
-      id: conductorId, 
-      email: user.email, 
-      role: user.role 
-    });
+    if (navigator.onLine) {
+      socket.emit('registrar_usuario', { id: conductorId, email: user.email, role: user.role });
+    }
 
     let watcherId = null;
     let intervalId = null;
@@ -133,58 +209,42 @@ const DashboardConductor = () => {
     const iniciarRastreo = async () => {
       try {
         if (Capacitor.isNativePlatform()) {
-          // MODO CELULAR
           watcherId = await BackgroundGeolocation.addWatcher(
-            {
-              backgroundMessage: "LogiDespacho está compartiendo tu ubicación en tiempo real.",
-              backgroundTitle: "Rastreo de Ruta Activo",
-              requestPermissions: true,
-              stale: false,
-              distanceFilter: 15 
-            },
+            { backgroundMessage: "LogiDespacho GPS Activo", backgroundTitle: "Rastreo de Ruta", requestPermissions: true, stale: false, distanceFilter: 15 },
             function callback(location, error) {
               if (error) return;
-              if (location) {
+              if (location && navigator.onLine) {
                 ultimaPosicionRef.current = { coords: { latitude: location.latitude, longitude: location.longitude } };
                 socket.emit('enviar_ubicacion', generarDatosGPS(location.latitude, location.longitude));
               }
             }
           );
         } else {
-          // MODO PC
           watcherId = navigator.geolocation.watchPosition(
             (position) => {
-              ultimaPosicionRef.current = { coords: { latitude: position.coords.latitude, longitude: position.coords.longitude } };
-              socket.emit('enviar_ubicacion', generarDatosGPS(position.coords.latitude, position.coords.longitude));
+              if (navigator.onLine) {
+                ultimaPosicionRef.current = { coords: { latitude: position.coords.latitude, longitude: position.coords.longitude } };
+                socket.emit('enviar_ubicacion', generarDatosGPS(position.coords.latitude, position.coords.longitude));
+              }
             },
-            (error) => console.error("Error GPS Navegador:", error),
-            { enableHighAccuracy: true }
+            (error) => console.error(error), { enableHighAccuracy: true }
           );
         }
 
         intervalId = setInterval(() => {
-          if (ultimaPosicionRef.current) {
-            socket.emit('enviar_ubicacion', generarDatosGPS(
-              ultimaPosicionRef.current.coords.latitude,
-              ultimaPosicionRef.current.coords.longitude
-            ));
+          if (ultimaPosicionRef.current && navigator.onLine) {
+            socket.emit('enviar_ubicacion', generarDatosGPS(ultimaPosicionRef.current.coords.latitude, ultimaPosicionRef.current.coords.longitude));
           }
         }, 5000);
-
-      } catch (error) {
-        console.error("Error al iniciar rastreo:", error);
-      }
+      } catch (error) { console.error("Error al iniciar rastreo:", error); }
     };
 
     iniciarRastreo();
 
     return () => {
       if (watcherId !== null) {
-        if (Capacitor.isNativePlatform()) {
-          BackgroundGeolocation.removeWatcher({ id: watcherId });
-        } else {
-          navigator.geolocation.clearWatch(watcherId);
-        }
+        if (Capacitor.isNativePlatform()) BackgroundGeolocation.removeWatcher({ id: watcherId });
+        else navigator.geolocation.clearWatch(watcherId);
       }
       if (intervalId) clearInterval(intervalId);
     };
@@ -193,154 +253,99 @@ const DashboardConductor = () => {
   // =========================================================================
 
   const handleCambiarEstado = async (pedidoId, nuevoEstado) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoId}/estado`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: nuevoEstado })
-      });
-      if (response.ok) fetchRutas(false);
-    } catch (error) { alert("Error de conexión al servidor."); }
+    const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoId}/estado`;
+    const body = { estado: nuevoEstado };
+    await procesarPeticion(url, 'PUT', body, pedidoId, nuevoEstado);
   };
 
-  // ---- LÓGICA DE ENTREGA EXITOSA ----
-  const iniciarEntrega = (pedido) => {
-    setPedidoFirma(pedido);
-    setShowModalFirma(true);
-  };
-
-  const limpiarFirma = () => {
-    sigCanvas.current.clear();
-  };
+  const iniciarEntrega = (pedido) => { setPedidoFirma(pedido); setShowModalFirma(true); };
+  const limpiarFirma = () => sigCanvas.current.clear();
 
   const confirmarEntregaConFirma = async () => {
     if (sigCanvas.current.isEmpty()) return alert("El cliente debe firmar en el recuadro.");
-    
     const firmaBase64 = sigCanvas.current.getCanvas().toDataURL('image/png');
-
     let valorACobrar = parseFloat(pedidoFirma.total_despachado);
     if (isNaN(valorACobrar) || valorACobrar <= 0) valorACobrar = parseFloat(pedidoFirma.valor_factura || 0);
 
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoFirma.id}/estado`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          estado: 'Entregado',
-          firma_cliente: firmaBase64,
-          valor_recaudado: valorACobrar 
-        })
-      });
+    const body = { estado: 'Entregado', firma_cliente: firmaBase64, valor_recaudado: valorACobrar };
+    const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoFirma.id}/estado`;
 
-      if (response.ok) {
-        setShowModalFirma(false);
-        setPedidoFirma(null);
-        fetchRutas(true);
-      }
-    } catch (error) { alert("Error de conexión."); }
+    setShowModalFirma(false);
+    await procesarPeticion(url, 'PUT', body, pedidoFirma.id, 'Entregado', valorACobrar);
+    setPedidoFirma(null);
   };
 
-  // ---- LÓGICA DE DEVOLUCIÓN / NOVEDAD MULTI-BODEGA ----
   const abrirModalDevolucion = (pedido) => {
     setPedidoDevolucion(pedido);
-    setMotivoDevolucion('');
-    setValorDevolucion(''); 
-    setDevolucionesBodegas([{ bodegaId: '', peso: '' }]); // Reinicia a 1 fila vacía
-    setPasoDevolucion(1); 
+    setMotivoDevolucion(''); setValorDevolucion(''); setDevolucionesBodegas([{ bodegaId: '', peso: '' }]); setPasoDevolucion(1); 
     setShowModalDevolucion(true);
   };
 
-  const agregarBodegaDevolucion = () => {
-    setDevolucionesBodegas([...devolucionesBodegas, { bodegaId: '', peso: '' }]);
-  };
-
-  const eliminarBodegaDevolucion = (index) => {
-    const nuevoArreglo = devolucionesBodegas.filter((_, i) => i !== index);
-    setDevolucionesBodegas(nuevoArreglo);
-  };
-
+  const agregarBodegaDevolucion = () => setDevolucionesBodegas([...devolucionesBodegas, { bodegaId: '', peso: '' }]);
+  const eliminarBodegaDevolucion = (index) => setDevolucionesBodegas(devolucionesBodegas.filter((_, i) => i !== index));
   const actualizarBodegaDevolucion = (index, campo, valor) => {
-    const nuevoArreglo = [...devolucionesBodegas];
-    nuevoArreglo[index][campo] = valor;
-    setDevolucionesBodegas(nuevoArreglo);
+    const nuevo = [...devolucionesBodegas]; nuevo[index][campo] = valor; setDevolucionesBodegas(nuevo);
   };
 
   const validarDatosDevolucion = (e) => {
     e.preventDefault();
-    
-    // Validar que todas las filas tengan bodega y peso
     for (let i = 0; i < devolucionesBodegas.length; i++) {
-      const fila = devolucionesBodegas[i];
-      if (!fila.bodegaId) return alert(`Por favor selecciona la bodega en la fila ${i + 1}.`);
-      if (!fila.peso || Number(fila.peso) <= 0) return alert(`Por favor ingresa un peso válido en la fila ${i + 1}.`);
+      if (!devolucionesBodegas[i].bodegaId) return alert(`Selecciona bodega en fila ${i + 1}.`);
+      if (!devolucionesBodegas[i].peso || Number(devolucionesBodegas[i].peso) <= 0) return alert(`Ingresa peso válido en fila ${i + 1}.`);
     }
-
     if (!motivoDevolucion.trim()) return alert("Debes escribir el motivo de la novedad.");
     
-    let cargaEnCamion = parseFloat(pedidoDevolucion.total_despachado);
-    if (isNaN(cargaEnCamion) || cargaEnCamion <= 0) cargaEnCamion = parseFloat(pedidoDevolucion.valor_factura || 0);
-    
+    let carga = parseFloat(pedidoDevolucion.total_despachado);
+    if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);
     const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
 
-    if (valorD <= 0) return alert("El valor de la novedad no puede ser cero. Digita el valor correctamente.");
-    if (valorD > cargaEnCamion) return alert(`Estás reportando $${valorD.toLocaleString()}, pero en el camión solo llevas $${cargaEnCamion.toLocaleString()}. Digita bien.`);
+    if (valorD <= 0) return alert("El valor de la novedad no puede ser cero.");
+    if (valorD > carga) return alert(`Reportas $${valorD.toLocaleString()}, pero llevas $${carga.toLocaleString()}.`);
 
     setPasoDevolucion(2);
   };
 
-  const limpiarFirmaDevolucion = () => {
-    sigCanvasDev.current.clear();
-  };
+  const limpiarFirmaDevolucion = () => sigCanvasDev.current.clear();
 
   const confirmarDevolucionConFirma = async () => {
-    if (sigCanvasDev.current.isEmpty()) return alert("El cliente debe firmar la novedad para proceder.");
-    
+    if (sigCanvasDev.current.isEmpty()) return alert("El cliente debe firmar la novedad.");
     const firmaBase64 = sigCanvasDev.current.getCanvas().toDataURL('image/png');
-
-    let cargaEnCamion = parseFloat(pedidoDevolucion.total_despachado);
-    if (isNaN(cargaEnCamion) || cargaEnCamion <= 0) cargaEnCamion = parseFloat(pedidoDevolucion.valor_factura || 0);
+    let carga = parseFloat(pedidoDevolucion.total_despachado);
+    if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);
     
     const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
-    const valorRecaudado = cargaEnCamion - valorD;
+    const valorRecaudado = carga - valorD;
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
-    // Construir la nota enriquecida con TODAS las bodegas seleccionadas
     const detallesBodegas = devolucionesBodegas.map(dev => {
       const nombreBodega = bodegas.find(b => String(b.id) === String(dev.bodegaId))?.nombre || 'Bodega';
       return `${nombreBodega}: ${dev.peso}Kg`;
     }).join(' | ');
-
     const notaEnriquecida = `[Retornos -> ${detallesBodegas}] ${motivoDevolucion}`;
 
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          estado: estadoReal, 
-          observaciones_entrega: notaEnriquecida,
-          observacion_devolucion: notaEnriquecida, 
-          valor_devolucion: valorD,
-          valor_recaudado: valorRecaudado,
-          firma_cliente: firmaBase64 
-        })
-      });
-      if (response.ok) {
-        setShowModalDevolucion(false);
-        fetchRutas(true);
-      }
-    } catch (error) { alert("Error de conexión."); }
+    const body = { estado: estadoReal, observaciones_entrega: notaEnriquecida, observacion_devolucion: notaEnriquecida, valor_devolucion: valorD, valor_recaudado: valorRecaudado, firma_cliente: firmaBase64 };
+    const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`;
+
+    setShowModalDevolucion(false);
+    await procesarPeticion(url, 'PUT', body, pedidoDevolucion.id, estadoReal, valorRecaudado);
   };
 
   let totalModal = parseFloat(pedidoDevolucion?.total_despachado);
   if (isNaN(totalModal) || totalModal <= 0) totalModal = parseFloat(pedidoDevolucion?.valor_factura || 0);
-
   const devModal = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0;
   const aRecaudarModal = Math.max(0, totalModal - devModal);
 
   const totalPeso = rutas.reduce((acc, r) => acc + Number(r.total_peso || 0), 0);
   const entregasPendientes = rutas.filter(r => r.estado_entrega === 'Asignado' || r.estado_entrega === 'En Ruta').length;
   const vehiculoAsignado = rutas.length > 0 && rutas[0].vehiculo_placa ? rutas[0].vehiculo_placa : 'Sin asignar';
+
+  // 👇 LÓGICA PARA DETECTAR FIN DE JORNADA 👇
+  useEffect(() => {
+    if (rutas.length > 0 && entregasPendientes === 0 && !modalTerminadoMostrado) {
+      setShowModalTerminado(true);
+      setModalTerminadoMostrado(true);
+    }
+  }, [rutas.length, entregasPendientes, modalTerminadoMostrado]);
 
   return (
     <div className="bg-slate-100 min-h-screen pb-20 font-sans">
@@ -359,11 +364,20 @@ const DashboardConductor = () => {
             <LogOut size={20} />
           </button>
         </div>
+        
+        {isOffline && (
+          <div className="bg-red-500 text-white text-[11px] font-bold text-center py-1.5 flex justify-center items-center gap-2 shadow-inner">
+            <WifiOff size={14} /> Modo Sin Conexión - Se sincronizará al recuperar señal
+          </div>
+        )}
+        {syncing && (
+          <div className="bg-blue-500 text-white text-[11px] font-bold text-center py-1.5 flex justify-center items-center gap-2 shadow-inner">
+            <RefreshCw size={14} className="animate-spin" /> Sincronizando entregas pendientes...
+          </div>
+        )}
       </div>
 
       <div className="p-4 space-y-4 max-w-2xl mx-auto">
-        
-        {/* RESUMEN */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-center">
@@ -371,8 +385,8 @@ const DashboardConductor = () => {
                 <Calendar size={16} className="text-[#47B3A8]" /> Hoy: {fechaFiltro}
               </label>
               <div className="flex items-center gap-2">
-                <button onClick={() => fetchRutas(true)} disabled={loading} className="bg-[#47B3A8]/10 text-[#47B3A8] p-1.5 rounded-lg shadow-sm hover:bg-[#47B3A8]/20 active:scale-95 transition-all">
-                  <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                <button onClick={() => fetchRutas(true)} disabled={loading || isOffline} className={`p-1.5 rounded-lg shadow-sm active:scale-95 transition-all ${isOffline ? 'bg-slate-100 text-slate-400' : 'bg-[#47B3A8]/10 text-[#47B3A8] hover:bg-[#47B3A8]/20'}`}>
+                  {isOffline ? <WifiOff size={16} /> : <RefreshCw size={16} className={loading ? "animate-spin" : ""} />}
                 </button>
                 <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md">
                   <Truck size={14} className="text-[#47B3A8]"/> {vehiculoAsignado}
@@ -393,8 +407,7 @@ const DashboardConductor = () => {
           </div>
         </div>
 
-        {/* TARJETAS DE PEDIDOS */}
-        {loading && rutas.length === 0 ? (
+        {loading && rutas.length === 0 && !isOffline ? (
           <div className="text-center py-10 text-slate-500 font-medium flex flex-col items-center gap-2">
             <RefreshCw size={24} className="animate-spin text-[#47B3A8]" /> Cargando ruta...
           </div>
@@ -411,6 +424,8 @@ const DashboardConductor = () => {
 
               let valorVisualCarga = parseFloat(ruta.total_despachado);
               if (isNaN(valorVisualCarga) || valorVisualCarga <= 0) valorVisualCarga = parseFloat(ruta.valor_factura || 0);
+
+              const isPendienteSync = JSON.parse(localStorage.getItem('offline_queue') || '[]').some(q => q.url.includes(ruta.id));
 
               return (
                 <div key={ruta.id} className={`bg-white rounded-2xl shadow-md border overflow-hidden relative transition-all ${
@@ -433,6 +448,11 @@ const DashboardConductor = () => {
                       </div>
                       {ruta.estado_entrega === 'En Ruta' && (
                         <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase animate-pulse flex items-center gap-1"><Truck size={12}/> En Ruta</span>
+                      )}
+                      {isPendienteSync && finalizado && (
+                        <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-[9px] font-extrabold uppercase flex items-center gap-1 shadow-sm border border-yellow-200" title="Pendiente de sincronizar">
+                          <CloudSync size={12}/> Pendiente Sync
+                        </span>
                       )}
                     </div>
 
@@ -516,7 +536,6 @@ const DashboardConductor = () => {
         )}
       </div>
 
-      {/* ================= MODAL DE FIRMA PARA ENTREGA TOTAL EXITOSA ================= */}
       {showModalFirma && pedidoFirma && (
         <div className="fixed inset-0 bg-slate-900/90 z-[100] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
@@ -560,12 +579,10 @@ const DashboardConductor = () => {
         </div>
       )}
 
-      {/* ================= MODAL INTELIGENTE DE NOVEDADES MULTI-BODEGA ================= */}
       {showModalDevolucion && pedidoDevolucion && (
         <div className="fixed inset-0 bg-slate-900/80 z-[100] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
             
-            {/* Cabecera dinámica según el paso */}
             <div className={`${pasoDevolucion === 1 ? 'bg-red-600' : 'bg-orange-600'} p-4 flex justify-between items-center text-white transition-colors shrink-0`}>
               <div className="flex items-center gap-2">
                 {pasoDevolucion === 1 ? <AlertCircle size={20} /> : <PenTool size={20} />}
@@ -574,7 +591,6 @@ const DashboardConductor = () => {
               <button onClick={() => setShowModalDevolucion(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20}/></button>
             </div>
 
-            {/* PASO 1: Llenar motivo, valor, y las bodegas */}
             {pasoDevolucion === 1 ? (
               <form onSubmit={validarDatosDevolucion} className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                 
@@ -586,10 +602,7 @@ const DashboardConductor = () => {
                       type="text" 
                       inputMode="numeric"
                       value={valorDevolucion ? Number(String(valorDevolucion).replace(/[^0-9]/g, '')).toLocaleString('es-CO') : ''} 
-                      onChange={(e) => {
-                        const numerosPuros = e.target.value.replace(/[^0-9]/g, '');
-                        setValorDevolucion(numerosPuros);
-                      }} 
+                      onChange={(e) => setValorDevolucion(e.target.value.replace(/[^0-9]/g, ''))} 
                       className="w-full pl-9 border-2 border-red-200 p-3 rounded-xl focus:border-red-500 outline-none text-red-900 font-extrabold text-lg bg-white transition-colors" 
                       placeholder="Ej: 350000" 
                       required 
@@ -597,7 +610,6 @@ const DashboardConductor = () => {
                   </div>
                 </div>
 
-                {/* 👇 CONTENEDOR DE MÚLTIPLES BODEGAS 👇 */}
                 <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
                   <div className="flex justify-between items-center mb-3">
                     <label className="text-[11px] font-bold text-orange-800 uppercase block">Datos para Reenvío (Logística)</label>
@@ -689,7 +701,6 @@ const DashboardConductor = () => {
                 </div>
               </form>
             ) : (
-              /* PASO 2: Capturar Firma del Cliente */
               <div className="p-5 flex-1 flex flex-col animate-fadeIn">
                 <p className="text-sm text-slate-600 mb-4 text-center">
                   Pide al cliente <b>{pedidoDevolucion.nombre_cliente}</b> que firme en el recuadro para confirmar que entrega/recibe con esta novedad.
@@ -720,6 +731,48 @@ const DashboardConductor = () => {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL DE FIN DE JORNADA ================= */}
+      {showModalTerminado && (
+        <div className="fixed inset-0 bg-slate-900/90 z-[110] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col p-6 text-center">
+            <div className="bg-green-100 text-green-600 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+              <CheckCircle size={40} />
+            </div>
+            <h2 className="text-2xl font-extrabold text-slate-800 mb-2">¡Excelente trabajo!</h2>
+            <p className="text-slate-600 mb-6 text-sm">
+              Has finalizado todas tus entregas de hoy. Recuerda <strong>cerrar sesión</strong> para detener el rastreo de tu ubicación y finalizar tu turno correctamente.
+            </p>
+
+            {/* AVISO DE SINCRONIZACIÓN PENDIENTE */}
+            {JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0 ? (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs p-3 rounded-xl mb-6 flex items-start gap-2 text-left">
+                <CloudSync size={16} className="shrink-0 mt-0.5" />
+                <span>
+                  <strong>¡Ojo! Tienes entregas sin sincronizar.</strong> Conéctate a internet para que se envíen al servidor antes de cerrar sesión.
+                </span>
+              </div>
+            ) : null}
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowModalTerminado(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors">
+                Cerrar aviso
+              </button>
+              <button
+                onClick={logout}
+                disabled={JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0}
+                className={`flex-1 py-3 rounded-xl font-bold shadow-md transition-transform flex justify-center items-center gap-2 text-white ${
+                  JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0 
+                    ? 'bg-slate-400 cursor-not-allowed' 
+                    : 'bg-red-500 hover:bg-red-600 active:scale-95'
+                }`}
+              >
+                <LogOut size={18}/> Cerrar Sesión
+              </button>
+            </div>
           </div>
         </div>
       )}
