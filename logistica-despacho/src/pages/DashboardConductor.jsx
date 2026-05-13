@@ -47,7 +47,7 @@ const DashboardConductor = () => {
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
   const sigCanvasDev = useRef({}); 
 
-  // 👇 VARIABLE PARA VERIFICAR SI HAY SINCRONIZACIONES PENDIENTES 👇
+  // VARIABLE PARA VERIFICAR SI HAY SINCRONIZACIONES PENDIENTES
   const pendingSyncs = JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0;
 
   // =========================================================================
@@ -71,6 +71,7 @@ const DashboardConductor = () => {
     };
   }, []);
 
+  // 👇 LÓGICA DE SINCRONIZACIÓN MEJORADA (DISPARA ALERTAS REPRESADAS) 👇
   const sincronizarPendientes = async () => {
     const queue = JSON.parse(localStorage.getItem('offline_queue')) || [];
     if (queue.length === 0) return;
@@ -86,6 +87,14 @@ const DashboardConductor = () => {
           body: item.body
         });
         if (!res.ok) throw new Error('Falló sync');
+
+        // Si se sincronizó bien y tenía una alerta de parcial pendiente, la disparamos
+        if (item.payloadAlerta) {
+          if (!socket.connected) socket.connect();
+          console.log("📢 DISPARANDO ALERTA REPRESADA (OFFLINE -> ONLINE):", item.payloadAlerta);
+          socket.emit('reportar_novedad', item.payloadAlerta);
+        }
+
       } catch (err) {
         failedQueue.push(item); 
       }
@@ -96,10 +105,12 @@ const DashboardConductor = () => {
     fetchRutas(true); 
   };
 
-  const procesarPeticion = async (url, method, body, pedidoId, nuevoEstadoLocal, recaudo = 0) => {
+  // 👇 LÓGICA PARA GUARDAR ALERTAS EN LA CAJA FUERTE 👇
+  const procesarPeticion = async (url, method, body, pedidoId, nuevoEstadoLocal, recaudo = 0, payloadAlerta = null) => {
     const guardarLocalmente = () => {
       const queue = JSON.parse(localStorage.getItem('offline_queue')) || [];
-      queue.push({ url, method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), timestamp: new Date().getTime() });
+      // Agregamos el payloadAlerta a la memoria del celular
+      queue.push({ url, method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), timestamp: new Date().getTime(), payloadAlerta });
       localStorage.setItem('offline_queue', JSON.stringify(queue));
       
       setRutas(prev => {
@@ -112,9 +123,19 @@ const DashboardConductor = () => {
     if (navigator.onLine) {
       try {
         const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (res.ok) fetchRutas(false);
-        else alert("Error del servidor, inténtalo más tarde.");
-      } catch (error) { guardarLocalmente(); }
+        if (res.ok) {
+          // Si guardó en la BD al instante y hay alerta, la disparamos
+          if (payloadAlerta) {
+            if (!socket.connected) socket.connect();
+            socket.emit('reportar_novedad', payloadAlerta);
+          }
+          fetchRutas(false);
+        } else {
+          alert("Error del servidor, inténtalo más tarde.");
+        }
+      } catch (error) { 
+        guardarLocalmente(); 
+      }
     } else {
       guardarLocalmente();
     }
@@ -343,16 +364,9 @@ const DashboardConductor = () => {
 
     setShowModalDevolucion(false);
 
-    // 👇 ALERTA BLINDADA CONTRA SUSPENSIÓN DE MOBILE 👇
-    if (navigator.onLine) {
-      if (!socket.connected) {
-        socket.connect();
-      }
-      console.log("📢 DISPARANDO ALERTA DESDE CONDUCTOR AL SERVIDOR:", payloadAlerta);
-      socket.emit('reportar_novedad', payloadAlerta);
-    }
-
-    await procesarPeticion(url, 'PUT', body, pedidoDevolucion.id, estadoReal, valorRecaudado);
+    // En vez de emitir aquí, se lo pasamos a procesarPeticion. 
+    // Si hay internet lo enviará, si no hay, lo guardará para cuando regrese la red.
+    await procesarPeticion(url, 'PUT', body, pedidoDevolucion.id, estadoReal, valorRecaudado, payloadAlerta);
   };
 
   let totalModal = parseFloat(pedidoDevolucion?.total_despachado);
@@ -386,7 +400,7 @@ const DashboardConductor = () => {
             </div>
           </div>
           
-          {/* 👇 BOTÓN DE CERRAR SESIÓN SUPERIOR BLINDADO 👇 */}
+          {/* BOTÓN DE CERRAR SESIÓN SUPERIOR BLINDADO */}
           <button 
             onClick={logout} 
             disabled={pendingSyncs}
