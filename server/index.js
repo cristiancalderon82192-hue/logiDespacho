@@ -1,15 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const http = require('http'); // <-- NUEVO: Importación nativa de Node para servidores HTTP
-const { Server } = require('socket.io'); // <-- NUEVO: Importación de WebSockets
+const http = require('http'); 
+const { Server } = require('socket.io'); 
 
-// 👇 AÑADIDO: Importamos la conexión a tu BD para poder limpiar los tokens 👇
-// (Asegúrate de que la ruta sea correcta, usualmente es './db' o './config/db')
 const db = require('./db'); 
 
 // === IMPORTACIÓN DE TODAS LAS RUTAS ===
-// (Asegúrate de que los nombres de los archivos en tu carpeta 'routes' coincidan con estos)
 const authRoutes = require('./routes/authRoutes');
 const pedidosRoutes = require('./routes/pedidosRoutes'); 
 const zonasRoutes = require('./routes/zonasRoutes');
@@ -73,37 +70,37 @@ io.on('connection', (socket) => {
   console.log('🟢 Nuevo dispositivo conectado al Socket:', socket.id);
 
   socket.on('registrar_usuario', (datosUsuario) => {
-    // 👇 AÑADIDO: Guardamos el ID del usuario en este socket específico para saber quién es cuando se vaya
     socket.userId = datosUsuario.id;
 
-    if (datosUsuario.role === 'admin' || datosUsuario.role === 'logistica') {
+    // 👇 CONVERSIÓN SEGURA DEL ROL A TEXTO 👇
+    const rolUsuario = String(datosUsuario.role).toLowerCase();
+
+    if (rolUsuario === 'admin' || rolUsuario === 'logistica' || rolUsuario === '1' || rolUsuario === '2' || rolUsuario === '3') {
       socket.join('sala_monitores');
       console.log(`👁️ Monitoreo Activo: Usuario (${datosUsuario.role}) se unió a sala_monitores`);
       
-      // Apenas el monitor entra, le mandamos la "foto actual" de todos los carros en memoria
       socket.emit('ubicaciones_iniciales', Object.values(ultimasUbicaciones));
       
-    } else if (datosUsuario.role === 'conductor') {
+    } else if (rolUsuario === 'conductor' || rolUsuario === '4') {
       console.log(`🚗 Conductor en ruta conectado: ID ${datosUsuario.id} | Socket: ${socket.id}`);
     }
   });
 
   socket.on('enviar_ubicacion', (datosGPS) => {
-    // 1. Actualizamos la posición en la memoria del servidor
     ultimasUbicaciones[datosGPS.id_conductor] = datosGPS;
-
-    // 2. NUEVO: Imprimimos en la terminal del backend cada vez que llega un reporte
     console.log(`⏱️ [${new Date().toLocaleTimeString()}] GPS recibido de ${datosGPS.nombre}: Lat ${datosGPS.lat}, Lng ${datosGPS.lng}`);
-
-    // 3. Rebotamos la info a la sala de monitores
     socket.to('sala_monitores').emit('actualizacion_gps', datosGPS);
   });
 
-  // 👇 MODIFICADO: Evento de desconexión blindado con limpieza de Base de Datos 👇
+// 👇 AHORA: Modo Megáfono (infalible). Se lo manda a todos.
+  socket.on('reportar_novedad', (datosNovedad) => {
+    console.log(`⚠️ ALERTA: Novedad de ${datosNovedad.conductor} en factura ${datosNovedad.factura}`);
+    io.emit('alerta_novedad', datosNovedad);
+  });
+
   socket.on('disconnect', async () => {
     console.log('🔴 Dispositivo desconectado:', socket.id);
     
-    // Si este socket tenía un ID de usuario registrado, limpiamos su sesión
     if (socket.userId) {
       console.log(`🧹 Limpiando sesión del usuario ID: ${socket.userId} por cierre de navegador...`);
       try {

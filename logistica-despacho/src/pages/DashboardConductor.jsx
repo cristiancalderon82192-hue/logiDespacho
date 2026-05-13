@@ -28,7 +28,7 @@ const DashboardConductor = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [syncing, setSyncing] = useState(false);
 
-  // 👇 NUEVOS ESTADOS PARA AVISO DE FIN DE JORNADA 👇
+  // ESTADOS PARA AVISO DE FIN DE JORNADA
   const [showModalTerminado, setShowModalTerminado] = useState(false);
   const [modalTerminadoMostrado, setModalTerminadoMostrado] = useState(false);
 
@@ -327,6 +327,18 @@ const DashboardConductor = () => {
     const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`;
 
     setShowModalDevolucion(false);
+
+    // 👇 AÑADIDO: DISPARADOR DE NOTIFICACIÓN DE NOVEDAD 👇
+    if (navigator.onLine) {
+      socket.emit('reportar_novedad', {
+        factura: pedidoDevolucion.id_factura,
+        cliente: pedidoDevolucion.nombre_cliente,
+        estado: estadoReal,
+        motivo: notaEnriquecida,
+        conductor: user?.nombre_completo || user?.email || 'Conductor'
+      });
+    }
+
     await procesarPeticion(url, 'PUT', body, pedidoDevolucion.id, estadoReal, valorRecaudado);
   };
 

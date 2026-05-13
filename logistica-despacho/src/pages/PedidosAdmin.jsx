@@ -3,7 +3,7 @@ import {
   Save, Truck, FileText, Calendar, User, Weight, MapPin, Search, 
   ChevronDown, ChevronUp, PlusCircle, DollarSign, Phone, X, CheckCircle, 
   Edit, Trash2, RefreshCw, AlertTriangle, Lock, Eye, XCircle, UserPlus, CreditCard,
-  Printer 
+  Printer, Plus 
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 const PedidosAdmin = () => {
   const { user } = useAuth();
 
-  const [showForm, setShowForm] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -116,9 +116,21 @@ const PedidosAdmin = () => {
     e.preventDefault();
     if (isReadOnly) return;
 
-    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) {
-      return alert("❌ Debes ingresar un Valor de Factura válido (No puede estar vacío ni ser negativo).");
+    // 👇 VALIDACIÓN ESTRICTA: ABSOLUTAMENTE TODOS LOS CAMPOS OBLIGATORIOS 👇
+    if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
+      alert("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
+      setShowClientModal(true);
+      return;
     }
+    if (!formData.id_factura || formData.id_factura.trim() === '') return alert("❌ El campo 'Id_Factura' es obligatorio.");
+    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) return alert("❌ Debes ingresar un 'Valor de Factura' válido (No negativo).");
+    if (!formData.fecha_facturacion) return alert("❌ La 'Fecha Fac.' es obligatoria.");
+    if (!formData.hora_registro) return alert("❌ La 'Hora Registro Entrega' es obligatoria.");
+    if (!formData.fecha_promesa) return alert("❌ La 'Fecha Promesa' es obligatoria.");
+    if (!formData.fecha_agendada) return alert("❌ La 'Fecha Agendada' es obligatoria.");
+    if (!formData.telefono || formData.telefono.trim() === '') return alert("❌ El campo 'Teléfono' es obligatorio.");
+    if (!formData.destino_id) return alert("❌ Debes seleccionar un 'Destino'.");
+    if (!formData.nota_manual || formData.nota_manual.trim() === '') return alert("❌ El campo 'Nota Manual' es obligatorio. Escribe una descripción o 'Ninguna'.");
 
     const totalPeso = [1, 2, 3, 4, 5, 6, 7, 8].reduce((acc, num) => acc + Number(formData[`peso_b${num}`] || 0), 0);
     if (totalPeso <= 0) {
@@ -135,7 +147,8 @@ const PedidosAdmin = () => {
       });
       if (response.ok) {
         alert(editingId ? "✅ Pedido Actualizado" : "✅ Pedido Guardado");
-        resetForm(); fetchPedidos();
+        resetForm(); 
+        fetchPedidos();
       } else {
         const errorData = await response.json(); alert(`❌ Error: ${errorData.error}`);
       }
@@ -176,8 +189,8 @@ const PedidosAdmin = () => {
         fecha_agendada: formatearFecha(data.fecha_agendada),
         telefono: data.telefono || '', destino_id: data.destino_id || '' 
       });
-      setEditingId(pedidoId); setShowForm(true); 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setEditingId(pedidoId); 
+      setShowFormModal(true); 
     } catch (error) { alert("Error al cargar datos"); }
   };
 
@@ -218,16 +231,14 @@ const PedidosAdmin = () => {
 
       const doc = new jsPDF();
       
-      // 👇 LÓGICA DE COLORES DINÁMICOS SEGÚN EL ESTADO 👇
-      let colorHeader = [71, 179, 168]; // Verde por defecto (Entregado / Normal)
+      let colorHeader = [71, 179, 168]; 
       
       if (data.estado_entrega === 'Entregado Incompleto') {
-        colorHeader = [245, 158, 11]; // Amarillo/Naranja (Amber 500)
+        colorHeader = [245, 158, 11]; 
       } else if (data.estado_entrega === 'Devolución') {
-        colorHeader = [239, 68, 68]; // Rojo (Red 500)
+        colorHeader = [239, 68, 68]; 
       }
 
-      // Aplicar color dinámico al banner principal
       doc.setFillColor(colorHeader[0], colorHeader[1], colorHeader[2]); 
       doc.rect(0, 0, 210, 30, 'F');
       
@@ -243,11 +254,9 @@ const PedidosAdmin = () => {
       doc.text(`Fecha Agendada: ${data.fecha_agendada || 'N/A'}`, 14, 52);
       doc.setFont("helvetica", "bold");
       
-      // Aplicar color dinámico al texto del estado
       doc.setTextColor(colorHeader[0], colorHeader[1], colorHeader[2]);
       doc.text(`Estado Actual: ${data.estado_entrega}`, 14, 59);
 
-      // Tabla de cliente con el color dinámico en la cabecera
       autoTable(doc, {
           startY: 65,
           head: [['Datos del Cliente', 'Ubicación']],
@@ -255,7 +264,7 @@ const PedidosAdmin = () => {
               [`Nombre: ${data.nombre_cliente}\nTeléfono: ${data.telefono || 'N/A'}`, `Destino: ${data.destino}\nZona: ${data.zona_envio || 'N/A'}`]
           ],
           theme: 'grid',
-          headStyles: { fillColor: colorHeader } // 👈 COLOR DINÁMICO AQUÍ
+          headStyles: { fillColor: colorHeader } 
       });
 
       const bodegas = [];
@@ -328,7 +337,8 @@ const PedidosAdmin = () => {
 
   const resetForm = () => {
     setFormData({ ...initialFormState, tipo_documento: listaTiposDoc.length > 0 ? listaTiposDoc[0].nombre : 'Factura' });
-    setEditingId(null); setShowForm(false);
+    setEditingId(null); 
+    setShowFormModal(false); 
   };
 
   const clientesFiltrados = listaClientes.filter(c => 
@@ -338,130 +348,42 @@ const PedidosAdmin = () => {
   return (
     <div className="bg-slate-50 min-h-screen p-3 md:p-8 w-full max-w-full overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-        
-        {/* ================= FORMULARIO (ACORDEÓN) ================= */}
-        <div className={`bg-white rounded-xl shadow-md overflow-hidden border transition-all duration-300 ${isReadOnly ? 'border-slate-300' : editingId ? 'border-orange-400 ring-2 ring-orange-100' : 'border-slate-200'}`}>
-          
-          <div onClick={() => setShowForm(!showForm)} className={`px-4 md:px-6 py-3 md:py-4 flex justify-between items-center cursor-pointer transition-colors group ${isReadOnly ? 'bg-slate-800' : editingId ? 'bg-orange-600' : 'bg-slate-900 hover:bg-slate-800'}`}>
-            <div className="flex items-center gap-3">
-              <div className={`p-1.5 md:p-2 rounded-full ${showForm ? (isReadOnly ? 'bg-white text-slate-800' : editingId ? 'bg-white text-orange-600' : 'bg-blue-600 text-white') : 'bg-slate-800 text-slate-400'}`}>
-                {isReadOnly ? <Eye size={18} /> : editingId ? <Edit size={18}/> : (showForm ? <Truck size={18} /> : <PlusCircle size={18} />)}
-              </div>
-              <div>
-                <h2 className="text-sm md:text-lg font-bold text-white">
-                  {isReadOnly ? `Viendo Pedido #${editingId}` : editingId ? `Editando Pedido #${editingId}` : 'Registrar Nuevo Despacho'}
-                </h2>
-                {!showForm && <p className="text-[10px] md:text-xs text-slate-400">Haz clic para desplegar</p>}
-              </div>
-            </div>
-            <div className="text-white">{showForm ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
-          </div>
-
-          {showForm && (
-            <form onSubmit={handleSubmit} className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 border-t border-slate-100 animate-fadeIn">
-              
-              {isReadOnly && (
-                <div className="col-span-1 lg:col-span-2 bg-slate-100 border border-slate-300 p-3 md:p-4 rounded-xl flex items-center gap-3">
-                  <Lock className="text-slate-500 shrink-0" size={20} />
-                  <div>
-                    <p className="font-bold text-slate-700 text-sm">Formulario Bloqueado</p>
-                    <p className="text-[10px] md:text-sm text-slate-600">Este pedido está en estado <b>{formData.estado_entrega}</b>.</p>
-                  </div>
-                </div>
-              )}
-
-              {/* GRUPO A: DOCUMENTACIÓN */}
-              <div className="space-y-3 md:space-y-4">
-                <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" required /></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor *</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} required min="0" className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white placeholder:text-slate-300" placeholder="Ej: 150000"/></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Fac.</label><input type="date" name="fecha_facturacion" value={formData.fecha_facturacion} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Hora Registro Entrega</label><input type="time" name="hora_registro" value={formData.hora_registro} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Promesa</label><input type="date" name="fecha_promesa" value={formData.fecha_promesa} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-blue-600 uppercase">Fecha Agendada</label><input type="date" name="fecha_agendada" value={formData.fecha_agendada} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded border-blue-200 bg-blue-50 focus:ring-blue-500 disabled:bg-slate-100" /></div>
-                </div>
-              </div>
-
-              {/* GRUPO B: CLIENTE Y UBICACIÓN */}
-              <div className="space-y-3 md:space-y-4">
-                <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><User size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Cliente & Destino</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Cliente</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className="relative flex-1">
-                        <input type="text" name="nombre_cliente" value={formData.nombre_cliente} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" placeholder="Buscar o crear..." required />
-                        <User size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
-                      </div>
-                      {!isReadOnly && <button type="button" onClick={() => setShowClientModal(true)} className="bg-blue-600 text-white py-2.5 px-4 md:py-2 rounded w-full sm:w-auto flex justify-center gap-2 font-bold text-sm shadow-sm"><Search size={16} /> Buscar</button>}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Teléfono</label>
-                    <div className="relative">
-                      <input type="text" name="telefono" value={formData.telefono} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white"/>
-                      <Phone size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
-                    </div>
-                  </div>
-                  <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Zona</label><input type="text" name="zona_envio" value={formData.zona_envio} readOnly className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-slate-100 text-slate-500" /></div>
-                  <div className="sm:col-span-2">
-                    <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Destino</label>
-                    <div className="relative">
-                      <select name="destino_id" value={formData.destino_id} onChange={handleDestinoChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100" required><option value="">-- Seleccione --</option>{listaDestinos.map(d => (<option key={d.id} value={d.id}>{d.nombre} {d.zona_nombre ? `(${d.zona_nombre})` : ''}</option>))}</select>
-                      <MapPin size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
-                    </div>
-                  </div>
-                  <div className="sm:col-span-2"><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Nota Manual</label><input type="text" name="nota_manual" value={formData.nota_manual} onChange={handleChange} disabled={isReadOnly} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white focus:ring-2 focus:ring-blue-500 outline-none" /></div>
-                </div>
-              </div>
-
-              {/* GRUPO C: PESOS */}
-              <div className="lg:col-span-2 bg-slate-50 p-3 md:p-4 rounded-lg border border-slate-200">
-                <h3 className="text-xs md:text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Weight size={16} className={isReadOnly ? "text-slate-400" : ""} /> Carga (Kg)</h3>
-                <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                    <div key={num}><label className="block text-[9px] md:text-[10px] font-bold text-slate-400 uppercase text-center">B{num}</label><input type="number" name={`peso_b${num}`} value={formData[`peso_b${num}`]} onChange={handleChange} disabled={isReadOnly} className="w-full text-center py-2 md:py-1 px-1 border rounded font-bold text-sm text-slate-700 disabled:bg-slate-100 bg-white focus:ring-2 focus:ring-blue-500 outline-none"/></div>
-                  ))}
-                </div>
-                <div className="mt-4 flex flex-col sm:flex-row justify-end gap-2 md:gap-3">
-                  <button type="button" onClick={resetForm} className="w-full sm:w-auto text-slate-500 hover:bg-slate-200 bg-slate-100 sm:bg-transparent px-4 py-2.5 md:py-2 rounded font-bold text-sm border sm:border-none">{isReadOnly ? 'CERRAR VISTA' : 'CANCELAR'}</button>
-                  {!isReadOnly && <button type="submit" className={`w-full sm:w-auto text-white px-6 py-2.5 md:py-2 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{editingId ? <RefreshCw size={16}/> : <Save size={16}/>} {editingId ? 'ACTUALIZAR' : 'GUARDAR'}</button>}
-                </div>
-              </div>
-            </form>
-          )}
-        </div>
 
         {/* ================= TABLA DE PEDIDOS Y FILTRO DE FECHAS RESPONSIVO ================= */}
         <div className="space-y-4 md:space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 pb-2 border-b border-slate-300">
-             <div>
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2"><FileText className="text-slate-600" /> Historial</h2>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2"><FileText className="text-slate-600" /> Historial de Pedidos</h2>
             </div>
             
-            {/* Contenedor responsivo para el filtro de fechas */}
-            <div className="flex flex-col sm:flex-row w-full md:w-auto items-stretch sm:items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
-              <div className="flex items-center gap-2">
-                <Calendar size={16} className="text-slate-400 hidden sm:block ml-1"/>
-                <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Desde</span>
-                <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
-              </div>
-              
-              <span className="text-slate-300 hidden sm:inline px-1">|</span>
-              <div className="h-px w-full bg-slate-100 sm:hidden"></div>
-              
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Hasta</span>
-                <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
-              </div>
-              
-              <button onClick={fetchPedidos} className="mt-2 sm:mt-0 w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 sm:py-1.5 rounded-md transition-colors font-bold text-sm">
-                <Search size={16} /> 
-                <span className="sm:hidden">Buscar Pedidos</span>
+            <div className="flex flex-col sm:flex-row w-full md:w-auto items-stretch sm:items-center gap-2 md:gap-3">
+              <button 
+                onClick={() => { resetForm(); setShowFormModal(true); }} 
+                className="bg-blue-600 text-white px-5 py-2.5 sm:py-2 rounded-lg font-bold shadow-md hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors w-full sm:w-auto h-full"
+              >
+                <Plus size={18} /> Nuevo Despacho
               </button>
+
+              <div className="flex flex-col sm:flex-row w-full sm:w-auto items-stretch sm:items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-slate-400 hidden sm:block ml-1"/>
+                  <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Desde</span>
+                  <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
+                </div>
+                
+                <span className="text-slate-300 hidden sm:inline px-1">|</span>
+                <div className="h-px w-full bg-slate-100 sm:hidden"></div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Hasta</span>
+                  <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
+                </div>
+                
+                <button onClick={fetchPedidos} className="mt-2 sm:mt-0 w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 sm:py-1.5 rounded-md transition-colors font-bold text-sm">
+                  <Search size={16} /> 
+                  <span className="sm:hidden">Buscar Pedidos</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -557,9 +479,131 @@ const PedidosAdmin = () => {
 
       </div>
 
+      {/* ================= MODAL DEL FORMULARIO DE PEDIDOS ================= */}
+      {showFormModal && (
+        <div className="fixed inset-0 bg-slate-900/80 z-[60] flex justify-center items-center p-3 md:p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] relative">
+            
+            {/* Encabezado del Modal del Formulario */}
+            <div className={`px-4 md:px-6 py-4 flex items-center justify-between gap-3 border-b shrink-0 ${isReadOnly ? 'bg-slate-800 text-white' : editingId ? 'bg-orange-600 text-white' : 'bg-slate-900 text-white'}`}>
+              <div className="flex items-center gap-3">
+                {isReadOnly ? <Eye size={24} /> : editingId ? <Edit size={24} /> : <Truck size={24} />}
+                <div>
+                  <h2 className="text-lg md:text-xl font-bold">{isReadOnly ? `Viendo Pedido #${editingId}` : editingId ? `Editando Pedido #${editingId}` : 'Registrar Nuevo Despacho'}</h2>
+                  <p className="text-[10px] md:text-xs opacity-80">Administración general</p>
+                </div>
+              </div>
+              <button onClick={() => setShowFormModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button>
+            </div>
+
+            {/* Contenido del Formulario */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <form onSubmit={handleSubmit} className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                
+                {isReadOnly && (
+                  <div className="col-span-1 lg:col-span-2 bg-slate-100 border border-slate-300 p-3 md:p-4 rounded-xl flex items-center gap-3">
+                    <Lock className="text-slate-500 shrink-0" size={20} />
+                    <div>
+                      <p className="font-bold text-slate-700 text-sm md:text-base">Formulario Bloqueado</p>
+                      <p className="text-[10px] md:text-sm text-slate-600">Este pedido está en estado <b>{formData.estado_entrega}</b>. Las modificaciones no están permitidas.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* GRUPO A: DOCUMENTACIÓN */}
+                <div className="space-y-3 md:space-y-4">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" /></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor *</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} required min="0" className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white placeholder:text-slate-300" placeholder="Ej: 150000"/></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Fac.</label><input type="date" name="fecha_facturacion" value={formData.fecha_facturacion} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Hora Registro Entrega</label><input type="time" name="hora_registro" value={formData.hora_registro} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Promesa</label><input type="date" name="fecha_promesa" value={formData.fecha_promesa} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-blue-600 uppercase">Fecha Agendada</label><input type="date" name="fecha_agendada" value={formData.fecha_agendada} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded border-blue-200 bg-blue-50 focus:ring-blue-500 disabled:bg-slate-100" /></div>
+                  </div>
+                </div>
+
+                {/* GRUPO B: CLIENTE Y UBICACIÓN */}
+                <div className="space-y-3 md:space-y-4">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><User size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Cliente & Destino</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Cliente</label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex-1">
+                          <input 
+                            type="text" 
+                            name="nombre_cliente" 
+                            value={formData.nombre_cliente} 
+                            readOnly
+                            onClick={() => !isReadOnly && setShowClientModal(true)}
+                            disabled={isReadOnly} 
+                            required
+                            className={`w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded disabled:bg-slate-100 ${!isReadOnly ? 'bg-blue-50 border-blue-200 cursor-pointer hover:border-blue-400 text-blue-900 font-semibold' : 'bg-white'}`}
+                            placeholder="Haz clic para buscar cliente..." 
+                          />
+                          <User size={14} className={`absolute left-2.5 top-3 md:top-2.5 ${!isReadOnly ? 'text-blue-500' : 'text-slate-400'}`}/>
+                        </div>
+                        {!isReadOnly && <button type="button" onClick={() => setShowClientModal(true)} className="bg-blue-600 text-white py-2.5 px-4 md:py-2 rounded w-full sm:w-auto flex justify-center gap-2 font-bold text-sm shadow-sm"><Search size={16} /> Buscar</button>}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Teléfono</label>
+                      <div className="relative">
+                        <input type="text" name="telefono" value={formData.telefono} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white"/>
+                        <Phone size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
+                      </div>
+                    </div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Zona</label><input type="text" name="zona_envio" value={formData.zona_envio} readOnly required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-slate-100 text-slate-500" /></div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Destino</label>
+                      <div className="relative">
+                        <select name="destino_id" value={formData.destino_id} onChange={handleDestinoChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 pr-3 pl-8 text-sm rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100">
+                          <option value="">-- Seleccione --</option>
+                          {listaDestinos.map(d => (<option key={d.id} value={d.id}>{d.nombre} {d.zona_nombre ? `(${d.zona_nombre})` : ''}</option>))}
+                        </select>
+                        <MapPin size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Nota Manual</label>
+                      <input type="text" name="nota_manual" value={formData.nota_manual} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* GRUPO C: PESOS */}
+                <div className="lg:col-span-2 bg-slate-50 p-3 md:p-4 rounded-lg border border-slate-200">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Weight size={16} className={isReadOnly ? "text-slate-400" : ""} /> Carga (Kg)</h3>
+                  <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                      <div key={num}><label className="block text-[9px] md:text-[10px] font-bold text-slate-400 uppercase text-center">B{num}</label><input type="number" name={`peso_b${num}`} value={formData[`peso_b${num}`]} onChange={handleChange} disabled={isReadOnly} required className="w-full text-center py-2 md:py-1 px-1 border rounded font-bold text-sm text-slate-700 disabled:bg-slate-100 bg-white focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                    ))}
+                  </div>
+                  
+                  {/* CONTROLES DE GUARDADO DENTRO DEL MODAL */}
+                  <div className="mt-6 pt-4 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-2 md:gap-3">
+                    <button type="button" onClick={() => setShowFormModal(false)} className="w-full sm:w-auto text-slate-600 hover:bg-slate-200 bg-slate-200/50 px-6 py-2.5 md:py-2.5 rounded-lg font-bold text-sm text-center transition-colors">
+                      {isReadOnly ? 'Cerrar Vista' : 'Cancelar'}
+                    </button>
+                    {!isReadOnly && (
+                      <button type="submit" className={`w-full sm:w-auto text-white px-8 py-2.5 md:py-2.5 rounded-lg font-extrabold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+                        {editingId ? <RefreshCw size={18}/> : <Save size={18}/>} {editingId ? 'Actualizar Pedido' : 'Guardar Pedido'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL DE CLIENTES AVANZADO ================= */}
       {showClientModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-center p-3 md:p-4 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex justify-center items-center p-3 md:p-4 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
             <div className="bg-slate-900 p-3 md:p-4 flex justify-between items-center text-white shrink-0">

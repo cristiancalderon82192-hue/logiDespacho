@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Calendar, CheckCircle, X, User, Edit, Search, Filter, Trash2, Printer, AlertCircle, XCircle, Lock, AlertTriangle, ListChecks, CheckSquare, Square, FileText } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { socket } from '../utils/socket';
 
 const AsignacionLogistica = () => {
+  const { user } = useAuth(); 
   
   const obtenerFechaLocal = () => {
     const fecha = new Date();
@@ -23,13 +26,11 @@ const AsignacionLogistica = () => {
   
   const [loading, setLoading] = useState(false);
 
-  // ESTADOS PARA SELECCIÓN MÚLTIPLE (LOTES)
   const [pedidosSeleccionados, setPedidosSeleccionados] = useState([]);
   const [showModalLote, setShowModalLote] = useState(false);
   const [asignacionLote, setAsignacionLote] = useState({ conductor_id: '', vehiculo_id: '' });
   const [detallesLote, setDetallesLote] = useState({});
 
-  // ESTADOS PARA ASIGNACIÓN INDIVIDUAL (Edición)
   const [showModalIndividual, setShowModalIndividual] = useState(false);
   const [pedidoIndividual, setPedidoIndividual] = useState(null);
   const [asignacionIndividual, setAsignacionIndividual] = useState({ 
@@ -64,7 +65,6 @@ const AsignacionLogistica = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fechaFiltro]);
 
-  // ================= LÓGICA DE SELECCIÓN MÚLTIPLE (LOTES) =================
   const toggleSeleccion = (id) => {
     setPedidosSeleccionados(prev => 
       prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
@@ -93,6 +93,8 @@ const AsignacionLogistica = () => {
     }
 
     const payloadDetalles = [];
+    const notificacionesParciales = []; 
+
     for (const pId of pedidosSeleccionados) {
       const pedidoOriginal = pedidos.find(p => p.id === pId);
       const det = detallesLote[pId];
@@ -101,8 +103,17 @@ const AsignacionLogistica = () => {
         return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor de la factura original.`);
       }
 
-      if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura) && det.observacion.trim() === '') {
-        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación del envío parcial.`);
+      if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura)) {
+        if (det.observacion.trim() === '') {
+          return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación.`);
+        }
+        notificacionesParciales.push({
+          factura: pedidoOriginal.id_factura,
+          cliente: pedidoOriginal.nombre_cliente,
+          estado: 'Entregado Incompleto', 
+          motivo: `[Asignación en Bodega] ${det.observacion}`,
+          conductor: user?.nombre_completo || 'Logística'
+        });
       }
 
       payloadDetalles.push({
@@ -125,9 +136,18 @@ const AsignacionLogistica = () => {
       });
 
       if (res.ok) {
-        alert("✅ Ruta por Lote generada exitosamente.");
         setShowModalLote(false);
         setPedidosSeleccionados([]);
+
+        // 👇 DISPARADOR 100% INSTANTÁNEO (LOTE) 👇
+        if (notificacionesParciales.length > 0) {
+          notificacionesParciales.forEach(notificacion => {
+            socket.emit('reportar_novedad', notificacion); // Por internet a los demás
+            window.dispatchEvent(new CustomEvent('alerta_local', { detail: notificacion })); // Instántaneo para ti
+          });
+        }
+
+        alert("✅ Ruta por Lote generada exitosamente.");
         fetchData(true);
       }
     } catch (error) {
@@ -135,7 +155,6 @@ const AsignacionLogistica = () => {
     }
   };
 
-  // ================= LÓGICA DE ASIGNACIÓN INDIVIDUAL (EDICIÓN PARCIALES) =================
   const handleAbrirAsignacionIndividual = (pedido) => {
     if (['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedido.estado_entrega)) return;
 
@@ -157,6 +176,7 @@ const AsignacionLogistica = () => {
 
     const valorIngresado = Number(asignacionIndividual.total_despachado);
     const valorFactura = Number(pedidoIndividual.valor_factura || 0);
+    const esParcial = valorIngresado < valorFactura;
 
     if (valorIngresado > valorFactura) {
       return alert(`❌ ALERTA:\nEl valor a despachar no puede superar la factura.`);
@@ -169,8 +189,22 @@ const AsignacionLogistica = () => {
         body: JSON.stringify(asignacionIndividual)
       });
       if (res.ok) {
-        alert("✅ Ruta actualizada exitosamente");
         setShowModalIndividual(false);
+
+        // 👇 DISPARADOR 100% INSTANTÁNEO (INDIVIDUAL) 👇
+        if (esParcial) {
+          const payloadAlerta = {
+            factura: pedidoIndividual.id_factura,
+            cliente: pedidoIndividual.nombre_cliente,
+            estado: 'Entregado Incompleto',
+            motivo: `[Modificación en Bodega] ${asignacionIndividual.observaciones_entrega}`,
+            conductor: user?.nombre_completo || 'Logística'
+          };
+          socket.emit('reportar_novedad', payloadAlerta); // Por internet a los demás
+          window.dispatchEvent(new CustomEvent('alerta_local', { detail: payloadAlerta })); // Instántaneo para ti
+        }
+
+        alert("✅ Ruta actualizada exitosamente");
         fetchData(true); 
       }
     } catch (error) { alert("Error de conexión"); }
@@ -189,13 +223,11 @@ const AsignacionLogistica = () => {
     } catch (error) { alert("Error de conexión"); }
   };
 
-  // ================= UTILIDADES Y ORDENAMIENTO (NUEVO) =================
   const obtenerPesoFormateado = (p) => Number(p.total_peso || p.peso || 0).toLocaleString();
   const obtenerPesoNumerico = (p) => Number(p.total_peso || p.peso || 0);
 
   const destinosUnicos = [...new Set(pedidos.map(p => p.destino))].sort();
   
-  // 👉 AQUÍ ESTÁ LA MAGIA DEL ORDENAMIENTO AGRUPADO POR LOTES 👈
   const pedidosFiltrados = pedidos
     .filter(p => {
       const matchDestino = destinoFiltro ? p.destino === destinoFiltro : true;
@@ -203,23 +235,12 @@ const AsignacionLogistica = () => {
       return matchDestino && matchConductor;
     })
     .sort((a, b) => {
-      // 1. Prioridad: "Pendientes" siempre arriba (0 va antes que 1)
       const prioridadA = a.estado_entrega === 'Pendiente' ? 0 : 1;
       const prioridadB = b.estado_entrega === 'Pendiente' ? 0 : 1;
-      
-      if (prioridadA !== prioridadB) {
-        return prioridadA - prioridadB;
-      }
-
-      // 2. Si ambos están asignados, ordenar por numero_viaje DESCENDENTE (más reciente primero)
+      if (prioridadA !== prioridadB) return prioridadA - prioridadB;
       const viajeA = Number(a.numero_viaje || 0);
       const viajeB = Number(b.numero_viaje || 0);
-
-      if (viajeA !== viajeB) {
-        return viajeB - viajeA; 
-      }
-
-      // 3. Desempate: Si están en el mismo viaje (lote), ordenarlos por número de factura
+      if (viajeA !== viajeB) return viajeB - viajeA; 
       return String(a.id_factura).localeCompare(String(b.id_factura));
     });
 
@@ -228,7 +249,6 @@ const AsignacionLogistica = () => {
   const totalPesoPlanilla = pedidosFiltrados.reduce((acc, p) => acc + obtenerPesoNumerico(p), 0);
   const totalValorPlanilla = pedidosFiltrados.reduce((acc, p) => acc + Number(p.total_despachado || 0), 0);
 
-  // Cálculos precisos para el Modal del Lote
   const pedidosSeleccionadosObj = pedidosFiltrados.filter(p => pedidosSeleccionados.includes(p.id));
   const pesoLoteTotal = pedidosSeleccionadosObj.reduce((acc, p) => acc + obtenerPesoNumerico(p), 0);
   const valorLoteTotal = pedidosSeleccionadosObj.reduce((acc, p) => acc + Number(p.valor_factura || 0), 0);

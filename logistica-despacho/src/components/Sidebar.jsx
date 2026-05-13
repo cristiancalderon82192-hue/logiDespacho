@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
+import { socket } from '../utils/socket';
 
 const Sidebar = ({ userRole = 'guest' }) => {
   const location = useLocation();
@@ -14,6 +15,8 @@ const Sidebar = ({ userRole = 'guest' }) => {
   
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  
+  const [parcialesCount, setParcialesCount] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -30,18 +33,64 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
   const currentRole = normalizeRole(userRole);
 
+  // =========================================================================
+  // 📍 LÓGICA DEL CONTADOR DE PARCIALES (TIEMPO REAL Y AUTO-LIMPIEZA)
+  // =========================================================================
+  useEffect(() => {
+    if (currentRole !== 'admin' && currentRole !== 'logistica') return;
+
+    // 1. Función para consultar el valor EXACTO en la base de datos
+    const cargarConteoParciales = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales`);
+        if (res.ok) {
+          const data = await res.json();
+          setParcialesCount(data.length || 0);
+        }
+      } catch (error) {
+        // Silencioso
+      }
+    };
+
+    // Carga inicial
+    cargarConteoParciales();
+
+    // 2. Auto-sincronización cada 10 segundos (Limpiará el contador automáticamente)
+    const interval = setInterval(cargarConteoParciales, 10000);
+
+    // 3. Sumar instantáneamente cuando alguien reporta un problema
+    const incrementarContador = () => {
+      setParcialesCount(prev => prev + 1);
+    };
+
+    // 4. Actualizar instantáneamente cuando alguien resuelve un parcial localmente
+    const actualizarContador = () => {
+      cargarConteoParciales();
+    };
+
+    socket.on('alerta_novedad', incrementarContador);
+    window.addEventListener('alerta_local', incrementarContador);
+    window.addEventListener('parcial_resuelto', actualizarContador);
+
+    return () => {
+      clearInterval(interval);
+      socket.off('alerta_novedad', incrementarContador);
+      window.removeEventListener('alerta_local', incrementarContador);
+      window.removeEventListener('parcial_resuelto', actualizarContador);
+    };
+  }, [currentRole]);
+
+  // =========================================================================
+
   const mainItems = [
     { path: currentRole === 'admin' ? '/admin-home' : '/dashboard-lider', icon: LayoutDashboard, label: 'Dashboard', roles: ['admin', 'lider_sala'] },
     { path: '/dashboard-logistica', icon: LayoutDashboard, label: 'Dashboard', roles: ['logistica'] },
     { path: currentRole === 'admin' ? '/pedidos-admin' : '/pedidos-lider', icon: Package, label: 'Pedidos', roles: ['admin', 'lider_sala', 'logistica'] },
     { path: '/logistica-asignacion', icon: Truck, label: 'Asignar Rutas', roles: ['logistica'] },
-    
-    // 👇 OPCIÓN: MAPA EN TIEMPO REAL (ADMIN Y LOGÍSTICA) 👇
     { path: '/ubicacion-vivo', icon: Map, label: 'GPS en Vivo', roles: ['admin', 'logistica'] },
-    
     { path: '/clientes', icon: UsersRound, label: 'Clientes', roles: ['admin'] },
     { path: '/flota', icon: Truck, label: 'Flota', roles: ['admin'] },
-    { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'] }
+    { path: '/logistica-parciales', icon: AlertCircle, label: 'Envíos Parciales', roles: ['logistica', 'admin'], badge: parcialesCount }
   ];
 
   const reportItems = [
@@ -81,6 +130,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
               ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 translate-x-1' 
               : 'text-slate-800 hover:bg-white/40 hover:text-slate-900 hover:translate-x-2'
             }
+            ${item.badge > 0 && !isActive ? 'bg-red-500/10' : ''} 
           `}
           style={{ animationDelay, animationFillMode: 'forwards' }}
         >
@@ -90,8 +140,15 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
           <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
-          <Icon size={20} className={`relative z-10 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-3'}`} />
-          <span className="text-sm relative z-10">{item.label}</span>
+          <Icon size={20} className={`relative z-10 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-3'} ${item.badge > 0 && !isActive ? 'text-red-600' : ''}`} />
+          
+          <span className={`text-sm relative z-10 flex-1 ${item.badge > 0 && !isActive ? 'text-red-900 font-bold' : ''}`}>{item.label}</span>
+          
+          {item.badge !== undefined && item.badge > 0 && (
+            <div className="relative z-10 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md animate-pulse border border-red-400 min-w-[20px] text-center">
+              {item.badge > 99 ? '99+' : item.badge}
+            </div>
+          )}
         </Link>
       );
     });
