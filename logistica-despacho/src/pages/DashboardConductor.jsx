@@ -47,6 +47,9 @@ const DashboardConductor = () => {
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
   const sigCanvasDev = useRef({}); 
 
+  // 👇 VARIABLE PARA VERIFICAR SI HAY SINCRONIZACIONES PENDIENTES 👇
+  const pendingSyncs = JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0;
+
   // =========================================================================
   // 📍 DETECCIÓN DE CONEXIÓN Y SINCRONIZACIÓN AUTOMÁTICA
   // =========================================================================
@@ -167,7 +170,7 @@ const DashboardConductor = () => {
   }, [fechaFiltro, user, syncing]);
 
   // =========================================================================
-  // 📍 LÓGICA DE RASTREO GPS BLINDADA (HÍBRIDA PC/CELULAR)
+  // 📍 LÓGICA DE RASTREO GPS BLINDADA
   // =========================================================================
   const ultimaPosicionRef = useRef(null);
 
@@ -176,6 +179,7 @@ const DashboardConductor = () => {
     const conductorId = user.id || user.id_usuario || user.email;
 
     if (navigator.onLine) {
+      if (!socket.connected) socket.connect();
       socket.emit('registrar_usuario', { id: conductorId, email: user.email, role: user.role });
     }
 
@@ -215,6 +219,7 @@ const DashboardConductor = () => {
               if (error) return;
               if (location && navigator.onLine) {
                 ultimaPosicionRef.current = { coords: { latitude: location.latitude, longitude: location.longitude } };
+                if (!socket.connected) socket.connect();
                 socket.emit('enviar_ubicacion', generarDatosGPS(location.latitude, location.longitude));
               }
             }
@@ -224,6 +229,7 @@ const DashboardConductor = () => {
             (position) => {
               if (navigator.onLine) {
                 ultimaPosicionRef.current = { coords: { latitude: position.coords.latitude, longitude: position.coords.longitude } };
+                if (!socket.connected) socket.connect();
                 socket.emit('enviar_ubicacion', generarDatosGPS(position.coords.latitude, position.coords.longitude));
               }
             },
@@ -233,6 +239,7 @@ const DashboardConductor = () => {
 
         intervalId = setInterval(() => {
           if (ultimaPosicionRef.current && navigator.onLine) {
+            if (!socket.connected) socket.connect();
             socket.emit('enviar_ubicacion', generarDatosGPS(ultimaPosicionRef.current.coords.latitude, ultimaPosicionRef.current.coords.longitude));
           }
         }, 5000);
@@ -323,20 +330,26 @@ const DashboardConductor = () => {
     }).join(' | ');
     const notaEnriquecida = `[Retornos -> ${detallesBodegas}] ${motivoDevolucion}`;
 
+    const payloadAlerta = {
+      factura: pedidoDevolucion.id_factura,
+      cliente: pedidoDevolucion.nombre_cliente,
+      estado: estadoReal,
+      motivo: notaEnriquecida,
+      conductor: user?.nombre_completo || user?.email || 'Conductor'
+    };
+
     const body = { estado: estadoReal, observaciones_entrega: notaEnriquecida, observacion_devolucion: notaEnriquecida, valor_devolucion: valorD, valor_recaudado: valorRecaudado, firma_cliente: firmaBase64 };
     const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`;
 
     setShowModalDevolucion(false);
 
-    // 👇 AÑADIDO: DISPARADOR DE NOTIFICACIÓN DE NOVEDAD 👇
+    // 👇 ALERTA BLINDADA CONTRA SUSPENSIÓN DE MOBILE 👇
     if (navigator.onLine) {
-      socket.emit('reportar_novedad', {
-        factura: pedidoDevolucion.id_factura,
-        cliente: pedidoDevolucion.nombre_cliente,
-        estado: estadoReal,
-        motivo: notaEnriquecida,
-        conductor: user?.nombre_completo || user?.email || 'Conductor'
-      });
+      if (!socket.connected) {
+        socket.connect();
+      }
+      console.log("📢 DISPARANDO ALERTA DESDE CONDUCTOR AL SERVIDOR:", payloadAlerta);
+      socket.emit('reportar_novedad', payloadAlerta);
     }
 
     await procesarPeticion(url, 'PUT', body, pedidoDevolucion.id, estadoReal, valorRecaudado);
@@ -351,7 +364,7 @@ const DashboardConductor = () => {
   const entregasPendientes = rutas.filter(r => r.estado_entrega === 'Asignado' || r.estado_entrega === 'En Ruta').length;
   const vehiculoAsignado = rutas.length > 0 && rutas[0].vehiculo_placa ? rutas[0].vehiculo_placa : 'Sin asignar';
 
-  // 👇 LÓGICA PARA DETECTAR FIN DE JORNADA 👇
+  // LÓGICA PARA DETECTAR FIN DE JORNADA
   useEffect(() => {
     if (rutas.length > 0 && entregasPendientes === 0 && !modalTerminadoMostrado) {
       setShowModalTerminado(true);
@@ -372,7 +385,14 @@ const DashboardConductor = () => {
               <p className="font-bold text-sm leading-tight truncate max-w-[160px]">{user?.nombre_completo || 'Conductor'}</p>
             </div>
           </div>
-          <button onClick={logout} className="bg-slate-800 p-2.5 rounded-full text-red-400 hover:bg-red-500 hover:text-white transition-colors">
+          
+          {/* 👇 BOTÓN DE CERRAR SESIÓN SUPERIOR BLINDADO 👇 */}
+          <button 
+            onClick={logout} 
+            disabled={pendingSyncs}
+            className={`p-2.5 rounded-full transition-colors shadow-md ${pendingSyncs ? 'bg-slate-800 text-slate-500 opacity-50 cursor-not-allowed' : 'bg-slate-800 text-red-400 hover:bg-red-500 hover:text-white active:scale-95'}`}
+            title={pendingSyncs ? 'Sincroniza antes de salir' : 'Cerrar Sesión'}
+          >
             <LogOut size={20} />
           </button>
         </div>
@@ -760,7 +780,7 @@ const DashboardConductor = () => {
             </p>
 
             {/* AVISO DE SINCRONIZACIÓN PENDIENTE */}
-            {JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0 ? (
+            {pendingSyncs ? (
               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs p-3 rounded-xl mb-6 flex items-start gap-2 text-left">
                 <CloudSync size={16} className="shrink-0 mt-0.5" />
                 <span>
@@ -775,9 +795,9 @@ const DashboardConductor = () => {
               </button>
               <button
                 onClick={logout}
-                disabled={JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0}
+                disabled={pendingSyncs}
                 className={`flex-1 py-3 rounded-xl font-bold shadow-md transition-transform flex justify-center items-center gap-2 text-white ${
-                  JSON.parse(localStorage.getItem('offline_queue') || '[]').length > 0 
+                  pendingSyncs 
                     ? 'bg-slate-400 cursor-not-allowed' 
                     : 'bg-red-500 hover:bg-red-600 active:scale-95'
                 }`}
