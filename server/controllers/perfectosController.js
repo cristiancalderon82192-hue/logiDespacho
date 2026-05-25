@@ -23,7 +23,7 @@ const getReportePerfectos = async (req, res) => {
                AND (
                  (HOUR(p.hora_registro) < 12 AND HOUR(p.fecha_entrega_conductor) < 12) 
                  OR 
-                 (HOUR(p.hora_registro) >= 12 AND HOUR(p.fecha_entrega_conductor) >= 12 AND HOUR(p.fecha_entrega_conductor) <= 23)
+                 (HOUR(p.hora_registro) >= 12) -- Puede entregarse en la mañana o en la tarde
                )
           THEN 'Perfecto'
           ELSE 'No Perfecto'
