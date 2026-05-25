@@ -77,6 +77,7 @@ const Login = () => {
         if (rolLimpio.includes('admin') || rolLimpio === '1') rolNormalizado = 'admin';
         else if (rolLimpio.includes('logistic') || rolLimpio === '3') rolNormalizado = 'logistica'; 
         else if (rolLimpio.includes('conductor') || rolLimpio === '4') rolNormalizado = 'conductor';
+        else if (rolLimpio.includes('bodeguero') || rolLimpio === '5') rolNormalizado = 'bodeguero';
 
         const usuarioCorregido = { ...data, role: rolNormalizado };
         if (usuarioCorregido.user) usuarioCorregido.user.role = rolNormalizado;
@@ -93,6 +94,8 @@ const Login = () => {
           // Pedimos permisos de GPS antes de entrar a su panel
           await solicitarPermisosGPS();
           navigate('/conductor-home'); 
+        } else if (rolNormalizado === 'bodeguero') {
+          navigate('/bodega-dashboard'); 
         } else {
           navigate('/dashboard-lider'); 
         }

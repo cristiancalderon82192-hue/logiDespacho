@@ -22,7 +22,8 @@ import ReporteFinanciero from './pages/ReporteFinanciero';
 import ReporteEfectividad from './pages/ReporteEfectividad';
 import ReporteFlota from './pages/ReporteFlota';
 import ReportePerfectos from './pages/ReportePerfectos';
-import ReporteLeadTime from './pages/ReporteLeadTime'; 
+import ReporteLeadTime from './pages/ReporteLeadTime';
+import ReporteMovimientos from './pages/ReporteMovimientos'; 
 
 // 👇 NUEVA IMPORTACIÓN DE LA VISTA DEL MAPA 👇
 import UbicacionFlota from './pages/UbicacionFlota';
@@ -33,6 +34,12 @@ import DashboardLogistica from './pages/DashboardLogistica';
 import AsignacionLogistica from './pages/AsignacionLogistica';
 import ReporteParciales from './pages/ReporteParciales'; 
 import DashboardConductor from './pages/DashboardConductor'; 
+
+// importacion del modulo de bodeguero
+import DashboardBodega from './pages/DashboardBodega';
+import PendientesBodega from './pages/PendientesBodega';
+import EntregadosBodega from './pages/EntregadosBodega';
+import ReporteBodegaParciales from './pages/ReporteBodegaParciales';
 
 // REDIRECT INTELIGENTE
 const RootRedirect = () => {
@@ -45,7 +52,8 @@ const RootRedirect = () => {
   if (rol === 'admin' || rol === '1') return <Navigate to="/admin-home" replace />;
   if (rol === 'logistica' || rol === '3') return <Navigate to="/dashboard-logistica" replace />;
   if (rol === 'conductor' || rol === '4') return <Navigate to="/conductor-home" replace />;
-  
+  if (rol === 'bodeguero' || rol === '5') return <Navigate to="/bodega-dashboard" replace />;
+
   return <Navigate to="/dashboard-lider" replace />;
 };
 
@@ -98,14 +106,21 @@ export default function App() {
           <Route path="/reportes/flota" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteFlota /></MainLayout></ProtectedRoute>} />
           <Route path="/reportes/perfectos" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReportePerfectos /></MainLayout></ProtectedRoute>} />
           <Route path="/reportes/leadtime" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteLeadTime /></MainLayout></ProtectedRoute>} />
-          
+          <Route path="/reportes/movimientos" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3]}><MainLayout><ReporteMovimientos /></MainLayout></ProtectedRoute>} />
+
           {/* RUTAS DEL LÍDER DE SALA */}
           <Route path="/dashboard-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2]}><MainLayout><DashboardLider /></MainLayout></ProtectedRoute>} />
           <Route path="/pedidos-lider" element={<ProtectedRoute allowedRoles={['lider_sala', '2', 2, 'logistica', '3', 3]}><MainLayout><PedidosLider /></MainLayout></ProtectedRoute>} />
           
           {/* RUTAS DEL CONDUCTOR */}
           <Route path="/conductor-home" element={<ProtectedRoute allowedRoles={['conductor', '4', 4]}><DashboardConductor /></ProtectedRoute>} />
-
+          
+          {/* MÓDULO BODEGA */}
+          <Route path="/bodega-dashboard" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3, 'lider_sala', '2', 2, 'bodeguero', '5', 5]}><MainLayout><DashboardBodega /></MainLayout></ProtectedRoute>} />
+          <Route path="/bodega-pendientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3, 'lider_sala', '2', 2, 'bodeguero', '5', 5]}><MainLayout><PendientesBodega /></MainLayout></ProtectedRoute>} />
+          <Route path="/bodega-entregados" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3, 'lider_sala', '2', 2, 'bodeguero', '5', 5]}><MainLayout><EntregadosBodega /></MainLayout></ProtectedRoute>} />
+          <Route path="/bodega-reporte-parciales" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'logistica', '3', 3, 'bodeguero', '5', 5]}><MainLayout><ReporteBodegaParciales /></MainLayout></ProtectedRoute>} />
+          
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>

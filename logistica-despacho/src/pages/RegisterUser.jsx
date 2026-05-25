@@ -22,7 +22,6 @@ const RegisterUser = () => {
   const fetchData = async () => {
     try {
       const [resU, resB] = await Promise.all([
-        // CORREGIDO: Uso de backticks (``)
         fetch(`${import.meta.env.VITE_API_URL}/api/usuarios`),
         fetch(`${import.meta.env.VITE_API_URL}/api/bodegas`) 
       ]);
@@ -51,7 +50,6 @@ const RegisterUser = () => {
       return alert("La contraseña es obligatoria para nuevos usuarios");
     }
 
-    // CORREGIDO: Uso de backticks (``)
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/usuarios/${editingId}` 
       : `${import.meta.env.VITE_API_URL}/api/usuarios`;
@@ -107,6 +105,7 @@ const RegisterUser = () => {
       case 2: return 'Líder Sala';
       case 3: return 'Logística';
       case 4: return 'Conductor'; 
+      case 5: return 'Bodeguero'; // 👇 NUEVO ROL AÑADIDO
       default: return 'Desconocido';
     }
   };
@@ -167,6 +166,8 @@ const RegisterUser = () => {
                   <option value="2">Líder de Sala</option>
                   <option value="3">Logística</option>
                   <option value="4">Conductor</option> 
+                  {/* 👇 NUEVO ROL AÑADIDO AL FORMULARIO 👇 */}
+                  <option value="5">Bodeguero</option> 
                 </select>
               </div>
             </div>
@@ -224,6 +225,7 @@ const RegisterUser = () => {
                         u.rol_id === 1 ? 'bg-purple-50 text-purple-700 border-purple-200' :
                         u.rol_id === 2 ? 'bg-blue-50 text-blue-700 border-blue-200' :
                         u.rol_id === 4 ? 'bg-orange-50 text-orange-700 border-orange-200' : 
+                        u.rol_id === 5 ? 'bg-teal-50 text-teal-700 border-teal-200' : /* 👇 NUEVO ESTILO BODEGUERO 👇 */
                         'bg-slate-100 text-slate-600 border-slate-200'
                       }`}>
                         {getRoleName(u.rol_id)}

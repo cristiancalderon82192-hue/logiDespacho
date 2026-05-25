@@ -19,7 +19,7 @@ const tiposDocumentoRoutes = require('./routes/tiposDocumentoRoutes');
 const pedidosLiderRoutes = require('./routes/pedidosLiderRoutes');
 const logisticaRoutes = require('./routes/logisticaRoutes');
 const conductorRoutes = require('./routes/conductorRoutes');
-
+const movimientosRoutes = require('./routes/movimientosRoutes');
 const app = express();
 
 // 1. CONFIGURACIÓN DE SEGURIDAD (CORS)
@@ -44,13 +44,19 @@ app.use('/api/lider', pedidosLiderRoutes);
 app.use('/api/logistica', logisticaRoutes);
 app.use('/api/conductor', conductorRoutes);
 
+// --- RUTAS DEL MÓDULO BODEGA/MOSTRADOR ---
+app.use('/api/bodega/dashboard', require('./routes/bodegaDashboardRoutes'));
+app.use('/api/bodega/pendientes', require('./routes/bodegaPendientesRoutes'));
+app.use('/api/bodega/entregados', require('./routes/bodegaEntregadosRoutes'));
+app.use('/api/bodega/reportes', require('./routes/bodegaReportesRoutes'));
+
 // --- RUTAS DE REPORTES INDIVIDUALES ---
 app.use('/api/reportes/financiero', require('./routes/financieroRoutes'));
 app.use('/api/reportes/productividad', require('./routes/productividadRoutes'));
 app.use('/api/reportes/efectividad', require('./routes/efectividadRoutes'));
 app.use('/api/reportes/flota', require('./routes/flotaRoutes'));
 app.use('/api/reportes/perfectos', require('./routes/perfectosRoutes'));
-
+app.use('/api/reportes/movimientos', movimientosRoutes);
 // ==============================================================
 // 4. CONFIGURACIÓN DE WEBSOCKETS (GPS EN TIEMPO REAL Y SESIONES)
 // ==============================================================
@@ -62,6 +68,9 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Guardar io en la app de Express para usarlo en los controladores
+app.set('socketio', io);
 
 // Memoria RAM del servidor para guardar el último GPS de cada conductor
 const ultimasUbicaciones = {};
