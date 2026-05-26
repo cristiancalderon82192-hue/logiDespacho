@@ -108,4 +108,45 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { login, logout };
+// 👇 NUEVA FUNCIÓN PARA CAMBIAR CONTRASEÑA 👇
+const changePassword = async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+    
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Faltan datos requeridos" });
+    }
+
+    // 1. Obtener el usuario actual para verificar la contraseña
+    const [rows] = await db.query("SELECT password_hash FROM usuarios WHERE id = ?", [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    const usuario = rows[0];
+
+    // 2. Verificar la contraseña actual (manejo híbrido por si es texto plano viejo)
+    let passwordValida = false;
+    if (usuario.password_hash === currentPassword) {
+      passwordValida = true;
+    } else {
+      passwordValida = await bcrypt.compare(currentPassword, usuario.password_hash);
+    }
+
+    if (!passwordValida) {
+      return res.status(401).json({ error: "La contraseña actual es incorrecta" });
+    }
+
+    // 3. Hashear y guardar la nueva
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    await db.query("UPDATE usuarios SET password_hash = ? WHERE id = ?", [hashedPassword, userId]);
+
+    res.json({ message: "Contraseña actualizada exitosamente" });
+  } catch (error) {
+    console.error("Error cambiando contraseña:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+module.exports = { login, logout, changePassword };

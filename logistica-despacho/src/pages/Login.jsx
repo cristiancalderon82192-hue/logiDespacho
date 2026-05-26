@@ -74,7 +74,8 @@ const Login = () => {
         const rolLimpio = rolOriginal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
         let rolNormalizado = 'lider_sala'; 
         
-        if (rolLimpio.includes('admin') || rolLimpio === '1') rolNormalizado = 'admin';
+        if (rolLimpio === 'super_admin' || rolLimpio === '6') rolNormalizado = 'super_admin';
+        else if (rolLimpio.includes('admin') || rolLimpio === '1') rolNormalizado = 'admin';
         else if (rolLimpio.includes('logistic') || rolLimpio === '3') rolNormalizado = 'logistica'; 
         else if (rolLimpio.includes('conductor') || rolLimpio === '4') rolNormalizado = 'conductor';
         else if (rolLimpio.includes('bodeguero') || rolLimpio === '5') rolNormalizado = 'bodeguero';
@@ -86,7 +87,9 @@ const Login = () => {
         login(usuarioCorregido); 
         
         // REDIRECCIÓN Y SOLICITUD DE PERMISOS SEGÚN ROL
-        if (rolNormalizado === 'admin') {
+        if (rolNormalizado === 'super_admin') {
+          navigate('/'); // El App.jsx interceptará esto y mostrará el selector
+        } else if (rolNormalizado === 'admin') {
           navigate('/admin-home'); 
         } else if (rolNormalizado === 'logistica') {
           navigate('/dashboard-logistica'); 

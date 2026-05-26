@@ -11,4 +11,6 @@ router.post('/login', authController.login);
 // 👇 DEFINIMOS LA NUEVA RUTA DE LOGOUT 👇
 router.post('/logout', authController.logout);
 
+router.put('/change-password', authController.changePassword);
+
 module.exports = router;

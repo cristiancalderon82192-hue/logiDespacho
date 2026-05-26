@@ -200,6 +200,11 @@ const Sidebar = ({ userRole = 'guest' }) => {
               {currentRole.replace('_', ' ')}
             </p>
           </div>
+          {user?.realRole === 'super_admin' && (
+            <div className="mt-2 bg-yellow-400/20 text-yellow-300 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border border-yellow-400/30">
+              👑 Modo Auditor
+            </div>
+          )}
           {user?.nombre_completo && (
             <div className="mt-3 text-center">
               <p className="text-xs text-slate-800 font-medium">Bienvenido,</p>
@@ -246,7 +251,20 @@ const Sidebar = ({ userRole = 'guest' }) => {
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-900/10 bg-[#47B3A8] z-20">
+        <div className="p-4 border-t border-slate-900/10 bg-[#47B3A8] z-20 space-y-2">
+          {user?.realRole === 'super_admin' && (
+            <button
+              onClick={() => {
+                // Reiniciar a super_admin para que se active el RoleSelector
+                const updatedUser = { ...user, role: '6', rol_nombre: 'super_admin' };
+                sessionStorage.setItem('userData', JSON.stringify(updatedUser));
+                window.location.replace('/');
+              }}
+              className="relative w-full flex items-center justify-center space-x-2 p-2.5 text-slate-900 bg-yellow-400 hover:bg-yellow-500 rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden"
+            >
+              <span className="text-sm relative z-10">👑 Cambiar Rol</span>
+            </button>
+          )}
           <button
             onClick={logout}
             className="relative w-full flex items-center justify-center space-x-2 p-3.5 text-slate-900 bg-white/20 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden"

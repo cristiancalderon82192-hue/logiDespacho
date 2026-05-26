@@ -30,6 +30,7 @@ import UbicacionFlota from './pages/UbicacionFlota';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar'; 
+import RoleSelector from './components/RoleSelector';
 import DashboardLogistica from './pages/DashboardLogistica';
 import AsignacionLogistica from './pages/AsignacionLogistica';
 import ReporteParciales from './pages/ReporteParciales'; 
@@ -48,7 +49,16 @@ const RootRedirect = () => {
   if (!user) return <Navigate to="/login" replace />;
   
   const rol = String(user.role).toLowerCase().trim();
+  const rolNombre = user.rol_nombre ? user.rol_nombre.toLowerCase() : '';
   
+  if (rolNombre === 'super_admin' || rol === '6') {
+    return (
+      <MainLayout>
+        <div className="flex-1 bg-slate-50 min-h-screen"></div>
+      </MainLayout>
+    );
+  }
+
   if (rol === 'admin' || rol === '1') return <Navigate to="/admin-home" replace />;
   if (rol === 'logistica' || rol === '3') return <Navigate to="/dashboard-logistica" replace />;
   if (rol === 'conductor' || rol === '4') return <Navigate to="/conductor-home" replace />;
@@ -60,8 +70,12 @@ const RootRedirect = () => {
 const MainLayout = ({ children }) => {
   const { user } = useAuth();
 
+  const isSuperAdminSelecting = user?.realRole === 'super_admin' && user?.rol_nombre === 'super_admin';
+
   return (
-    <div className="flex bg-slate-50 min-h-screen w-full">
+    <div className="flex bg-slate-50 min-h-screen w-full relative">
+      {isSuperAdminSelecting && <RoleSelector />}
+      
       <Sidebar userRole={user?.role} />
       
       <main className="flex-1 w-full lg:pl-64 p-4 md:p-8 transition-all duration-300 overflow-x-hidden">

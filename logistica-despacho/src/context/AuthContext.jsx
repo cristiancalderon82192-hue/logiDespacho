@@ -99,9 +99,25 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   const login = (userData) => {
+    // Si es super_admin, marcamos su rol real
+    if (userData.rol_nombre === 'super_admin') {
+      userData.realRole = 'super_admin';
+    }
     setUser(userData);
     sessionStorage.setItem('userData', JSON.stringify(userData));
     if (!socket.connected) socket.connect();
+  };
+
+  const switchRole = (newRoleId, newRoleName) => {
+    if (user?.realRole === 'super_admin') {
+      const updatedUser = { 
+        ...user, 
+        role: newRoleId, 
+        rol_nombre: newRoleName 
+      };
+      setUser(updatedUser);
+      sessionStorage.setItem('userData', JSON.stringify(updatedUser));
+    }
   };
 
   const logout = async () => {
@@ -135,7 +151,7 @@ export const AuthProvider = ({ children }) => {
   const esConductor = rolUsuario === '4' || rolUsuario === 'conductor';
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, switchRole }}>
       {children}
       
       {/* NOTIFICACIÓN FLOTANTE GLOBAL */}
