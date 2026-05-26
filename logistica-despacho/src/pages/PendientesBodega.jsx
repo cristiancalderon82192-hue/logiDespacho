@@ -519,16 +519,16 @@ const PendientesBodega = () => {
               <div className="border-t pt-4">
                 <h4 className="font-extrabold text-sm mb-3">Materiales en Espera</h4>
                 {items.map((item, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <input type="text" placeholder="Código" className="border p-2 rounded w-24" required value={item.codigo} onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} />
-                    <input type="text" placeholder="Descripción" className="border p-2 rounded flex-1" required value={item.nombre} onChange={(e) => handleItemChange(index, 'nombre', e.target.value)} />
-                    <input type="number" step="0.01" placeholder="Cant" className="border p-2 rounded w-20" required value={item.cantidad} onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)} />
-                    <select className="border p-2 rounded w-24" value={item.unidad} onChange={(e) => handleItemChange(index, 'unidad', e.target.value)}><option>UND</option><option>MTS2</option><option>KG</option></select>
-                    <select className="border p-2 rounded w-36 text-purple-700" required value={item.bodega_id} onChange={(e) => handleItemChange(index, 'bodega_id', e.target.value)}>
+                  <div key={index} className="grid grid-cols-2 md:flex gap-2 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg md:p-0 md:bg-transparent md:border-0 md:mb-2 relative">
+                    <input type="text" placeholder="Código" className="border p-2 rounded w-full md:w-24 text-sm" required value={item.codigo} onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} />
+                    <input type="text" placeholder="Descripción" className="border p-2 rounded col-span-2 md:col-span-1 md:flex-1 text-sm" required value={item.nombre} onChange={(e) => handleItemChange(index, 'nombre', e.target.value)} />
+                    <input type="number" step="any" placeholder="Cant" className="border p-2 rounded w-full md:w-20 text-sm" required value={item.cantidad} onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)} />
+                    <select className="border p-2 rounded w-full md:w-24 text-sm" value={item.unidad} onChange={(e) => handleItemChange(index, 'unidad', e.target.value)}><option>UND</option><option>MTS2</option><option>KG</option></select>
+                    <select className="border p-2 rounded col-span-2 md:col-span-1 md:w-36 text-purple-700 text-sm" required value={item.bodega_id} onChange={(e) => handleItemChange(index, 'bodega_id', e.target.value)}>
                       <option value="">Bodega Ubicación</option>
                       {bodegasExistentes.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
                     </select>
-                    {items.length > 1 && <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-500"><Trash2 size={18}/></button>}
+                    {items.length > 1 && <button type="button" onClick={() => handleRemoveItem(index)} className="absolute -top-2 -right-2 md:relative md:top-0 md:right-0 text-red-500 bg-white border md:border-0 rounded-full p-1 md:p-0"><Trash2 size={16}/></button>}
                   </div>
                 ))}
                 <button type="button" onClick={handleAddItem} className="text-[#47B3A8] text-xs font-bold mt-2"><Plus size={14} className="inline"/> Añadir línea</button>
