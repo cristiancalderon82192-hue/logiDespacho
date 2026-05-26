@@ -135,7 +135,8 @@ const EntregadosBodega = () => {
 
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
         <div className="p-5 border-b bg-slate-900 text-white"><h2 className="font-bold flex items-center gap-2"><FileCheck size={18}/> Registro Histórico de Despachos</h2></div>
-        <div className="overflow-x-auto">
+        {/* VISTA ESCRITORIO (TABLA) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b">
@@ -179,6 +180,52 @@ const EntregadosBodega = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* VISTA MÓVIL (TARJETAS) */}
+        <div className="md:hidden grid grid-cols-1 gap-4 p-4 bg-slate-50">
+          {historialFiltrado.length === 0 ? (
+            <p className="text-center text-slate-400 p-4">Aún no hay registros históricos.</p>
+          ) : (
+            historialFiltrado.map((h) => (
+              <div key={h.id} className="bg-white border rounded-xl p-4 shadow-sm flex flex-col gap-3 relative">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Factura No.</p>
+                  <p className="text-lg font-black text-slate-800">{h.factura_num}</p>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-y-3 gap-x-2 text-sm border-t border-b border-slate-100 py-3 my-1">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Fecha y Hora Entrega</p>
+                    <p className="font-medium text-slate-700 text-xs flex items-center gap-1"><Calendar size={12}/>{new Date(h.fecha_entrega).toLocaleString()}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Creado Por</p>
+                      <p className="font-medium text-slate-700 text-xs truncate">
+                        {h.nombre_creador ? h.nombre_creador : <span className="italic text-slate-400">No registrado</span>}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Despachador</p>
+                      <p className="font-bold text-slate-700 text-xs flex items-center gap-1"><User size={12}/>{h.despachador}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end mt-1">
+                  <button onClick={() => descargarPDFSupport(h)} className="flex-1 bg-slate-900 text-white hover:bg-slate-800 text-sm py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm font-bold">
+                    <Download size={16}/> Descargar PDF
+                  </button>
+                  {h.firma_bodeguero && h.firma_bodeguero.length > 50 && (
+                    <button onClick={() => descargarEvidencia(h)} className="flex-1 bg-blue-600 text-white hover:bg-blue-700 text-sm py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm font-bold">
+                      <Camera size={16}/> Ver Foto
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

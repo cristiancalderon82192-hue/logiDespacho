@@ -377,7 +377,8 @@ const PendientesBodega = () => {
 
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
         <div className="p-5 border-b bg-slate-900 text-white"><h2 className="font-bold flex items-center gap-2"><Package size={18}/> Listado en Tiempo Real</h2></div>
-        <div className="overflow-x-auto">
+        {/* VISTA ESCRITORIO (TABLA) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b">
@@ -386,7 +387,7 @@ const PendientesBodega = () => {
             </thead>
             <tbody className="text-sm text-slate-700">
               {pendientesFiltrados.length === 0 ? (
-                <tr><td colSpan="5" className="p-8 text-center text-slate-400">No hay materiales pendientes.</td></tr>
+                <tr><td colSpan="8" className="p-8 text-center text-slate-400">No hay materiales pendientes.</td></tr>
               ) : (
                 pendientesFiltrados.map((p) => (
                   <tr key={p.id} className="border-b hover:bg-slate-50">
@@ -436,6 +437,44 @@ const PendientesBodega = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* VISTA MÓVIL (TARJETAS) */}
+        <div className="md:hidden grid grid-cols-1 gap-4 p-4 bg-slate-50">
+          {pendientesFiltrados.length === 0 ? (
+            <p className="text-center text-slate-400 p-4">No hay materiales pendientes.</p>
+          ) : (
+            pendientesFiltrados.map((p) => (
+              <div key={p.id} className="bg-white border rounded-xl p-4 shadow-sm flex flex-col gap-3 relative">
+                <div className="flex justify-between items-start mb-1">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Factura No.</p>
+                    <p className="text-lg font-black text-slate-800">{p.factura_num}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-extrabold uppercase ${p.estado === 'Pendiente' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{p.estado}</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm border-t border-b border-slate-100 py-3 my-1">
+                  <div><p className="text-[10px] text-slate-400 font-bold uppercase">Origen</p><p className="font-bold text-[#47B3A8] text-xs">{p.nombre_punto_venta}</p></div>
+                  <div><p className="text-[10px] text-slate-400 font-bold uppercase">Fecha</p><p className="font-medium text-slate-700 text-xs flex items-center gap-1"><Calendar size={12}/>{new Date(p.fecha_factura).toLocaleDateString()}</p></div>
+                  <div className="col-span-2"><p className="text-[10px] text-slate-400 font-bold uppercase">Cliente</p><p className="font-bold text-slate-700 text-xs">{p.nombre_cliente}</p></div>
+                  <div><p className="text-[10px] text-slate-400 font-bold uppercase">Total Items</p><p className="font-bold text-slate-700 text-xs">{p.total_items} Unds</p></div>
+                  <div><p className="text-[10px] text-slate-400 font-bold uppercase">Creado Por</p><p className="font-medium text-slate-700 text-xs truncate">{p.nombre_creador || <span className="italic text-slate-400">No registrado</span>}</p></div>
+                </div>
+
+                <div className="flex gap-2 justify-end mt-1">
+                  {user?.role === 'admin' && (
+                    <button onClick={() => eliminarPendiente(p.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors flex items-center justify-center shrink-0"><Trash2 size={16}/></button>
+                  )}
+                  {!isLectura ? (
+                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"><CheckCircle size={16}/> Entregar</button>
+                  ) : (
+                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"><Eye size={16}/> Ver Detalle</button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -623,56 +662,97 @@ const PendientesBodega = () => {
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><Package size={14}/> Artículos a Entregar</p>
                 <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-100 text-slate-500 text-xs uppercase">
-                      <tr><th className="p-2 md:p-3 font-bold">Código</th><th className="p-2 md:p-3 font-bold">Descripción</th><th className="p-2 md:p-3 text-center font-bold">Cantidad</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {pendienteSeleccionado.productos && pendienteSeleccionado.productos.length > 0 ? (
-                        pendienteSeleccionado.productos.map((item, idx) => {
-                          const codigo = item.codigo || item.codigo_producto || item.id_producto || item.cod || '';
-                          const nombre = item.nombre || item.nombre_producto || item.descripcion || item.desc || item.producto || '-';
-                          const maxVal = parseFloat(item.cant_a_entregar !== undefined ? item.cant_a_entregar : (item.cantidad || item.peso || 0));
-                          const actualVal = item.cantidad_a_entregar_ahora !== undefined ? item.cantidad_a_entregar_ahora : maxVal;
-                          const unidad = item.unidad || item.unidad_medida || item.medida || '';
-                          
-                          return (
-                            <tr key={idx} className="hover:bg-slate-50">
-                              <td className="p-2 md:p-3 font-mono text-slate-600 text-xs">{codigo || '-'}</td>
-                              <td className="p-2 md:p-3 font-medium text-slate-800">{nombre}</td>
-                              <td className="p-2 md:p-3 text-center">
-                                <div className="flex items-center justify-center gap-1">
+                  {/* ESCRITORIO */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-100 text-slate-500 text-xs uppercase">
+                        <tr><th className="p-3 font-bold">Código</th><th className="p-3 font-bold">Descripción</th><th className="p-3 text-center font-bold">Cantidad</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {pendienteSeleccionado.productos && pendienteSeleccionado.productos.length > 0 ? (
+                          pendienteSeleccionado.productos.map((item, idx) => {
+                            const codigo = item.codigo || item.codigo_producto || item.id_producto || item.cod || '';
+                            const nombre = item.nombre || item.nombre_producto || item.descripcion || item.desc || item.producto || '-';
+                            const maxVal = parseFloat(item.cant_a_entregar !== undefined ? item.cant_a_entregar : (item.cantidad || item.peso || 0));
+                            const actualVal = item.cantidad_a_entregar_ahora !== undefined ? item.cantidad_a_entregar_ahora : maxVal;
+                            const unidad = item.unidad || item.unidad_medida || item.medida || '';
+                            
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="p-3 font-mono text-slate-600 text-xs">{codigo || '-'}</td>
+                                <td className="p-3 font-medium text-slate-800">{nombre}</td>
+                                <td className="p-3 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    {isLectura ? (
+                                      <span className="text-sm font-bold text-[#47B3A8]">{actualVal}</span>
+                                    ) : (
+                                      <input 
+                                        type="number" min="0" max={maxVal} step="any"
+                                        value={actualVal === 0 && actualVal !== '0' ? '' : actualVal} 
+                                        onChange={(e) => handleCantidadCambio(idx, e.target.value)}
+                                        className="w-20 border border-slate-300 bg-white rounded p-1 text-center text-sm font-bold text-[#47B3A8] outline-none focus:ring-2 focus:ring-[#47B3A8] transition-all"
+                                      />
+                                    )}
+                                    <span className="text-[10px] text-slate-400">{unidad}</span>
+                                  </div>
+                                  {!isLectura && actualVal !== '' && actualVal < maxVal && (
+                                    <p className="text-[9px] text-orange-600 mt-1 font-bold tracking-tight">Queda saldo: {parseFloat((maxVal - actualVal).toFixed(2))}</p>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr><td colSpan="3" className="p-4 text-center text-slate-400">No hay detalle de productos disponible para esta factura.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* MÓVIL */}
+                  <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                    {pendienteSeleccionado.productos && pendienteSeleccionado.productos.length > 0 ? (
+                      pendienteSeleccionado.productos.map((item, idx) => {
+                        const codigo = item.codigo || item.codigo_producto || item.id_producto || item.cod || '';
+                        const nombre = item.nombre || item.nombre_producto || item.descripcion || item.desc || item.producto || '-';
+                        const maxVal = parseFloat(item.cant_a_entregar !== undefined ? item.cant_a_entregar : (item.cantidad || item.peso || 0));
+                        const actualVal = item.cantidad_a_entregar_ahora !== undefined ? item.cantidad_a_entregar_ahora : maxVal;
+                        const unidad = item.unidad || item.unidad_medida || item.medida || '';
+
+                        return (
+                          <div key={idx} className="p-3 flex flex-col gap-2 bg-slate-50">
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase">Código: <span className="font-mono text-slate-600 normal-case">{codigo || '-'}</span></p>
+                              <p className="font-bold text-slate-800 text-sm mt-1">{nombre}</p>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-slate-200 pt-2 mt-1">
+                              <p className="text-xs font-bold text-slate-500 uppercase">A entregar:</p>
+                              <div className="flex flex-col items-end">
+                                <div className="flex items-center gap-1">
                                   {isLectura ? (
                                     <span className="text-sm font-bold text-[#47B3A8]">{actualVal}</span>
                                   ) : (
                                     <input 
-                                      type="number" 
-                                      min="0" 
-                                      max={maxVal}
-                                      step="any"
+                                      type="number" min="0" max={maxVal} step="any"
                                       value={actualVal === 0 && actualVal !== '0' ? '' : actualVal} 
                                       onChange={(e) => handleCantidadCambio(idx, e.target.value)}
-                                      className="w-16 md:w-20 border border-slate-300 bg-white rounded p-1 text-center text-sm font-bold text-[#47B3A8] outline-none focus:ring-2 focus:ring-[#47B3A8] transition-all"
+                                      className="w-16 border border-slate-300 bg-white rounded p-1 text-center text-sm font-bold text-[#47B3A8] outline-none focus:ring-2 focus:ring-[#47B3A8] transition-all"
                                     />
                                   )}
-                                  <span className="text-[10px] text-slate-400">{unidad}</span>
+                                  <span className="text-[10px] text-slate-400 font-bold">{unidad}</span>
                                 </div>
                                 {!isLectura && actualVal !== '' && actualVal < maxVal && (
-                                  <p className="text-[9px] text-orange-600 mt-1 font-bold tracking-tight">Queda saldo: {parseFloat((maxVal - actualVal).toFixed(2))}</p>
+                                  <p className="text-[9px] text-orange-600 mt-1 font-bold tracking-tight">Saldo: {parseFloat((maxVal - actualVal).toFixed(2))}</p>
                                 )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan="3" className="p-4 text-center text-slate-400">
-                            No hay detalle de productos disponible para esta factura.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="p-4 text-center text-slate-400 text-sm">No hay detalle de productos disponible.</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
