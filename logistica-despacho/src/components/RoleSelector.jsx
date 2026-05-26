@@ -4,11 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, UserCog, Package, Truck, Activity, Briefcase, Key, Lock, Check } from 'lucide-react';
 
 const rolesDisponibles = [
-  { id: '1', nombre: 'Admin', icon: <ShieldAlert size={24}/>, color: 'bg-red-50 text-red-600 border-red-200' },
-  { id: '3', nombre: 'Logística', icon: <Activity size={24}/>, color: 'bg-purple-50 text-purple-600 border-purple-200' },
-  { id: '2', nombre: 'Líder / Comercial', icon: <Briefcase size={24}/>, color: 'bg-blue-50 text-blue-600 border-blue-200' },
-  { id: '5', nombre: 'Bodeguero', icon: <Package size={24}/>, color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  { id: '4', nombre: 'Conductor', icon: <Truck size={24}/>, color: 'bg-orange-50 text-orange-600 border-orange-200' }
+  { id: 'admin', nombre: 'Admin', icon: <ShieldAlert size={24}/>, color: 'bg-red-50 text-red-600 border-red-200' },
+  { id: 'logistica', nombre: 'Logística', icon: <Activity size={24}/>, color: 'bg-purple-50 text-purple-600 border-purple-200' },
+  { id: 'lider_sala', nombre: 'Líder / Comercial', icon: <Briefcase size={24}/>, color: 'bg-blue-50 text-blue-600 border-blue-200' },
+  { id: 'bodeguero', nombre: 'Bodeguero', icon: <Package size={24}/>, color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+  { id: 'conductor', nombre: 'Conductor', icon: <Truck size={24}/>, color: 'bg-orange-50 text-orange-600 border-orange-200' }
 ];
 
 export default function RoleSelector() {
