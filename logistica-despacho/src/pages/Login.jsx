@@ -5,7 +5,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 import { registerPlugin } from '@capacitor/core';
 import { 
   Mail, Lock, ArrowRight, Loader2, Truck, BarChart3, 
-  User, Building, Phone, ArrowLeft, Send, CheckCircle2, Package
+  User, Building, Phone, ArrowLeft, Send, CheckCircle2, Package, Bot, MapPin
 } from 'lucide-react';
 import logoCliente from '../assets/logoitsoluciones.png'; 
 
@@ -174,6 +174,16 @@ const Login = () => {
                 <BarChart3 className="text-[#a2ffec] mb-2" size={24} />
                 <h3 className="font-bold text-base mb-1">Auditoría OTIF</h3>
                 <p className="text-xs text-teal-100/80">Reportes financieros al instante.</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 p-4 rounded-2xl hover:-translate-y-1 transition-transform duration-300 cursor-default delay-150">
+                <Bot className="text-[#a2ffec] mb-2" size={24} />
+                <h3 className="font-bold text-base mb-1">Asistente IA</h3>
+                <p className="text-xs text-teal-100/80">Consultas con lenguaje natural.</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 p-4 rounded-2xl hover:-translate-y-1 transition-transform duration-300 cursor-default delay-200">
+                <MapPin className="text-[#a2ffec] mb-2" size={24} />
+                <h3 className="font-bold text-base mb-1">GPS en Vivo</h3>
+                <p className="text-xs text-teal-100/80">Monitoreo satelital de la flota.</p>
               </div>
             </div>
           </div>

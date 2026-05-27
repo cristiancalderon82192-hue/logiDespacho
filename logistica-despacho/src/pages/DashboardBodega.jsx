@@ -3,21 +3,42 @@ import { Clock, LayoutDashboard, CheckCircle, Package, PieChart as PieChartIcon,
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const DashboardBodega = () => {
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+
+  const obtenerPrimerDiaMesLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    return `${año}-${mes}-01`;
+  };
+
+  const hoy = obtenerFechaLocal();
+  const primerDiaMes = obtenerPrimerDiaMesLocal();
+
+  const [fechaInicio, setFechaInicio] = useState(primerDiaMes);
+  const [fechaFin, setFechaFin] = useState(hoy);
   const [stats, setStats] = useState({ total_pendientes: 0, total_parciales: 0, total_entregados: 0, items_totales_espera: 0 });
 
+  const cargarKpis = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/dashboard?inicio=${fechaInicio}&fin=${fechaFin}`);
+      if (res.ok) setStats(await res.json());
+    } catch (error) { console.error("Error", error); }
+  };
+
   useEffect(() => {
-    const cargarKpis = async () => {
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/dashboard`);
-        if (res.ok) setStats(await res.json());
-      } catch (error) { console.error("Error", error); }
-    };
     cargarKpis();
 
     // Actualización en tiempo real silenciosa (cada 5 segundos)
     const interval = setInterval(cargarKpis, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fechaInicio, fechaFin]);
 
   // Datos para las gráficas basados en los KPIs actuales
   const dataDistribucion = [
@@ -37,9 +58,30 @@ const DashboardBodega = () => {
 
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden animate-fadeIn">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl font-extrabold text-slate-800">Dashboard Operativo de Mostrador</h1>
-        <p className="text-sm text-slate-500">Métricas en tiempo real de entregas y materiales en espera</p>
+      <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 mb-6 md:mb-8">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-800">Dashboard Operativo de Mostrador</h1>
+          <p className="text-sm text-slate-500">Métricas en tiempo real de entregas y materiales en espera</p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-fit animate-fade-in-up-1">
+          <input 
+            type="date" 
+            value={fechaInicio} 
+            onChange={(e) => setFechaInicio(e.target.value)}
+            className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
+          />
+          <span className="text-slate-300">/</span>
+          <input 
+            type="date" 
+            value={fechaFin} 
+            onChange={(e) => setFechaFin(e.target.value)}
+            className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
+          />
+          <button onClick={cargarKpis} className="bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600 transition-colors shadow-sm" title="Actualizar datos">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

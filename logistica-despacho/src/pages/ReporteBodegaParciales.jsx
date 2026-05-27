@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Package, Search, Calendar, FileText, Link as LinkIcon, RefreshCw } from 'lucide-react';
 
 const ReporteBodegaParciales = () => {
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+  const hoyLocal = obtenerFechaLocal();
+
+  const [fechaInicio, setFechaInicio] = useState(hoyLocal);
+  const [fechaFin, setFechaFin] = useState(hoyLocal);
+
   const [reporte, setReporte] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [filtroFactura, setFiltroFactura] = useState('');
@@ -9,7 +21,7 @@ const ReporteBodegaParciales = () => {
   const cargarReporte = async () => {
     setCargando(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/reportes/parciales`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/reportes/parciales?inicio=${fechaInicio}&fin=${fechaFin}`);
       if (res.ok) {
         const data = await res.json();
         setReporte(data);
@@ -23,7 +35,8 @@ const ReporteBodegaParciales = () => {
 
   useEffect(() => {
     cargarReporte();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fechaInicio, fechaFin]);
 
   const reporteFiltrado = reporte.filter(r => 
     filtroFactura ? r.factura_base?.toLowerCase().includes(filtroFactura.toLowerCase()) : true
@@ -31,17 +44,36 @@ const ReporteBodegaParciales = () => {
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <div>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div className="text-center md:text-left">
           <h1 className="text-2xl font-extrabold text-slate-800">Trazabilidad de Entregas Parciales</h1>
           <p className="text-sm text-slate-500">Consulta el ciclo de vida y cantidad de despachos por cada factura original</p>
         </div>
-        <button 
-          onClick={cargarReporte} 
-          className="bg-white border text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-sm transition-colors"
-        >
-          <RefreshCw size={16} className={cargando ? "animate-spin" : ""} /> Actualizar
-        </button>
+        
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto justify-center">
+            <input 
+              type="date" 
+              value={fechaInicio} 
+              onChange={(e) => setFechaInicio(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
+            />
+            <span className="text-slate-300">/</span>
+            <input 
+              type="date" 
+              value={fechaFin} 
+              onChange={(e) => setFechaFin(e.target.value)}
+              className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
+            />
+          </div>
+
+          <button 
+            onClick={cargarReporte} 
+            className="bg-white border text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-sm transition-colors w-full md:w-auto justify-center"
+          >
+            <RefreshCw size={16} className={cargando ? "animate-spin" : ""} /> Actualizar
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">

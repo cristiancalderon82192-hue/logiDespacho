@@ -2,6 +2,15 @@ const pool = require('../db');
 
 const getReporteParciales = async (req, res) => {
   try {
+    const { inicio, fin } = req.query;
+    
+    let whereClause = "";
+    const params = [];
+    if (inicio && fin) {
+      whereClause = "WHERE DATE(h.fecha_entrega) BETWEEN ? AND ?";
+      params.push(inicio, fin);
+    }
+
     const [rows] = await pool.query(`
       SELECT 
         IF(LOCATE('-S', h.factura_num) > 0, SUBSTRING_INDEX(h.factura_num, '-S', 1), h.factura_num) as factura_base,
@@ -16,9 +25,10 @@ const getReporteParciales = async (req, res) => {
       LEFT JOIN clientes c ON p.cliente_id = c.id
       LEFT JOIN bodegas b ON p.punto_venta_id = b.id
       LEFT JOIN usuarios u ON p.usuario_id = u.id
+      ${whereClause}
       GROUP BY factura_base, cliente, punto_venta, nombre_creador
       ORDER BY ultima_entrega DESC
-    `);
+    `, params);
     
     res.json(rows);
   } catch (error) {

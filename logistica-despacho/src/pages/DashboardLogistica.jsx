@@ -13,9 +13,18 @@ const DashboardLogistica = () => {
     return `${año}-${mes}-${dia}`;
   };
 
+  const obtenerPrimerDiaMesLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    return `${año}-${mes}-01`;
+  };
+
   const hoyLocal = obtenerFechaLocal();
+  const primerDiaMes = obtenerPrimerDiaMesLocal();
   
-  const [fechaFiltro, setFechaFiltro] = useState(hoyLocal);
+  const [fechaInicio, setFechaInicio] = useState(primerDiaMes);
+  const [fechaFin, setFechaFin] = useState(hoyLocal);
   const [loading, setLoading] = useState(false);
   
   // Estados de datos
@@ -31,8 +40,8 @@ const DashboardLogistica = () => {
 
       // Llamamos a las 2 APIs al mismo tiempo (Dashboard general + Ocupación de flota del día)
       const [resDash, resFlota] = await Promise.all([
-        fetch(`${apiUrl}/api/dashboard?inicio=${fechaFiltro}&fin=${fechaFiltro}`),
-        fetch(`${apiUrl}/api/reportes/flota?fechaInicio=${fechaFiltro}&fechaFin=${fechaFiltro}`)
+        fetch(`${apiUrl}/api/dashboard?inicio=${fechaInicio}&fin=${fechaFin}`),
+        fetch(`${apiUrl}/api/reportes/flota?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`)
       ]);
       
       const dataDash = await resDash.json();
@@ -70,7 +79,7 @@ const DashboardLogistica = () => {
   useEffect(() => {
     fetchDashboardData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fechaFiltro]);
+  }, [fechaInicio, fechaFin]);
 
   const COLORS = ['#47B3A8', '#3A948C', '#2C7A73', '#1F5F59', '#124540'];
 
@@ -97,15 +106,25 @@ const DashboardLogistica = () => {
             <p className="text-slate-500 mt-1 text-sm md:text-base">Monitoreo de carga, rutas y ocupación por fecha de salida</p>
           </div>
           
-          <div className="flex items-center gap-3 bg-slate-50 p-2 md:p-3 rounded-xl border border-slate-200 focus-within:border-[#47B3A8] transition-colors shadow-inner">
-            <Calendar className="text-[#47B3A8] ml-1" size={20} />
-            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider hidden sm:block">Fecha de Salida:</span>
-            <input 
-              type="date" 
-              value={fechaFiltro} 
-              onChange={(e) => setFechaFiltro(e.target.value)}
-              className="bg-transparent border-none text-slate-700 text-sm md:text-base block p-1 outline-none font-bold cursor-pointer"
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-50 p-2 md:p-3 rounded-xl border border-slate-200 focus-within:border-[#47B3A8] transition-colors shadow-inner">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Calendar size={18} className="text-[#47B3A8]" />
+              <input 
+                type="date" 
+                value={fechaInicio} 
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="bg-transparent text-sm font-bold text-slate-700 outline-none w-full"
+              />
+            </div>
+            <span className="text-slate-300 hidden sm:block">/</span>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input 
+                type="date" 
+                value={fechaFin} 
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="bg-transparent text-sm font-bold text-slate-700 outline-none w-full"
+              />
+            </div>
           </div>
         </div>
 

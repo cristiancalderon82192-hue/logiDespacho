@@ -1,20 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Search, Package, Weight, FileText, MapPin, TrendingUp, Filter, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 
 const DashboardLider = () => {
   const { user } = useAuth();
 
-  const date = new Date();
-  const defaultInicio = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-  const defaultFin = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
 
-  const [fechaInicio, setFechaInicio] = useState(defaultInicio);
-  const [fechaFin, setFechaFin] = useState(defaultFin);
+  const obtenerPrimerDiaMesLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    return `${año}-${mes}-01`;
+  };
+
+  const hoy = obtenerFechaLocal();
+  const primerDiaMes = obtenerPrimerDiaMesLocal();
+
+  const [fechaInicio, setFechaInicio] = useState(primerDiaMes);
+  const [fechaFin, setFechaFin] = useState(hoy);
   
   const [pedidos, setPedidos] = useState([]);
   const [datosGrafica, setDatosGrafica] = useState([]); 
+  const [datosBodegas, setDatosBodegas] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const fetchDatos = async () => {
@@ -22,15 +37,28 @@ const DashboardLider = () => {
     
     setLoading(true);
     try {
-      // CORREGIDO: Uso de backticks (``) en lugar de comillas simples
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/lider/dashboard?inicio=${fechaInicio}&fin=${fechaFin}&usuario_id=${user.id}`);
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       
-      if (!response.ok) throw new Error("Error en la respuesta del servidor");
+      const [resLider, resGlobal] = await Promise.all([
+        fetch(`${apiUrl}/api/lider/dashboard?inicio=${fechaInicio}&fin=${fechaFin}&usuario_id=${user.id}`),
+        fetch(`${apiUrl}/api/dashboard?inicio=${fechaInicio}&fin=${fechaFin}`)
+      ]);
       
-      const data = await response.json();
+      if (!resLider.ok) throw new Error("Error en la respuesta del servidor");
       
-      setPedidos(data.lista || []);     
-      setDatosGrafica(data.grafica || []); 
+      const dataLider = await resLider.json();
+      const dataGlobal = resGlobal.ok ? await resGlobal.json() : {};
+      
+      setPedidos(dataLider.lista || []);     
+      setDatosGrafica(dataLider.grafica || []); 
+      
+      if (dataGlobal.bodegas) {
+        setDatosBodegas(Object.keys(dataGlobal.bodegas).map(key => ({
+          name: key.toUpperCase(), peso: Number(dataGlobal.bodegas[key])
+        })));
+      } else {
+        setDatosBodegas([]);
+      }
       
     } catch (error) {
       console.error("Error cargando dashboard:", error);
@@ -168,6 +196,33 @@ const DashboardLider = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-3 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 md:mb-6 flex items-center gap-2">
+              <Weight className="text-[#47B3A8]" size={20}/> Distribución de Carga por Bodega (Global)
+            </h3>
+            <div className="h-64 w-full">
+              {datosBodegas.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-slate-400 font-medium bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  No hay carga agendada para estas fechas.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={datosBodegas} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748B', fontWeight: 'bold', fontSize: 12}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 12}} tickFormatter={(value) => `${value}kg`} />
+                    <Tooltip cursor={{fill: '#F8FAFC'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold', color: '#1e293b'}} />
+                    <Bar dataKey="peso" radius={[6, 6, 0, 0]} maxBarSize={50}>
+                      {datosBodegas.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#47B3A8', '#3A948C', '#2C7A73', '#1F5F59', '#124540'][index % 5]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>

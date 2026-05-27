@@ -10,12 +10,17 @@ const ReporteFinanciero = () => {
   const [error, setError] = useState(null);
   const [animacionBarra, setAnimacionBarra] = useState(0);
 
-  const fechaActual = new Date();
-  const hoyStr = fechaActual.toISOString().split('T')[0];
-  const primerDiaMesStr = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1).toISOString().split('T')[0];
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+  const hoy = obtenerFechaLocal();
 
-  const [fechaInicio, setFechaInicio] = useState(primerDiaMesStr);
-  const [fechaFin, setFechaFin] = useState(hoyStr);
+  const [fechaInicio, setFechaInicio] = useState(hoy);
+  const [fechaFin, setFechaFin] = useState(hoy);
 
   const formatearMoneda = (valor) => {
     return new Intl.NumberFormat('es-CO', {

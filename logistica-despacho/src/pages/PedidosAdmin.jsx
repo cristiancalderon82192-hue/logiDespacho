@@ -40,12 +40,18 @@ const PedidosAdmin = () => {
   };
   const [formData, setFormData] = useState(initialFormState);
 
-  const date = new Date();
-  const defaultInicio = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-  const defaultFin = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+  const hoy = obtenerFechaLocal();
+
   const [pedidos, setPedidos] = useState([]);
-  const [fechaInicio, setFechaInicio] = useState(defaultInicio);
-  const [fechaFin, setFechaFin] = useState(defaultFin);
+  const [fechaInicio, setFechaInicio] = useState(hoy);
+  const [fechaFin, setFechaFin] = useState(hoy);
 
   const isReadOnly = ['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(formData.estado_entrega);
 

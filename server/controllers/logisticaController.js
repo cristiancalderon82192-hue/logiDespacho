@@ -183,6 +183,15 @@ const quitarAsignacion = async (req, res) => {
 // 7. Obtener reporte de envíos parciales
 const getPedidosParciales = async (req, res) => {
   try {
+    const { inicio, fin } = req.query;
+    
+    let dateFilter = "";
+    const params = [];
+    if (inicio && fin) {
+      dateFilter = "AND DATE(p.fecha_agendada) BETWEEN ? AND ?";
+      params.push(inicio, fin);
+    }
+
     const sql = `
       SELECT p.*, 
              td.nombre as tipo_documento,
@@ -197,9 +206,10 @@ const getPedidosParciales = async (req, res) => {
       LEFT JOIN usuarios uc ON p.usuario_id = uc.id
       LEFT JOIN bodegas b ON uc.bodega_id = b.id
       WHERE p.valor_factura_pendiente > 0
+      ${dateFilter}
       ORDER BY p.fecha_agendada DESC, p.id_factura ASC
     `;
-    const [pedidos] = await db.query(sql);
+    const [pedidos] = await db.query(sql, params);
     res.json(pedidos);
   } catch (error) {
     res.status(500).json({ error: "Error al cargar pedidos parciales" });

@@ -13,11 +13,26 @@ const AdminDashboard = () => {
   const [error, setError] = useState(null);
 
   // Estados para fechas (Por defecto: Mes a la fecha)
-  const date = new Date();
-  const defaultInicio = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-  const defaultFin = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
-  const [fechaInicio, setFechaInicio] = useState(defaultInicio);
-  const [fechaFin, setFechaFin] = useState(defaultFin);
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+
+  const obtenerPrimerDiaMesLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    return `${año}-${mes}-01`;
+  };
+
+  const hoy = obtenerFechaLocal();
+  const primerDiaMes = obtenerPrimerDiaMesLocal();
+
+  const [fechaInicio, setFechaInicio] = useState(primerDiaMes);
+  const [fechaFin, setFechaFin] = useState(hoy);
 
   // Estados para los 4 indicadores principales
   const [indicadores, setIndicadores] = useState({ otif: 0, prod: 0, fin: 0, flota: 0 });

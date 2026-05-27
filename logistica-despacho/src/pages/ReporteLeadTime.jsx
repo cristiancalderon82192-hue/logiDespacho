@@ -6,12 +6,17 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const ReporteLeadTime = () => {
-  const date = new Date();
-  const defaultInicio = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-  const defaultFin = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+  const obtenerFechaLocal = () => {
+    const fecha = new Date();
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
+  };
+  const hoy = obtenerFechaLocal();
 
-  const [fechaInicio, setFechaInicio] = useState(defaultInicio);
-  const [fechaFin, setFechaFin] = useState(defaultFin);
+  const [fechaInicio, setFechaInicio] = useState(hoy);
+  const [fechaFin, setFechaFin] = useState(hoy);
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(false);
 

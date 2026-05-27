@@ -12,6 +12,8 @@ const ReporteParciales = () => {
 
   const hoyLocal = obtenerFechaLocal();
 
+  const [fechaInicio, setFechaInicio] = useState(hoyLocal);
+  const [fechaFin, setFechaFin] = useState(hoyLocal);
   const [pedidos, setPedidos] = useState([]);
   const [conductores, setConductores] = useState([]);
   const [vehiculos, setVehiculos] = useState([]);
@@ -29,7 +31,7 @@ const ReporteParciales = () => {
   const fetchParciales = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales?inicio=${fechaInicio}&fin=${fechaFin}`);
       if (response.ok) setPedidos(await response.json());
     } catch (error) { console.error("Error:", error); } 
     finally { setLoading(false); }
@@ -52,7 +54,7 @@ const ReporteParciales = () => {
     fetchParciales();
     fetchCatalogos();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fechaInicio, fechaFin]);
 
   const formatFecha = (fechaStr) => {
     if (!fechaStr) return '---';
@@ -185,8 +187,8 @@ const ReporteParciales = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* ENCABEZADO */}
-        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto text-center md:text-left flex-col md:flex-row">
+        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-4 md:p-6 flex flex-col xl:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4 w-full xl:w-auto text-center md:text-left flex-col md:flex-row">
             <div className="bg-red-100 p-3 rounded-full text-red-600 shrink-0">
               <AlertCircle size={24} className="md:w-8 md:h-8" />
             </div>
@@ -195,9 +197,28 @@ const ReporteParciales = () => {
               <p className="text-slate-500 text-[10px] md:text-sm mt-1">Selecciona la mercancía pendiente para enviarla en lote.</p>
             </div>
           </div>
-          <div className="bg-red-50 border border-red-200 px-4 py-3 md:px-6 md:py-3 rounded-xl text-center w-full md:w-auto">
-            <p className="text-[10px] md:text-xs font-bold text-red-500 uppercase tracking-wider mb-1">Total Deuda Bodega</p>
-            <p className="text-xl md:text-2xl font-extrabold text-red-600">${totalPendientePlata.toLocaleString('es-CO')}</p>
+          
+          <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto justify-end">
+            <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-fit">
+              <input 
+                type="date" 
+                value={fechaInicio} 
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
+              />
+              <span className="text-slate-300">/</span>
+              <input 
+                type="date" 
+                value={fechaFin} 
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
+              />
+            </div>
+
+            <div className="bg-red-50 border border-red-200 px-4 py-3 md:px-6 md:py-3 rounded-xl text-center w-full md:w-auto">
+              <p className="text-[10px] md:text-xs font-bold text-red-500 uppercase tracking-wider mb-1">Total Deuda Bodega</p>
+              <p className="text-xl md:text-2xl font-extrabold text-red-600">${totalPendientePlata.toLocaleString('es-CO')}</p>
+            </div>
           </div>
         </div>
 

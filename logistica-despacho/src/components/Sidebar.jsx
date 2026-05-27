@@ -16,6 +16,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [activeModule, setActiveModule] = useState('general');
 
   const [parcialesCount, setParcialesCount] = useState(0);
 
@@ -213,40 +214,62 @@ const Sidebar = ({ userRole = 'guest' }) => {
               </p>
             </div>
           )}
+
+          {(currentRole === 'admin' || currentRole === 'logistica' || currentRole === 'lider_sala') && (
+            <div className="w-full mt-5 px-2 animate-fade-in">
+              <select 
+                value={activeModule}
+                onChange={(e) => setActiveModule(e.target.value)}
+                className="w-full bg-slate-900/10 border border-slate-900/20 text-slate-900 text-xs font-bold rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/30 cursor-pointer shadow-inner appearance-none text-center"
+                style={{ textAlignLast: 'center' }}
+              >
+                <option value="general">🚛 LOGISTICA DE DESPACHO</option>
+                <option value="bodega">📦 MATERIAL PENDIENTE</option>
+              </select>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar pb-20">
-          <div className="space-y-1">
-            <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>
-              Operaciones
-            </p>
-            {renderLinks(mainItems, 0)}
-          </div>
+          {(!['admin', 'logistica', 'lider_sala'].includes(currentRole) || activeModule === 'general') && (
+            <div className="animate-fade-in">
+              <div className="space-y-1">
+                <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>
+                  Operaciones
+                </p>
+                {renderLinks(mainItems, 0)}
+              </div>
 
-          {(currentRole === 'admin' || currentRole === 'logistica' || currentRole === 'lider_sala' || currentRole === 'bodeguero') && (
-            <div className="mt-8 space-y-1">
-              <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
-                Módulo Materiales Pendientes
-              </p>
-              {renderLinks(bodegaItems, 5)}
+              {(currentRole === 'admin' || currentRole === 'logistica') && (
+                <div className="mt-8 space-y-1">
+                  <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
+                    Reportes
+                  </p>
+                  {renderLinks(reportItems, 10)}
+                </div>
+              )}
+
+              {currentRole === 'admin' && (
+                <div className="mt-8 space-y-1">
+                  <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}>
+                    Sistema
+                  </p>
+                  {renderLinks(configItems, 20)}
+                </div>
+              )}
             </div>
           )}
 
-          {(currentRole === 'admin' || currentRole === 'logistica') && (
-            <div className="mt-8 space-y-1">
-              <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
-                Reportes
-              </p>
-              {renderLinks(reportItems, 10)}
-            </div>
-          )}
-
-          {currentRole === 'admin' && (
-            <div className="mt-8 space-y-1">
-              <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}>
-                Sistema
-              </p>
-              {renderLinks(configItems, 20)}
+          {(!['admin', 'logistica', 'lider_sala'].includes(currentRole) || activeModule === 'bodega') && (
+            <div className="animate-fade-in">
+              {(currentRole === 'admin' || currentRole === 'logistica' || currentRole === 'lider_sala' || currentRole === 'bodeguero') && (
+                <div className={`${activeModule === 'bodega' ? 'mt-0' : 'mt-8'} space-y-1`}>
+                  <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
+                    Módulo Materiales Pendientes
+                  </p>
+                  {renderLinks(bodegaItems, 5)}
+                </div>
+              )}
             </div>
           )}
         </nav>

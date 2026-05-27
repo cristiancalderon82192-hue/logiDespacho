@@ -53,11 +53,12 @@ export default function RoleSelector() {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600"></div>
-        
-        <div className="text-center mb-8">
+    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] overflow-y-auto">
+      <div className="flex min-h-full items-start justify-center p-4 sm:p-6 md:items-center">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-5 sm:p-8 relative mt-4 sm:mt-8 md:mt-0 mb-4 sm:mb-8 md:mb-0">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600"></div>
+          
+          <div className="text-center mb-6 sm:mb-8">
           <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600 shadow-inner">
             <UserCog size={32} />
           </div>
@@ -135,6 +136,7 @@ export default function RoleSelector() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }
