@@ -102,19 +102,19 @@ export default function ChatAssistant() {
   return (
     <>
       {/* Floating Button */}
-      <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
+      <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
         <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-60" style={{ animationDuration: '3s' }}></div>
         <button
           onClick={() => setIsOpen(true)}
           ref={botRef}
-          className="relative p-4 rounded-full shadow-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white hover:shadow-indigo-500/50 hover:scale-110 transition-transform duration-300 flex items-center justify-center overflow-hidden group"
+          className="relative p-3 sm:p-4 rounded-full shadow-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white hover:shadow-indigo-500/50 hover:scale-110 transition-transform duration-300 flex items-center justify-center overflow-hidden group"
         >
           {/* Ojos/Cuerpo del robot que siguen al mouse */}
           <div 
             style={{ transform: botTransform, transition: 'transform 0.1s ease-out' }}
             className="flex items-center justify-center relative z-10"
           >
-            <Bot size={32} className="group-hover:animate-none" />
+            <Bot size={28} className="group-hover:animate-none sm:w-[32px] sm:h-[32px]" />
           </div>
           
           {/* Reflejo brillante tipo "cristal" encima */}
@@ -124,7 +124,7 @@ export default function ChatAssistant() {
 
       {/* Chat Window */}
       <div 
-        className={`fixed bottom-6 right-6 w-[380px] h-[550px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 z-50 transform origin-bottom-right border border-gray-200 ${isOpen ? 'scale-100 opacity-100 pointer-events-auto' : 'scale-0 opacity-0 pointer-events-none'}`}
+        className={`fixed bottom-0 right-0 w-full h-[90vh] sm:w-[380px] sm:h-[600px] sm:bottom-6 sm:right-6 bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 z-[9999] transform origin-bottom-right border border-gray-200 ${isOpen ? 'scale-100 opacity-100 pointer-events-auto' : 'scale-0 opacity-0 pointer-events-none'}`}
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-4 flex justify-between items-center text-white shadow-md z-10">
