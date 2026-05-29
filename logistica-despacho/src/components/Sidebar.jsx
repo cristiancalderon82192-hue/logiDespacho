@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
 import { socket } from '../utils/socket';
-import { PackageOpen, FileCheck } from 'lucide-react';
+import { PackageOpen, FileCheck, Activity } from 'lucide-react';
 
 const Sidebar = ({ userRole = 'guest' }) => {
   const location = useLocation();
@@ -117,7 +117,8 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/bodegas', icon: Building2, label: 'Bodegas', roles: ['admin'] },
     { path: '/zonas', icon: Map, label: 'Zonas', roles: ['admin'] },
     { path: '/destinos', icon: MapPin, label: 'Destinos', roles: ['admin'] },
-    { path: '/tipos-documento', icon: FileStack, label: 'Tipos Doc.', roles: ['admin'] }
+    { path: '/tipos-documento', icon: FileStack, label: 'Tipos Doc.', roles: ['admin'] },
+    { path: '/test-desempeno', icon: Activity, label: 'Test Desempeño', roles: ['admin'] }
   ];
 
   const renderLinks = (items, startIndex = 0) => {

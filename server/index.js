@@ -58,6 +58,7 @@ app.use('/api/reportes/flota', require('./routes/flotaRoutes'));
 app.use('/api/reportes/perfectos', require('./routes/perfectosRoutes'));
 app.use('/api/reportes/movimientos', movimientosRoutes);
 app.use('/api/assistant', require('./routes/assistantRoutes'));
+app.use('/api/test', require('./routes/testRoutes'));
 // ==============================================================
 // 4. CONFIGURACIÓN DE WEBSOCKETS (GPS EN TIEMPO REAL Y SESIONES)
 // ==============================================================

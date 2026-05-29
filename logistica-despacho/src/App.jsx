@@ -25,8 +25,8 @@ import ReportePerfectos from './pages/ReportePerfectos';
 import ReporteLeadTime from './pages/ReporteLeadTime';
 import ReporteMovimientos from './pages/ReporteMovimientos'; 
 
-// 👇 NUEVA IMPORTACIÓN DE LA VISTA DEL MAPA 👇
 import UbicacionFlota from './pages/UbicacionFlota';
+import TestDesempeno from './pages/TestDesempeno';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar'; 
@@ -107,6 +107,7 @@ export default function App() {
           <Route path="/usuarios/nuevo" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><RegisterUser /></MainLayout></ProtectedRoute>} />
           <Route path="/bodegas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Bodegas /></MainLayout></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Clientes /></MainLayout></ProtectedRoute>} />
+          <Route path="/test-desempeno" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><TestDesempeno /></MainLayout></ProtectedRoute>} />
 
           {/* RUTAS DE OPERACIONES (LOGÍSTICA Y MAPAS) */}
           <Route path="/dashboard-logistica" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><DashboardLogistica /></MainLayout></ProtectedRoute>} />
