@@ -109,9 +109,6 @@ Además, cuenta con integración de un **Asistente Inteligente (IA)**, manejo de
 
 ---
 
-## Arquitectura del Proyecto
-
-El proyecto está dividido en dos aplicaciones: el cliente React/Capacitor (`LOGISTICA-DESPACHO`) y el servidor Express (`SERVER`).
 
 ```text
 LogiDespacho/
@@ -224,113 +221,142 @@ LogiDespacho/
 
 El sistema utiliza una base de datos relacional MySQL. A continuación se presenta el esquema de las tablas organizado en formato de árbol:
 
-```text
-Base de Datos: logidespacho
-│
-├── usuarios
-│   ├── id (PK)
-│   ├── nombre_completo
-│   ├── email
-│   ├── password_hash
-│   ├── rol_id
-│   ├── estado
-│   ├── bodega_id
-│   ├── session_token
-│   └── created_at
-│
-├── roles
-│   ├── id (PK)
-│   └── nombre
-│
-├── clientes
-│   ├── id (PK)
-│   ├── documento
-│   ├── nombre
-│   ├── telefono
-│   ├── direccion_exacta
-│   └── created_at
-│
-├── pedidos
-│   ├── id (PK)
-│   ├── usuario_id
-│   ├── cliente_id
-│   ├── id_factura
-│   ├── tipo_documento_id
-│   ├── prioridad
-│   ├── valor_factura
-│   ├── destino_id
-│   ├── conductor_id
-│   ├── vehiculo_id
-│   ├── estado_entrega
-│   ├── fecha_agendada
-│   ├── fecha_entrega_conductor
-│   ├── fecha_facturacion
-│   ├── fecha_promesa
-│   ├── total_despachado
-│   ├── valor_factura_pendiente
-│   ├── firma_cliente
-│   ├── valor_recaudado
-│   └── numero_viaje
-│
-├── pedidos_detalle
-│   ├── id (PK)
-│   ├── pedido_id
-│   ├── bodega_id
-│   └── peso
-│
-├── bodegas
-│   ├── id (PK)
-│   └── nombre
-│
-├── bodega_pendientes
-│   ├── id (PK)
-│   ├── factura_num
-│   ├── punto_venta_id
-│   ├── cliente_id
-│   ├── fecha_promesa
-│   ├── tipo_entrega
-│   ├── estado
-│   └── usuario_id
-│
-├── bodega_pendientes_detalle
-│   ├── id (PK)
-│   ├── pendiente_id
-│   ├── codigo_producto
-│   ├── nombre_producto
-│   ├── cantidad_pendiente
-│   ├── cantidad_entregada
-│   ├── unidad_medida
-│   └── bodega_id
-│
-├── bodega_entregas_historial
-│   ├── id (PK)
-│   ├── pendiente_id
-│   ├── factura_num
-│   ├── productos_entregados
-│   ├── firma_cliente
-│   ├── firma_bodeguero
-│   ├── fecha_entrega
-│   └── usuario_id
-│
-├── vehiculos
-│   ├── id (PK)
-│   ├── placa
-│   ├── modelo
-│   ├── capacidad_kg
-│   └── estado
-│
-├── zonas
-│   ├── id (PK)
-│   └── nombre
-│
-├── destinos
-│   ├── id (PK)
-│   ├── nombre
-│   └── zona_id
-│
-└── tipos_documento
-    ├── id (PK)
-    └── nombre
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#e0f2fe",
+    "primaryTextColor": "#334155",
+    "primaryBorderColor": "#cbd5e1",
+    "lineColor": "#94a3b8",
+    "secondaryColor": "#f1f5f9",
+    "tertiaryColor": "#e2e8f0"
+  }
+}}%%
+erDiagram
+    usuarios {
+        int id PK
+        string nombre_completo
+        string email
+        string password_hash
+        int rol_id FK
+        string estado
+        int bodega_id FK
+        string session_token
+        datetime created_at
+    }
+    roles {
+        int id PK
+        string nombre
+    }
+    clientes {
+        int id PK
+        string documento
+        string nombre
+        string telefono
+        string direccion_exacta
+        datetime created_at
+    }
+    pedidos {
+        int id PK
+        int usuario_id FK
+        int cliente_id FK
+        string id_factura
+        int tipo_documento_id FK
+        string prioridad
+        float valor_factura
+        int destino_id FK
+        int conductor_id FK
+        int vehiculo_id FK
+        string estado_entrega
+        datetime fecha_agendada
+        datetime fecha_entrega_conductor
+        datetime fecha_facturacion
+        datetime fecha_promesa
+        float total_despachado
+        float valor_factura_pendiente
+        string firma_cliente
+        float valor_recaudado
+        string numero_viaje
+    }
+    pedidos_detalle {
+        int id PK
+        int pedido_id FK
+        int bodega_id FK
+        float peso
+    }
+    bodegas {
+        int id PK
+        string nombre
+    }
+    bodega_pendientes {
+        int id PK
+        string factura_num
+        int punto_venta_id
+        int cliente_id FK
+        datetime fecha_promesa
+        string tipo_entrega
+        string estado
+        int usuario_id FK
+    }
+    bodega_pendientes_detalle {
+        int id PK
+        int pendiente_id FK
+        string codigo_producto
+        string nombre_producto
+        float cantidad_pendiente
+        float cantidad_entregada
+        string unidad_medida
+        int bodega_id FK
+    }
+    bodega_entregas_historial {
+        int id PK
+        int pendiente_id FK
+        string factura_num
+        string productos_entregados
+        string firma_cliente
+        string firma_bodeguero
+        datetime fecha_entrega
+        int usuario_id FK
+    }
+    vehiculos {
+        int id PK
+        string placa
+        string modelo
+        float capacidad_kg
+        string estado
+    }
+    zonas {
+        int id PK
+        string nombre
+    }
+    destinos {
+        int id PK
+        string nombre
+        int zona_id FK
+    }
+    tipos_documento {
+        int id PK
+        string nombre
+    }
+
+    roles ||--o{ usuarios : "tiene"
+    bodegas ||--o{ usuarios : "asociada"
+    usuarios ||--o{ pedidos : "crea/gestiona"
+    clientes ||--o{ pedidos : "realiza"
+    tipos_documento ||--o{ pedidos : "tipo"
+    destinos ||--o{ pedidos : "hacia"
+    usuarios ||--o{ pedidos : "conductor"
+    vehiculos ||--o{ pedidos : "usa"
+    pedidos ||--o{ pedidos_detalle : "contiene"
+    bodegas ||--o{ pedidos_detalle : "desde"
+    clientes ||--o{ bodega_pendientes : "de"
+    usuarios ||--o{ bodega_pendientes : "gestionado por"
+    bodega_pendientes ||--o{ bodega_pendientes_detalle : "tiene"
+    bodegas ||--o{ bodega_pendientes_detalle : "en"
+    bodega_pendientes ||--o{ bodega_entregas_historial : "historial de"
+    usuarios ||--o{ bodega_entregas_historial : "entregado por"
+    zonas ||--o{ destinos : "contiene"
 ```
 
 ---
