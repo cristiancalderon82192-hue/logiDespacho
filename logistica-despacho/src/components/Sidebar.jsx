@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Package, UserPlus, Truck, LogOut,
   Building2, UsersRound, Map, MapPin, FileStack, AlertCircle, Menu, X,
-  DollarSign, BarChart2, CheckCircle, Clock
+  DollarSign, BarChart2, CheckCircle, Clock, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
@@ -118,6 +118,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/zonas', icon: Map, label: 'Zonas', roles: ['admin'] },
     { path: '/destinos', icon: MapPin, label: 'Destinos', roles: ['admin'] },
     { path: '/tipos-documento', icon: FileStack, label: 'Tipos Doc.', roles: ['admin'] },
+    { path: '/whatsapp-config', icon: MessageCircle, label: 'WhatsApp Bot', roles: ['admin'] },
     { path: '/test-desempeno', icon: Activity, label: 'Test Desempeño', roles: ['admin'] }
   ];
 

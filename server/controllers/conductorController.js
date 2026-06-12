@@ -1,4 +1,6 @@
 const db = require('../db');
+const whatsappService = require('../services/whatsappService');
+const templateService = require('../services/templateService');
 
 // 👇 FUNCIÓN PARA FORZAR LA HORA EXACTA DE COLOMBIA (UTC-5) 👇
 const obtenerFechaColombia = () => {
@@ -56,6 +58,7 @@ const getMisRutas = async (req, res) => {
 
 // 2. ACTUALIZAR ESTADO CON RECAUDO INTELIGENTE Y HORA LOCAL
 const actualizarEstado = async (req, res) => {
+  require('fs').appendFileSync('debug_wa.log', `Entro a actualizarEstado con id ${req.params.id}\n`);
   const { id } = req.params;
   const { estado, observacion_devolucion, valor_devolucion, firma_cliente, valor_recaudado } = req.body;
 
@@ -72,6 +75,10 @@ const actualizarEstado = async (req, res) => {
     
     // Obtenemos la hora colombiana justo en este instante
     const horaColombia = obtenerFechaColombia();
+
+    // Consultamos el teléfono y nombre del cliente para el mensaje de WhatsApp
+    const [clienteRows] = await db.query('SELECT c.telefono, c.nombre FROM clientes c JOIN pedidos p ON c.id = p.cliente_id WHERE p.id = ?', [id]);
+    const cliente = clienteRows.length > 0 ? clienteRows[0] : null;
 
     if (estado === 'Entregado') {
       sql = 'UPDATE pedidos SET estado_entrega = ?, fecha_entrega_conductor = ?, firma_cliente = ?, valor_recaudado = ? WHERE id = ?';
@@ -111,6 +118,34 @@ const actualizarEstado = async (req, res) => {
     }
 
     await db.query(sql, params);
+
+    require('fs').appendFileSync('debug_wa.log', `Evaluando: estado=${estado}, cliente=${JSON.stringify(cliente)}\n`);
+
+    // 👇 INTEGRACIÓN WHATSAPP 👇
+    if ((estado === 'Entregado' || estado === 'Entregado Incompleto') && cliente && cliente.telefono) {
+      // El host del frontend. Idealmente debería venir de una variable de entorno, 
+      // pero usaremos el dominio actual o localhost por defecto
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const linkComprobante = `${frontendUrl}/comprobante/${pedido.id_factura}`;
+      
+      const rawTemplate = templateService.getTemplate();
+      const mensaje = templateService.formatMessage(rawTemplate, {
+        nombre: cliente.nombre,
+        id_factura: pedido.id_factura,
+        estado: estado,
+        link: linkComprobante
+      });
+      
+      require('fs').appendFileSync('debug_wa.log', `Intentando enviar a ${cliente.telefono}: ${mensaje}\n`);
+      
+      // Enviamos el mensaje sin bloquear la respuesta al conductor
+      whatsappService.sendMessage(cliente.telefono, mensaje).then(res => {
+         require('fs').appendFileSync('debug_wa.log', `Resultado sendMessage: ${res}\n`);
+      }).catch(err => {
+         require('fs').appendFileSync('debug_wa.log', `Error sendMessage: ${err}\n`);
+      });
+    }
+
     res.json({ message: "Guardado Correctamente con Hora Local y Firma" });
   } catch (error) {
     console.error("Error al actualizar:", error);

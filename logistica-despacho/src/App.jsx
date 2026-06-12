@@ -9,6 +9,8 @@ import DashboardLider from './pages/DashboardLider';
 import PedidosLider from './pages/PedidosLider';
 import PedidosAdmin from './pages/PedidosAdmin';
 import RegisterUser from './pages/RegisterUser';
+import WhatsappConfig from './pages/WhatsappConfig';
+import ComprobantePublico from './pages/ComprobantePublico';
 import Bodegas from './pages/Bodegas';
 import Clientes from './pages/Clientes';
 import Zonas from './pages/Zonas';       
@@ -96,6 +98,9 @@ export default function App() {
           
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
+          
+          {/* RUTA PÚBLICA PARA COMPROBANTE DE ENTREGA WHATSAPP */}
+          <Route path="/comprobante/:id_factura" element={<ComprobantePublico />} />
 
           {/* RUTAS DEL ADMINISTRADOR */}
           <Route path="/admin-home" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><AdminDashboard /></MainLayout></ProtectedRoute>} />
@@ -108,6 +113,7 @@ export default function App() {
           <Route path="/bodegas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Bodegas /></MainLayout></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Clientes /></MainLayout></ProtectedRoute>} />
           <Route path="/test-desempeno" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><TestDesempeno /></MainLayout></ProtectedRoute>} />
+          <Route path="/whatsapp-config" element={<ProtectedRoute allowedRoles={['admin', '1', 1, 'Especial', '6', 6, 'super_admin']}><MainLayout><WhatsappConfig /></MainLayout></ProtectedRoute>} />
 
           {/* RUTAS DE OPERACIONES (LOGÍSTICA Y MAPAS) */}
           <Route path="/dashboard-logistica" element={<ProtectedRoute allowedRoles={['logistica', '3', 3, 'admin', '1', 1]}><MainLayout><DashboardLogistica /></MainLayout></ProtectedRoute>} />

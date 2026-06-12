@@ -1,5 +1,7 @@
 // UBICACIÓN: server/controllers/pedidosController.js
 const db = require('../db');
+const whatsappService = require('../services/whatsappService');
+const templateService = require('../services/templateService');
 
 // --- 1. CREAR UN NUEVO PEDIDO ---
 const crearPedido = async (req, res) => {
@@ -264,11 +266,14 @@ const actualizarPedido = async (req, res) => {
       if (tipos.length > 0) tipoDocId = tipos[0].id;
     }
 
+    const [pedidoAntiguoRows] = await db.query("SELECT estado_entrega FROM pedidos WHERE id = ?", [id]);
+    const estadoAntiguo = pedidoAntiguoRows.length > 0 ? pedidoAntiguoRows[0].estado_entrega : null;
+
     const sql = `
       UPDATE pedidos SET 
         id_factura=?, tipo_documento_id=?, prioridad=?, 
         valor_factura=?, fecha_facturacion=?, fecha_promesa=?, fecha_agendada=?, hora_registro=?, 
-        nota_manual=?, destino_id=?, cliente_id=?
+        nota_manual=?, destino_id=?, cliente_id=?, estado_entrega=?
       WHERE id=?
     `;
     
@@ -277,7 +282,7 @@ const actualizarPedido = async (req, res) => {
       data.valor_factura || 0, data.fecha_facturacion, data.fecha_promesa, 
       data.fecha_agendada || null, 
       data.hora_registro, data.nota_manual, 
-      destinoId, cliente_id, id
+      destinoId, cliente_id, data.estado_entrega || estadoAntiguo, id
     ]);
 
     await db.query("DELETE FROM pedidos_detalle WHERE pedido_id = ?", [id]);
@@ -286,6 +291,28 @@ const actualizarPedido = async (req, res) => {
       const peso = Number(data[`peso_b${i}`]);
       if (peso > 0) {
         await db.query("INSERT INTO pedidos_detalle (pedido_id, bodega_id, peso) VALUES (?, ?, ?)", [id, i, peso]);
+      }
+    }
+
+    // 👇 INTEGRACIÓN WHATSAPP (SI CAMBIÓ A ENTREGADO) 👇
+    if (data.estado_entrega === 'Entregado' && estadoAntiguo !== 'Entregado') {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const linkComprobante = `${frontendUrl}/comprobante/${data.id_factura}`;
+      
+      const rawTemplate = templateService.getTemplate();
+      
+      // Obtener el teléfono real del cliente desde la base de datos
+      const [clienteData] = await db.query("SELECT nombre, telefono FROM clientes WHERE id = ?", [cliente_id]);
+      
+      if (clienteData.length > 0 && clienteData[0].telefono) {
+        const mensaje = templateService.formatMessage(rawTemplate, {
+          nombre: clienteData[0].nombre,
+          id_factura: data.id_factura,
+          estado: 'Entregado',
+          link: linkComprobante
+        });
+        
+        whatsappService.sendMessage(clienteData[0].telefono, mensaje);
       }
     }
 
@@ -309,7 +336,46 @@ const eliminarPedido = async (req, res) => {
   }
 };
 
+// --- 7. OBTENER PEDIDO PÚBLICO (POR ID FACTURA) ---
+const obtenerPedidoPublicoPorFactura = async (req, res) => {
+  const { id_factura } = req.params;
+  try {
+    const sqlHeader = `
+      SELECT p.*, td.nombre as tipo_documento, c.nombre as nombre_cliente, c.telefono, d.nombre as destino_nombre, z.nombre as zona_nombre,
+      u.nombre_completo as conductor_nombre, v.placa as vehiculo_placa
+      FROM pedidos p
+      JOIN clientes c ON p.cliente_id = c.id
+      JOIN destinos d ON p.destino_id = d.id
+      JOIN zonas z ON d.zona_id = z.id
+      LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+      LEFT JOIN usuarios u ON p.conductor_id = u.id
+      LEFT JOIN vehiculos v ON p.vehiculo_id = v.id
+      WHERE p.id_factura = ?
+    `;
+    const [header] = await db.query(sqlHeader, [id_factura]);
+    
+    if (header.length === 0) return res.status(404).json({ error: "Pedido no encontrado" });
+
+    const pedido = header[0];
+    const id = pedido.id;
+
+    const [detalles] = await db.query("SELECT bodega_id, peso FROM pedidos_detalle WHERE pedido_id = ?", [id]);
+
+    pedido.destino = pedido.destino_nombre; 
+    pedido.zona_envio = pedido.zona_nombre;
+
+    for (let i = 1; i <= 8; i++) {
+      const det = detalles.find(d => d.bodega_id === i);
+      pedido[`peso_b${i}`] = det ? det.peso : 0;
+    }
+
+    res.json(pedido);
+  } catch (error) {
+    res.status(500).json({ error: "Error al cargar el pedido público" });
+  }
+};
+
 // --- EXPORTAR TODO ---
 module.exports = { 
-  crearPedido, listarPedidosRango, obtenerDashboard, obtenerPedidoPorId, actualizarPedido, eliminarPedido 
+  crearPedido, listarPedidosRango, obtenerDashboard, obtenerPedidoPorId, actualizarPedido, eliminarPedido, obtenerPedidoPublicoPorFactura 
 };

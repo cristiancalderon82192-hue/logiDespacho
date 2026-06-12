@@ -22,4 +22,7 @@ router.get('/pedidos/:id', pedidosController.obtenerPedidoPorId); // Cargar dato
 router.put('/pedidos/:id', pedidosController.actualizarPedido);   // Guardar edición
 router.delete('/pedidos/:id', pedidosController.eliminarPedido);  // Eliminar
 
+// --- RUTA PÚBLICA PARA COMPROBANTE ---
+router.get('/pedidos/public/:id_factura', pedidosController.obtenerPedidoPublicoPorFactura);
+
 module.exports = router;

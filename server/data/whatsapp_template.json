@@ -1,0 +1,1 @@
+{"mensaje":"¡Hola, {{nombre}}! 👋\n\nTu pedido con número de guía *{{id_factura}}* ha sido marcado como *{{estado}}*.\n\nPuedes descargar y ver tu comprobante de entrega oficial haciendo clic en el siguiente enlace:\n{{link}}\n\n¡Gracias por preferir a LogiDespacho! 🚚"}

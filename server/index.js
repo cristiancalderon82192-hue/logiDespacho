@@ -20,6 +20,8 @@ const pedidosLiderRoutes = require('./routes/pedidosLiderRoutes');
 const logisticaRoutes = require('./routes/logisticaRoutes');
 const conductorRoutes = require('./routes/conductorRoutes');
 const movimientosRoutes = require('./routes/movimientosRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
+const whatsappService = require('./services/whatsappService');
 const app = express();
 
 // 1. CONFIGURACIÓN DE SEGURIDAD (CORS)
@@ -59,6 +61,7 @@ app.use('/api/reportes/perfectos', require('./routes/perfectosRoutes'));
 app.use('/api/reportes/movimientos', movimientosRoutes);
 app.use('/api/assistant', require('./routes/assistantRoutes'));
 app.use('/api/test', require('./routes/testRoutes'));
+app.use('/api/whatsapp', whatsappRoutes);
 // ==============================================================
 // 4. CONFIGURACIÓN DE WEBSOCKETS (GPS EN TIEMPO REAL Y SESIONES)
 // ==============================================================
@@ -131,3 +134,6 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => { 
   console.log(`🚀 Servidor API y WebSockets corriendo en puerto ${PORT}`); 
 });
+
+// Inicializamos el cliente de WhatsApp
+whatsappService.initialize();
