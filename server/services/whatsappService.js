@@ -9,7 +9,8 @@ function initialize() {
     client = new Client({
         authStrategy: new LocalAuth({ clientId: "logidespacho-client" }),
         puppeteer: {
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
         }
     });
 
