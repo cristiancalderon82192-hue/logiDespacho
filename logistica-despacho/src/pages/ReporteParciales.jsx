@@ -73,10 +73,43 @@ const ReporteParciales = () => {
     pedidos
       .filter(p => pedidosSeleccionados.includes(p.id))
       .forEach(p => {
+        let detallesPrecargados = [];
+        
+        // Intentar precargar basándonos en el texto de devoluciones del conductor
+        if (p.observaciones_entrega && p.observaciones_entrega.includes('[Retornos ->')) {
+          try {
+            const match = p.observaciones_entrega.match(/\[Retornos -> (.*?)\]/);
+            if (match && match[1]) {
+              const retornosStr = match[1]; // "Bodega 1: 50Kg | Bodega 2: 10Kg"
+              const items = retornosStr.split('|').map(i => i.trim());
+              items.forEach(item => {
+                const parts = item.split(':');
+                if (parts.length === 2) {
+                  const bodegaName = parts[0].trim();
+                  const pesoStr = parts[1].replace('Kg', '').trim();
+                  
+                  // Buscar el ID de la bodega en el catálogo
+                  const bodegaEncontrada = bodegas.find(b => b.nombre.toLowerCase() === bodegaName.toLowerCase());
+                  if (bodegaEncontrada) {
+                    detallesPrecargados.push({ bodega_id: bodegaEncontrada.id, peso: pesoStr });
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Error parseando retornos", e);
+          }
+        }
+        
+        // Si no se encontró nada válido, ponemos el por defecto vacío
+        if (detallesPrecargados.length === 0) {
+          detallesPrecargados = [{ bodega_id: '', peso: '' }];
+        }
+
         valoresIniciales[p.id] = {
           valor_despachar: p.valor_factura_pendiente || 0,
           observacion: '',
-          detalles: [{ bodega_id: '', peso: '' }] // Bodegas individuales por factura en el lote
+          detalles: detallesPrecargados // Precarga lista
         };
       });
     setDetallesLote(valoresIniciales);
