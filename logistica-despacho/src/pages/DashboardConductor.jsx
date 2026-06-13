@@ -6,7 +6,12 @@ import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, Us
 import logoEmpresa from '../assets/rodeo.png';
 import { socket } from '../utils/socket'; 
 
-const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
+let BackgroundGeolocation;
+try {
+  BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
+} catch (e) {
+  console.warn('BackgroundGeolocation plugin ya estaba registrado.');
+}
 
 const DashboardConductor = () => {
   const { user, logout } = useAuth();
