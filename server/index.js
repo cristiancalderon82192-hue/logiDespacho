@@ -113,7 +113,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', async () => {
-    console.log('🔴 Dispositivo desconectado:', socket.id);
+    console.log('📱 Dispositivo desconectado:', socket.id);
     
     if (socket.userId) {
       console.log(`🧹 Limpiando sesión del usuario ID: ${socket.userId} por cierre de navegador...`);
@@ -125,6 +125,20 @@ io.on('connection', (socket) => {
       }
     }
   });
+});
+
+// --- NUEVO ENDPOINT PARA GPS EN SEGUNDO PLANO (PANTALLA BLOQUEADA) ---
+app.post('/api/conductor/ubicacion-bg', (req, res) => {
+  const datosGPS = req.body;
+  if (!datosGPS || !datosGPS.id_conductor) return res.status(400).json({ error: "Faltan datos" });
+
+  ultimasUbicaciones[datosGPS.id_conductor] = datosGPS;
+  console.log(`📡 [${new Date().toLocaleTimeString()}] GPS (HTTP/BG) recibido de ${datosGPS.nombre}: Lat ${datosGPS.lat}, Lng ${datosGPS.lng}`);
+  
+  // Emitimos a la sala de monitores para que se actualice el mapa en tiempo real
+  io.to('sala_monitores').emit('actualizacion_gps', datosGPS);
+  
+  res.status(200).json({ success: true });
 });
 
 // ==============================================================

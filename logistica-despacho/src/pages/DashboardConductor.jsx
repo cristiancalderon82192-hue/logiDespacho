@@ -241,12 +241,24 @@ const DashboardConductor = () => {
         if (Capacitor.isNativePlatform()) {
           watcherId = await BackgroundGeolocation.addWatcher(
             { backgroundMessage: "LogiDespacho GPS Activo", backgroundTitle: "Rastreo de Ruta", requestPermissions: true, stale: false, distanceFilter: 15 },
-            function callback(location, error) {
+            async function callback(location, error) {
               if (error) return;
               if (location && navigator.onLine) {
                 ultimaPosicionRef.current = { coords: { latitude: location.latitude, longitude: location.longitude } };
+                const datosGPS = generarDatosGPS(location.latitude, location.longitude);
+                
+                // 1. Envío seguro por HTTP (Funciona mucho mejor en segundo plano con pantalla apagada)
+                try {
+                  fetch(`${import.meta.env.VITE_API_URL}/api/conductor/ubicacion-bg`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datosGPS)
+                  }).catch(e => console.log('Fetch error en BG', e));
+                } catch(e) {}
+
+                // 2. Envío por WebSockets (Funciona bien en primer plano)
                 if (!socket.connected) socket.connect();
-                socket.emit('enviar_ubicacion', generarDatosGPS(location.latitude, location.longitude));
+                socket.emit('enviar_ubicacion', datosGPS);
               }
             }
           );
