@@ -136,4 +136,5 @@ server.listen(PORT, () => {
 });
 
 // Inicializamos el cliente de WhatsApp
-whatsappService.initialize();
+// DESACTIVADO TEMPORALMENTE PARA LA PRESENTACIÓN (Ahorro de memoria en Render)
+// whatsappService.initialize();
