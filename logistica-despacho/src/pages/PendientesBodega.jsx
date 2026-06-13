@@ -3,6 +3,7 @@ import { Package, FilePlus, Calendar, Plus, Trash2, Search, User, UserPlus, X, C
 import SignatureCanvas from 'react-signature-canvas';
 import { socket } from '../utils/socket';
 import { useAuth } from '../context/AuthContext';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const PendientesBodega = () => {
   const { user } = useAuth();
@@ -86,7 +87,7 @@ const PendientesBodega = () => {
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!formMaster.punto_venta_id || !formMaster.cliente_id || items.some(i => !i.bodega_id)) {
-      alert("Por favor selecciona opciones de las listas");
+      mostrarInfo("Por favor selecciona opciones de las listas");
       return;
     }
 
@@ -108,7 +109,7 @@ const PendientesBodega = () => {
       cargarDatos();
     } else {
       const errorData = await res.json();
-      alert(`❌ Error: ${errorData.error || errorData.message || 'No se pudo guardar el registro'}`);
+      mostrarError(`❌ Error: ${errorData.error || errorData.message || 'No se pudo guardar el registro'}`);
     }
   };
 
@@ -196,7 +197,7 @@ const PendientesBodega = () => {
       }
     } catch (err) {
       console.error("Error accediendo a la cámara: ", err);
-      alert("No se pudo acceder a la cámara. Verifica los permisos de tu navegador o dispositivo.");
+      mostrarError("No se pudo acceder a la cámara. Verifica los permisos de tu navegador o dispositivo.");
       setIsCameraOpen(false);
     }
   };
@@ -236,10 +237,10 @@ const PendientesBodega = () => {
   };
 
   const confirmarEntrega = async () => {
-    if (!firmaSoporte) return alert("Debes adjuntar la firma digital del cliente (Obligatoria).");
+    if (!firmaSoporte) return mostrarError("Debes adjuntar la firma digital del cliente (Obligatoria).");
     
     const totalAEntregar = pendienteSeleccionado.productos?.reduce((acc, p) => acc + (parseFloat(p.cantidad_a_entregar_ahora) || 0), 0) || 0;
-    if (totalAEntregar <= 0) return alert("Debes indicar al menos una cantidad mayor a cero para poder despachar.");
+    if (totalAEntregar <= 0) return mostrarError("Debes indicar al menos una cantidad mayor a cero para poder despachar.");
 
     setProcesandoEntrega(true);
     try {
@@ -254,13 +255,13 @@ const PendientesBodega = () => {
         })
       });
       if (res.ok) {
-        alert("✅ Entrega confirmada exitosamente.");
+        mostrarExito("✅ Entrega confirmada exitosamente.");
         cerrarModalEntrega();
         cargarDatos();
       } else {
-        const data = await res.json(); alert(`❌ Error: ${data.error || 'No se pudo confirmar la entrega'}`);
+        const data = await res.json(); mostrarError(`❌ Error: ${data.error || 'No se pudo confirmar la entrega'}`);
       }
-    } catch (error) { alert("Error de conexión al confirmar la entrega."); } finally { setProcesandoEntrega(false); }
+    } catch (error) { mostrarError("Error de conexión al confirmar la entrega."); } finally { setProcesandoEntrega(false); }
   };
 
   const handleSelectCliente = (cliente) => {
@@ -273,14 +274,14 @@ const PendientesBodega = () => {
 
   const handleCreateClient = async (e) => {
     e.preventDefault();
-    if (!newClientData.nombre || !newClientData.documento) return alert("Nombre y Cédula obligatorios");
+    if (!newClientData.nombre || !newClientData.documento) return mostrarInfo("Nombre y Cédula obligatorios");
     setSavingClient(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClientData)
       });
       if (response.ok) {
-        alert("✅ Cliente creado");
+        mostrarExito("✅ Cliente creado");
         const resC = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
         const clientesActualizados = await resC.json();
         setClientesExistentes(clientesActualizados);
@@ -295,23 +296,23 @@ const PendientesBodega = () => {
         setIsCreatingClient(false); 
         setShowClientModal(false);
       } else {
-        const resData = await response.json(); alert(`❌ Error: ${resData.error}`);
+        const resData = await response.json(); mostrarError(`❌ Error: ${resData.error}`);
       }
-    } catch (error) { alert("Error de conexión"); } finally { setSavingClient(false); }
+    } catch (error) { mostrarError("Error de conexión"); } finally { setSavingClient(false); }
   };
 
   const eliminarPendiente = async (id) => {
-    if (!window.confirm("¿Estás seguro de eliminar este registro pendiente de forma permanente?")) return;
+    if (!(await confirmarAccion("Confirmar", "¿Estás seguro de eliminar este registro pendiente de forma permanente?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        alert("✅ Registro eliminado");
+        mostrarExito("✅ Registro eliminado");
         cargarDatos();
       } else {
-        const data = await res.json(); alert(`❌ Error: ${data.error || 'No se pudo eliminar'}`);
+        const data = await res.json(); mostrarError(`❌ Error: ${data.error || 'No se pudo eliminar'}`);
       }
     } catch (e) {
-      alert("Error al intentar eliminar.");
+      mostrarError("Error al intentar eliminar.");
     }
   };
 
@@ -781,7 +782,7 @@ const PendientesBodega = () => {
                             if (!sigCanvasRef.current?.isEmpty()) {
                               setFirmaSoporte(sigCanvasRef.current.getCanvas().toDataURL('image/png'));
                             } else {
-                              alert("Por favor firme antes de guardar.");
+                              mostrarInfo("Por favor firme antes de guardar.");
                             }
                           }} className="flex-1 px-4 py-2 bg-[#47B3A8] text-white font-bold rounded-lg hover:bg-[#3d9a90] text-sm flex justify-center items-center gap-2 transition-colors shadow-sm">Guardar Firma</button>
                         </div>

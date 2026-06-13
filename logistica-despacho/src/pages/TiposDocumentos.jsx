@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileStack, Save, Edit, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const TiposDocumento = () => {
   const [tipos, setTipos] = useState([]);
@@ -23,7 +24,7 @@ const TiposDocumento = () => {
   // GUARDAR / ACTUALIZAR
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nombre.trim()) return alert("El nombre es obligatorio");
+    if (!nombre.trim()) return mostrarInfo("El nombre es obligatorio");
 
     // CORREGIDO: Uso de backticks (``) en ambas rutas
     const url = editingId 
@@ -40,14 +41,14 @@ const TiposDocumento = () => {
       const data = await res.json();
 
       if (res.ok) {
-        alert(editingId ? "✅ Actualizado correctamente" : "✅ Creado correctamente");
+        mostrarExito(editingId ? "✅ Actualizado correctamente" : "✅ Creado correctamente");
         setNombre('');
         setEditingId(null);
         fetchTipos();
       } else {
-        alert(`❌ Error: ${data.error}`);
+        mostrarError(`❌ Error: ${data.error}`);
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   // EDITAR
@@ -58,7 +59,7 @@ const TiposDocumento = () => {
 
   // ELIMINAR
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Seguro que deseas eliminar este tipo?")) return;
+    if (!(await confirmarAccion("Confirmar", "¿Seguro que deseas eliminar este tipo?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento/${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -66,9 +67,9 @@ const TiposDocumento = () => {
         fetchTipos();
       } else {
         // Mensaje específico si está en uso
-        alert(`⚠️ No se puede eliminar: ${data.error}`);
+        mostrarError(`⚠️ No se puede eliminar: ${data.error}`);
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   return (

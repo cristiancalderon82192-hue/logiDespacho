@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Calendar, CheckCircle, X, User, Edit, Search, Filter, Trash2, Printer, AlertCircle, XCircle, Lock, AlertTriangle, ListChecks, CheckSquare, Square, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { socket } from '../utils/socket';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const AsignacionLogistica = () => {
   const { user } = useAuth(); 
@@ -89,7 +90,7 @@ const AsignacionLogistica = () => {
   const handleAsignarLote = async (e) => {
     e.preventDefault();
     if (!asignacionLote.conductor_id || !asignacionLote.vehiculo_id) {
-      return alert("Debes seleccionar conductor y vehículo.");
+      return mostrarError("Debes seleccionar conductor y vehículo.");
     }
 
     const payloadDetalles = [];
@@ -100,12 +101,12 @@ const AsignacionLogistica = () => {
       const det = detallesLote[pId];
       
       if (Number(det.valor_despachar) > Number(pedidoOriginal.valor_factura)) {
-        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor de la factura original.`);
+        return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor de la factura original.`);
       }
 
       if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura)) {
         if (det.observacion.trim() === '') {
-          return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación.`);
+          return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación.`);
         }
         notificacionesParciales.push({
           factura: pedidoOriginal.id_factura,
@@ -147,11 +148,11 @@ const AsignacionLogistica = () => {
           });
         }
 
-        alert("✅ Ruta por Lote generada exitosamente.");
+        mostrarExito("✅ Ruta por Lote generada exitosamente.");
         fetchData(true);
       }
     } catch (error) {
-      alert("Error de conexión al asignar el lote.");
+      mostrarError("Error de conexión al asignar el lote.");
     }
   };
 
@@ -171,7 +172,7 @@ const AsignacionLogistica = () => {
   const handleAsignarIndividual = async (e) => {
     e.preventDefault();
     if (!asignacionIndividual.conductor_id || !asignacionIndividual.vehiculo_id || asignacionIndividual.total_despachado === '') {
-      return alert("Debes seleccionar un conductor, un vehículo y el valor despachado.");
+      return mostrarError("Debes seleccionar un conductor, un vehículo y el valor despachado.");
     }
 
     const valorIngresado = Number(asignacionIndividual.total_despachado);
@@ -179,7 +180,7 @@ const AsignacionLogistica = () => {
     const esParcial = valorIngresado < valorFactura;
 
     if (valorIngresado > valorFactura) {
-      return alert(`❌ ALERTA:\nEl valor a despachar no puede superar la factura.`);
+      return mostrarError(`❌ ALERTA:\nEl valor a despachar no puede superar la factura.`);
     }
 
     try {
@@ -204,14 +205,14 @@ const AsignacionLogistica = () => {
           window.dispatchEvent(new CustomEvent('alerta_local', { detail: payloadAlerta })); // Instántaneo para ti
         }
 
-        alert("✅ Ruta actualizada exitosamente");
+        mostrarExito("✅ Ruta actualizada exitosamente");
         fetchData(true); 
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   const handleQuitarAsignacion = async (pedidoId) => {
-    if (!window.confirm("¿Estás seguro de quitar la asignación?")) return;
+    if (!(await confirmarAccion("Confirmar", "¿Estás seguro de quitar la asignación?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoId}/desasignar`, {
         method: 'PUT'
@@ -220,7 +221,7 @@ const AsignacionLogistica = () => {
         setShowModalIndividual(false);
         fetchData(true); 
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   const obtenerPesoFormateado = (p) => Number(p.total_peso || p.peso || 0).toLocaleString();

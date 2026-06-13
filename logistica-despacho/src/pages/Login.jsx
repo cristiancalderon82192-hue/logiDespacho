@@ -8,6 +8,7 @@ import {
   User, Building, Phone, ArrowLeft, Send, CheckCircle2, Package, Bot, MapPin
 } from 'lucide-react';
 import logoCliente from '../assets/logoitsoluciones.png'; 
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 // Inicializamos el plugin de GPS
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
@@ -34,7 +35,7 @@ const Login = () => {
       const status = await BackgroundGeolocation.requestPermissions();
       console.log("Estado de permisos GPS:", status);
       if (status.location !== 'granted') {
-        alert("Atención: Para el correcto funcionamiento del despacho, debes permitir el acceso a la ubicación 'Todo el tiempo' en la configuración de tu celular.");
+        mostrarError("Atención: Para el correcto funcionamiento del despacho, debes permitir el acceso a la ubicación 'Todo el tiempo' en la configuración de tu celular.");
       }
     } catch (err) {
       console.error("Error solicitando permisos:", err);
@@ -45,7 +46,7 @@ const Login = () => {
     e.preventDefault();
     
     if (!captchaValido) {
-      alert("Por favor, verifica que no eres un robot.");
+      mostrarInfo("Por favor, verifica que no eres un robot.");
       return;
     }
 
@@ -65,7 +66,7 @@ const Login = () => {
         const objUsuario = data.user || data.usuario || data;
         
         if (String(objUsuario.estado) === '0' || objUsuario.estado === false) {
-          alert("❌ ACCESO DENEGADO: Tu cuenta de usuario se encuentra INACTIVA.");
+          mostrarError("❌ ACCESO DENEGADO: Tu cuenta de usuario se encuentra INACTIVA.");
           setLoading(false);
           return; 
         }
@@ -104,11 +105,11 @@ const Login = () => {
         }
         
       } else {
-        alert("Error: " + data.error);
+        mostrarError("Error: " + data.error);
       }
     } catch (error) {
       console.error("Error de conexión:", error);
-      alert("No se pudo conectar con el servidor.");
+      mostrarError("No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Save, Search, Pencil, Trash2, X } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const Destinos = () => {
   const [destinos, setDestinos] = useState([]);
@@ -25,7 +26,7 @@ const Destinos = () => {
   // GUARDAR O ACTUALIZAR
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.nombre || !form.zona_id) return alert("Complete los campos");
+    if (!form.nombre || !form.zona_id) return mostrarInfo("Complete los campos");
 
     // CORREGIDO: Uso de backticks (``) también en la segunda opción
     const url = editingId 
@@ -45,20 +46,20 @@ const Destinos = () => {
         setForm({ nombre: '', zona_id: '' });
         setEditingId(null);
         loadData();
-        alert(editingId ? "Ciudad actualizada" : "Ciudad guardada");
+        mostrarExito(editingId ? "Ciudad actualizada" : "Ciudad guardada");
       }
-    } catch (error) { alert("Error al guardar"); }
+    } catch (error) { mostrarError("Error al guardar"); }
   };
 
   // ELIMINAR
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar esta ciudad?")) return;
+    if (!(await confirmarAccion("Confirmar", "¿Eliminar esta ciudad?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/destinos/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok) loadData();
-      else alert(data.error);
-    } catch (e) { alert("Error de conexión"); }
+      else mostrarError(data.error);
+    } catch (e) { mostrarError("Error de conexión"); }
   };
 
   // PREPARAR EDICIÓN

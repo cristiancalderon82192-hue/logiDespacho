@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Map, Plus, Trash2, Pencil, Save, X } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const Zonas = () => {
   const [zonas, setZonas] = useState([]);
@@ -40,14 +41,14 @@ const Zonas = () => {
         setNombre('');
         setEditingId(null);
         fetchZonas();
-        alert(editingId ? "Zona actualizada" : "Zona creada");
+        mostrarExito(editingId ? "Zona actualizada" : "Zona creada");
       }
-    } catch (error) { alert("Error al guardar"); }
+    } catch (error) { mostrarError("Error al guardar"); }
   };
 
   // ELIMINAR
   const handleDelete = async (id) => {
-    if (!window.confirm("¿Seguro que quieres eliminar esta zona?")) return;
+    if (!(await confirmarAccion("Confirmar", "¿Seguro que quieres eliminar esta zona?"))) return;
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/zonas/${id}`, { method: 'DELETE' });
@@ -56,9 +57,9 @@ const Zonas = () => {
       if (res.ok) {
         fetchZonas();
       } else {
-        alert(data.error || "Error al eliminar");
+        mostrarError(data.error || "Error al eliminar");
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   // CARGAR DATOS EN FORMULARIO PARA EDITAR

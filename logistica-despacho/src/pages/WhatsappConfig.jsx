@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, QrCode, LogOut, CheckCircle, RefreshCw, Save, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const WhatsappConfig = () => {
   const { user } = useAuth();
@@ -42,7 +43,7 @@ const WhatsappConfig = () => {
   }, []);
 
   const handleLogout = async () => {
-    if (!window.confirm("¿Seguro que deseas cerrar la sesión de WhatsApp vinculada? Esto detendrá el envío de comprobantes hasta que vincules un nuevo dispositivo.")) return;
+    if (!(await confirmarAccion("Confirmar", "¿Seguro que deseas cerrar la sesión de WhatsApp vinculada? Esto detendrá el envío de comprobantes hasta que vincules un nuevo dispositivo."))) return;
     setLoading(true);
     try {
       await fetch(`${import.meta.env.VITE_API_URL}/api/whatsapp/logout`, { method: 'POST' });
@@ -62,13 +63,13 @@ const WhatsappConfig = () => {
         body: JSON.stringify({ mensaje: template })
       });
       if (res.ok) {
-        alert("¡Plantilla de mensaje guardada correctamente!");
+        mostrarInfo("¡Plantilla de mensaje guardada correctamente!");
       } else {
-        alert("Error al guardar la plantilla.");
+        mostrarError("Error al guardar la plantilla.");
       }
     } catch (error) {
       console.error(error);
-      alert("Error de conexión al guardar.");
+      mostrarError("Error de conexión al guardar.");
     } finally {
       setSavingTemplate(false);
     }

@@ -7,6 +7,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const PedidosLider = () => {
   const { user } = useAuth();
@@ -142,23 +143,23 @@ const PedidosLider = () => {
 
     // 👇 VALIDACIÓN ESTRICTA: ABSOLUTAMENTE TODOS LOS CAMPOS OBLIGATORIOS 👇
     if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
-      alert("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
+      mostrarError("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
       setShowClientModal(true);
       return;
     }
-    if (!formData.id_factura || formData.id_factura.trim() === '') return alert("❌ El campo 'Id_Factura' es obligatorio.");
-    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) return alert("❌ Debes ingresar un 'Valor de Factura' válido (No negativo).");
-    if (!formData.fecha_facturacion) return alert("❌ La 'Fecha Fac.' es obligatoria.");
-    if (!formData.hora_registro) return alert("❌ La 'Hora Registro Entrega' es obligatoria.");
-    if (!formData.fecha_promesa) return alert("❌ La 'Fecha Promesa' es obligatoria.");
-    if (!formData.fecha_agendada) return alert("❌ La 'Fecha Agendada' es obligatoria.");
-    if (!formData.telefono || formData.telefono.trim() === '') return alert("❌ El campo 'Teléfono' es obligatorio.");
-    if (!formData.destino_id) return alert("❌ Debes seleccionar un 'Destino'.");
-    if (!formData.nota_manual || formData.nota_manual.trim() === '') return alert("❌ El campo 'Nota Manual' es obligatorio. Escribe una descripción o 'Ninguna'.");
+    if (!formData.id_factura || formData.id_factura.trim() === '') return mostrarError("❌ El campo 'Id_Factura' es obligatorio.");
+    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) return mostrarError("❌ Debes ingresar un 'Valor de Factura' válido (No negativo).");
+    if (!formData.fecha_facturacion) return mostrarError("❌ La 'Fecha Fac.' es obligatoria.");
+    if (!formData.hora_registro) return mostrarError("❌ La 'Hora Registro Entrega' es obligatoria.");
+    if (!formData.fecha_promesa) return mostrarError("❌ La 'Fecha Promesa' es obligatoria.");
+    if (!formData.fecha_agendada) return mostrarError("❌ La 'Fecha Agendada' es obligatoria.");
+    if (!formData.telefono || formData.telefono.trim() === '') return mostrarError("❌ El campo 'Teléfono' es obligatorio.");
+    if (!formData.destino_id) return mostrarError("❌ Debes seleccionar un 'Destino'.");
+    if (!formData.nota_manual || formData.nota_manual.trim() === '') return mostrarError("❌ El campo 'Nota Manual' es obligatorio. Escribe una descripción o 'Ninguna'.");
 
     const totalPeso = [1, 2, 3, 4, 5, 6, 7, 8].reduce((acc, num) => acc + Number(formData[`peso_b${num}`] || 0), 0);
     if (totalPeso <= 0) {
-      return alert("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega.");
+      return mostrarError("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega.");
     }
 
     const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
@@ -172,22 +173,22 @@ const PedidosLider = () => {
       });
 
       if (response.ok) {
-        alert(editingId ? "✅ Pedido Actualizado" : "✅ Pedido Registrado");
+        mostrarExito(editingId ? "✅ Pedido Actualizado" : "✅ Pedido Registrado");
         resetForm();
         setShowFormModal(false); 
         fetchPedidos(true); 
       } else {
         const errorData = await response.json();
-        alert(`❌ Error: ${errorData.error}`);
+        mostrarError(`❌ Error: ${errorData.error}`);
       }
     } catch (error) { 
-      alert("Error de conexión con el servidor.");
+      mostrarError("Error de conexión con el servidor.");
     }
   };
 
   const handleCreateClient = async (e) => {
     e.preventDefault();
-    if (!newClientData.nombre || !newClientData.documento) return alert("El nombre y la Cédula/NIT son obligatorios");
+    if (!newClientData.nombre || !newClientData.documento) return mostrarInfo("El nombre y la Cédula/NIT son obligatorios");
     
     setSavingClient(true);
     try {
@@ -199,7 +200,7 @@ const PedidosLider = () => {
       const resData = await response.json();
       
       if (response.ok) {
-        alert("✅ Cliente creado exitosamente");
+        mostrarExito("✅ Cliente creado exitosamente");
         const resC = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
         setListaClientes(await resC.json());
         setFormData(prev => ({ ...prev, nombre_cliente: newClientData.nombre, telefono: newClientData.telefono }));
@@ -207,9 +208,9 @@ const PedidosLider = () => {
         setIsCreatingClient(false);
         setShowClientModal(false);
       } else {
-        alert(`❌ Error: ${resData.error || 'Verifica los datos'}`);
+        mostrarError(`❌ Error: ${resData.error || 'Verifica los datos'}`);
       }
-    } catch (error) { alert("Error de conexión"); } 
+    } catch (error) { mostrarError("Error de conexión"); } 
     finally { setSavingClient(false); }
   };
 
@@ -348,7 +349,7 @@ const PedidosLider = () => {
 
     } catch (error) {
       console.error("Error generando PDF", error);
-      alert("Error al generar el comprobante. Intenta de nuevo.");
+      mostrarError("Error al generar el comprobante. Intenta de nuevo.");
     }
   };
 

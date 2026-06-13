@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Truck, MapPin, Phone, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const RutaConductor = () => {
   const { user } = useAuth();
@@ -45,11 +46,11 @@ const RutaConductor = () => {
       });
 
       if (res.ok) {
-        alert("✅ Entrega registrada");
+        mostrarExito("✅ Entrega registrada");
         setSelectedPedido(null); // Cerrar modal
         fetchRuta(); // Recargar lista
       } else {
-        alert("Error al registrar");
+        mostrarError("Error al registrar");
       }
     } catch (error) {
       console.error(error);

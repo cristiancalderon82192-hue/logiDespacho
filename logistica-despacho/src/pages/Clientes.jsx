@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UsersRound, Save, Edit, Trash2, MapPin, Phone, RefreshCw, CreditCard, Search } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const Clientes = () => {
   const [clientes, setClientes] = useState([]);
@@ -29,8 +30,8 @@ const Clientes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.nombre) return alert("El nombre es obligatorio");
-    if (!formData.documento) return alert("La Cédula/NIT es obligatoria");
+    if (!formData.nombre) return mostrarInfo("El nombre es obligatorio");
+    if (!formData.documento) return mostrarInfo("La Cédula/NIT es obligatoria");
     
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/clientes/${editingId}` 
@@ -48,15 +49,15 @@ const Clientes = () => {
       const data = await res.json(); 
 
       if (res.ok) {
-        alert(editingId ? "✅ Cliente Actualizado" : "✅ Cliente Creado");
+        mostrarExito(editingId ? "✅ Cliente Actualizado" : "✅ Cliente Creado");
         setFormData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
         setEditingId(null);
         fetchClientes();
       } else {
-        alert(`❌ Error: ${data.error || 'No se pudo guardar'}`);
+        mostrarError(`❌ Error: ${data.error || 'No se pudo guardar'}`);
       }
     } catch (error) { 
-      alert("Error de conexión con el servidor"); 
+      mostrarError("Error de conexión con el servidor"); 
     }
   };
 
@@ -72,7 +73,7 @@ const Clientes = () => {
   };
 
   const handleDelete = async (id) => {
-    if(!window.confirm("¿Estás seguro de eliminar este cliente?")) return;
+    if(!(await confirmarAccion("Confirmar", "¿Estás seguro de eliminar este cliente?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes/${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -80,9 +81,9 @@ const Clientes = () => {
       if (res.ok) {
         fetchClientes();
       } else {
-        alert(`❌ Error: ${data.error}`); 
+        mostrarError(`❌ Error: ${data.error}`); 
       }
-    } catch (e) { alert("Error de conexión"); }
+    } catch (e) { mostrarError("Error de conexión"); }
   };
 
   // 👇 LÓGICA DE FILTRADO Y LÍMITE DE 5 👇

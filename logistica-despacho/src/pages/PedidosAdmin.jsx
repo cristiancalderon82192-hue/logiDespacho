@@ -8,6 +8,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const PedidosAdmin = () => {
   const { user } = useAuth();
@@ -124,23 +125,23 @@ const PedidosAdmin = () => {
 
     // 👇 VALIDACIÓN ESTRICTA: ABSOLUTAMENTE TODOS LOS CAMPOS OBLIGATORIOS 👇
     if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
-      alert("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
+      mostrarError("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
       setShowClientModal(true);
       return;
     }
-    if (!formData.id_factura || formData.id_factura.trim() === '') return alert("❌ El campo 'Id_Factura' es obligatorio.");
-    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) return alert("❌ Debes ingresar un 'Valor de Factura' válido (No negativo).");
-    if (!formData.fecha_facturacion) return alert("❌ La 'Fecha Fac.' es obligatoria.");
-    if (!formData.hora_registro) return alert("❌ La 'Hora Registro Entrega' es obligatoria.");
-    if (!formData.fecha_promesa) return alert("❌ La 'Fecha Promesa' es obligatoria.");
-    if (!formData.fecha_agendada) return alert("❌ La 'Fecha Agendada' es obligatoria.");
-    if (!formData.telefono || formData.telefono.trim() === '') return alert("❌ El campo 'Teléfono' es obligatorio.");
-    if (!formData.destino_id) return alert("❌ Debes seleccionar un 'Destino'.");
-    if (!formData.nota_manual || formData.nota_manual.trim() === '') return alert("❌ El campo 'Nota Manual' es obligatorio. Escribe una descripción o 'Ninguna'.");
+    if (!formData.id_factura || formData.id_factura.trim() === '') return mostrarError("❌ El campo 'Id_Factura' es obligatorio.");
+    if (formData.valor_factura === '' || Number(formData.valor_factura) < 0) return mostrarError("❌ Debes ingresar un 'Valor de Factura' válido (No negativo).");
+    if (!formData.fecha_facturacion) return mostrarError("❌ La 'Fecha Fac.' es obligatoria.");
+    if (!formData.hora_registro) return mostrarError("❌ La 'Hora Registro Entrega' es obligatoria.");
+    if (!formData.fecha_promesa) return mostrarError("❌ La 'Fecha Promesa' es obligatoria.");
+    if (!formData.fecha_agendada) return mostrarError("❌ La 'Fecha Agendada' es obligatoria.");
+    if (!formData.telefono || formData.telefono.trim() === '') return mostrarError("❌ El campo 'Teléfono' es obligatorio.");
+    if (!formData.destino_id) return mostrarError("❌ Debes seleccionar un 'Destino'.");
+    if (!formData.nota_manual || formData.nota_manual.trim() === '') return mostrarError("❌ El campo 'Nota Manual' es obligatorio. Escribe una descripción o 'Ninguna'.");
 
     const totalPeso = [1, 2, 3, 4, 5, 6, 7, 8].reduce((acc, num) => acc + Number(formData[`peso_b${num}`] || 0), 0);
     if (totalPeso <= 0) {
-      return alert("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega para poder despachar.");
+      return mostrarError("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega para poder despachar.");
     }
 
     const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
@@ -152,34 +153,34 @@ const PedidosAdmin = () => {
         body: JSON.stringify({ ...formData, usuario_id: user.id })
       });
       if (response.ok) {
-        alert(editingId ? "✅ Pedido Actualizado" : "✅ Pedido Guardado");
+        mostrarExito(editingId ? "✅ Pedido Actualizado" : "✅ Pedido Guardado");
         resetForm(); 
         fetchPedidos();
       } else {
-        const errorData = await response.json(); alert(`❌ Error: ${errorData.error}`);
+        const errorData = await response.json(); mostrarError(`❌ Error: ${errorData.error}`);
       }
     } catch (error) { console.error(error); }
   };
 
   const handleCreateClient = async (e) => {
     e.preventDefault();
-    if (!newClientData.nombre || !newClientData.documento) return alert("Nombre y Cédula obligatorios");
+    if (!newClientData.nombre || !newClientData.documento) return mostrarInfo("Nombre y Cédula obligatorios");
     setSavingClient(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClientData)
       });
       if (response.ok) {
-        alert("✅ Cliente creado");
+        mostrarExito("✅ Cliente creado");
         const resC = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
         setListaClientes(await resC.json());
         setFormData(prev => ({ ...prev, nombre_cliente: newClientData.nombre, telefono: newClientData.telefono }));
         setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
         setIsCreatingClient(false); setShowClientModal(false);
       } else {
-        const resData = await response.json(); alert(`❌ Error: ${resData.error}`);
+        const resData = await response.json(); mostrarError(`❌ Error: ${resData.error}`);
       }
-    } catch (error) { alert("Error"); } finally { setSavingClient(false); }
+    } catch (error) { mostrarError("Error"); } finally { setSavingClient(false); }
   };
 
   const handleEdit = async (pedidoId) => {
@@ -197,7 +198,7 @@ const PedidosAdmin = () => {
       });
       setEditingId(pedidoId); 
       setShowFormModal(true); 
-    } catch (error) { alert("Error al cargar datos"); }
+    } catch (error) { mostrarError("Error al cargar datos"); }
   };
 
   const handleDelete = async (pedidoFila) => {
@@ -209,20 +210,20 @@ const PedidosAdmin = () => {
       mensaje = `⚠️ ADVERTENCIA DE ADMINISTRADOR ⚠️\n\nEl pedido ${pedidoFila.id_factura} está en estado "${pedidoFila.estado_entrega}". Normalmente no se debería borrar.\n\n¿Estás seguro de forzar la eliminación por mantenimiento?`;
     }
 
-    if (!window.confirm(mensaje)) return;
+    if (!(await confirmarAccion("Confirmar", mensaje))) return;
     
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos/${pedidoFila.id}`, { method: 'DELETE' });
       if (res.ok) { 
-        alert("🗑️ Pedido eliminado correctamente."); 
+        mostrarInfo("🗑️ Pedido eliminado correctamente."); 
         fetchPedidos(); 
       } else {
         const errorData = await res.json();
-        alert(`❌ Error al eliminar: ${errorData.error || 'Desconocido'}`);
+        mostrarError(`❌ Error al eliminar: ${errorData.error || 'Desconocido'}`);
       }
     } catch (error) { 
       console.error(error); 
-      alert("Error de conexión al intentar eliminar el pedido.");
+      mostrarError("Error de conexión al intentar eliminar el pedido.");
     }
   };
 
@@ -337,7 +338,7 @@ const PedidosAdmin = () => {
 
     } catch (error) {
       console.error("Error generando PDF", error);
-      alert("Error al generar el comprobante. Intenta de nuevo.");
+      mostrarError("Error al generar el comprobante. Intenta de nuevo.");
     }
   };
 

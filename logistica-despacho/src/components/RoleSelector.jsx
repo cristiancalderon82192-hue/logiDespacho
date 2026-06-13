@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, UserCog, Package, Truck, Activity, Briefcase, Key, Lock, Check } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const rolesDisponibles = [
   { id: 'admin', nombre: 'Admin', icon: <ShieldAlert size={24}/>, color: 'bg-red-50 text-red-600 border-red-200' },
@@ -38,15 +39,15 @@ export default function RoleSelector() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert("Contraseña actualizada exitosamente");
+        mostrarExito("Contraseña actualizada exitosamente");
         setShowPasswordForm(false);
         setCurrentPassword('');
         setNewPassword('');
       } else {
-        alert(data.error || "Error al actualizar la contraseña");
+        mostrarError(data.error || "Error al actualizar la contraseña");
       }
     } catch (error) {
-      alert("Error de red");
+      mostrarError("Error de red");
     } finally {
       setLoading(false);
     }

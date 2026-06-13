@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, User, Mail, Lock, Shield, Edit, Trash2, RefreshCw, Package } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const RegisterUser = () => {
   const { user } = useAuth();
@@ -44,10 +45,10 @@ const RegisterUser = () => {
     e.preventDefault();
     
     if(!formData.nombre_completo || !formData.email || !formData.rol_id) {
-      return alert("Todos los campos principales son obligatorios");
+      return mostrarInfo("Todos los campos principales son obligatorios");
     }
     if(!editingId && !formData.password) {
-      return alert("La contraseña es obligatoria para nuevos usuarios");
+      return mostrarInfo("La contraseña es obligatoria para nuevos usuarios");
     }
 
     const url = editingId 
@@ -66,14 +67,14 @@ const RegisterUser = () => {
       const data = await res.json();
 
       if (res.ok) {
-        alert(editingId ? "✅ Usuario actualizado" : "✅ Usuario creado");
+        mostrarExito(editingId ? "✅ Usuario actualizado" : "✅ Usuario creado");
         setFormData({ nombre_completo: '', email: '', password: '', rol_id: '3', estado: '1', bodega_id: '' });
         setEditingId(null);
         fetchData(); 
       } else {
-        alert(data.error || "Error al guardar");
+        mostrarError(data.error || "Error al guardar");
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   const handleEdit = (u) => {
@@ -90,12 +91,12 @@ const RegisterUser = () => {
   };
 
   const handleDelete = async (id) => {
-    if(!window.confirm("¿Eliminar usuario?")) return;
+    if(!(await confirmarAccion("Confirmar", "¿Eliminar usuario?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/usuarios/${id}`, { method: 'DELETE' });
       if(res.ok) fetchData();
-      else alert("No se pudo eliminar");
-    } catch (error) { alert("Error de conexión"); }
+      else mostrarError("No se pudo eliminar");
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   const getRoleName = (id) => {

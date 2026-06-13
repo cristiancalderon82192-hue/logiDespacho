@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, FileText, MapPin, Calendar, CheckCircle, Truck, User, X, Weight, Building2, Plus, Trash2, CheckSquare, Square } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const ReporteParciales = () => {
   const obtenerFechaLocal = () => {
@@ -147,7 +148,7 @@ const ReporteParciales = () => {
   const handleAsignarLoteSaldos = async (e) => {
     e.preventDefault();
     if (!asignacionLote.conductor_id || !asignacionLote.vehiculo_id || !asignacionLote.fecha_agendada) {
-      return alert("Debes seleccionar conductor, vehículo y fecha de salida.");
+      return mostrarError("Debes seleccionar conductor, vehículo y fecha de salida.");
     }
 
     const payloadDetalles = [];
@@ -158,16 +159,16 @@ const ReporteParciales = () => {
       const det = detallesLote[pId];
       
       if (Number(det.valor_despachar) > Number(pedidoOriginal.valor_factura_pendiente)) {
-        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede despachar más de lo que debe ($${Number(pedidoOriginal.valor_factura_pendiente).toLocaleString()}).`);
+        return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede despachar más de lo que debe ($${Number(pedidoOriginal.valor_factura_pendiente).toLocaleString()}).`);
       }
 
       if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura_pendiente) && det.observacion.trim() === '') {
-        return alert(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} sigue incompleta. Es OBLIGATORIO escribir una justificación.`);
+        return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} sigue incompleta. Es OBLIGATORIO escribir una justificación.`);
       }
 
       const detallesValidos = det.detalles.every(d => d.bodega_id !== '' && d.peso !== '' && Number(d.peso) > 0);
       if (!detallesValidos) {
-        return alert(`❌ ALERTA: Verifica las bodegas y pesos de la factura ${pedidoOriginal.id_factura}. Deben ser válidos.`);
+        return mostrarError(`❌ ALERTA: Verifica las bodegas y pesos de la factura ${pedidoOriginal.id_factura}. Deben ser válidos.`);
       }
 
       // Agrupamos la info de esta factura
@@ -194,17 +195,17 @@ const ReporteParciales = () => {
       });
 
       if (res.ok) {
-        alert("✅ Lote de saldos agrupado en un solo viaje exitosamente.");
+        mostrarExito("✅ Lote de saldos agrupado en un solo viaje exitosamente.");
         setShowModalLote(false);
         setPedidosSeleccionados([]);
         fetchParciales();
       } else {
         const errorData = await res.json();
-        alert(`❌ Error: ${errorData.error}`);
+        mostrarError(`❌ Error: ${errorData.error}`);
       }
 
     } catch (error) {
-      alert("Error de conexión al asignar el lote de saldos.");
+      mostrarError("Error de conexión al asignar el lote de saldos.");
     }
   };
 

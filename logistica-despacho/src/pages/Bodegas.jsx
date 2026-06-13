@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Save, Edit, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const Bodegas = () => {
   const [bodegas, setBodegas] = useState([]);
@@ -19,7 +20,7 @@ const Bodegas = () => {
   // GUARDAR (CREAR / EDITAR) CON AUTO-FORMATO Y VALIDACIÓN ESTRICTA
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.nombre.trim()) return alert("El nombre es obligatorio");
+    if (!formData.nombre.trim()) return mostrarInfo("El nombre es obligatorio");
 
     // 👇 1. AUTO-FORMATO INTELIGENTE (La magia del texto) 👇
     let nombreFormateado = formData.nombre.trim();
@@ -50,7 +51,7 @@ const Bodegas = () => {
     });
 
     if (isDuplicate) {
-      return alert("❌ ALERTA DE DUPLICADO:\n\nYa existe una bodega con este nombre. El sistema la detectó aunque tenga diferencias en mayúsculas o espacios.");
+      return mostrarError("❌ ALERTA DE DUPLICADO:\n\nYa existe una bodega con este nombre. El sistema la detectó aunque tenga diferencias en mayúsculas o espacios.");
     }
     // 👆 FIN DE LÓGICA DE DUPLICADOS 👆
 
@@ -69,15 +70,15 @@ const Bodegas = () => {
       });
       
       if (res.ok) {
-        alert(editingId ? "✅ Bodega Actualizada" : "✅ Bodega Creada");
+        mostrarExito(editingId ? "✅ Bodega Actualizada" : "✅ Bodega Creada");
         setFormData({ nombre: '' });
         setEditingId(null);
         fetchBodegas();
       } else {
         const errorData = await res.json();
-        alert(`Error al guardar: ${errorData.error || 'Desconocido'}`);
+        mostrarError(`Error al guardar: ${errorData.error || 'Desconocido'}`);
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   // PREPARAR EDICIÓN
@@ -88,14 +89,14 @@ const Bodegas = () => {
 
   // ELIMINAR
   const handleDelete = async (id) => {
-    if(!window.confirm("¿Eliminar esta bodega?")) return;
+    if(!(await confirmarAccion("Confirmar", "¿Eliminar esta bodega?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodegas/${id}`, { method: 'DELETE' });
       const data = await res.json();
       
       if (res.ok) fetchBodegas();
-      else alert(data.error || "No se pudo eliminar");
-    } catch (error) { alert("Error de conexión"); }
+      else mostrarError(data.error || "No se pudo eliminar");
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   return (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, Save, Edit, Trash2, RefreshCw, Activity, AlertCircle, Search } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const Flota = () => {
   const [vehiculos, setVehiculos] = useState([]);
@@ -26,7 +27,7 @@ const Flota = () => {
   // GUARDAR
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.placa) return alert("La placa es obligatoria");
+    if (!formData.placa) return mostrarInfo("La placa es obligatoria");
 
     // CORREGIDO: Uso de backticks (``) en ambas opciones
     const url = editingId 
@@ -43,14 +44,14 @@ const Flota = () => {
       
       const data = await res.json();
       if (res.ok) {
-        alert(editingId ? "✅ Vehículo Actualizado" : "✅ Vehículo Registrado");
+        mostrarExito(editingId ? "✅ Vehículo Actualizado" : "✅ Vehículo Registrado");
         setFormData({ placa: '', modelo: '', capacidad_kg: '', estado: '1' });
         setEditingId(null);
         fetchVehiculos();
       } else {
-        alert(data.error);
+        mostrarError(data.error);
       }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { mostrarError("Error de conexión"); }
   };
 
   // EDITAR
@@ -67,12 +68,12 @@ const Flota = () => {
 
   // ELIMINAR
   const handleDelete = async (id) => {
-    if(!window.confirm("¿Eliminar vehículo?")) return;
+    if(!(await confirmarAccion("Confirmar", "¿Eliminar vehículo?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vehiculos/${id}`, { method: 'DELETE' });
       if (res.ok) fetchVehiculos();
-      else alert("No se puede eliminar (tiene historial)");
-    } catch (e) { alert("Error de conexión"); }
+      else mostrarInfo("No se puede eliminar (tiene historial)");
+    } catch (e) { mostrarError("Error de conexión"); }
   };
 
   // Filtrar vehículos por placa

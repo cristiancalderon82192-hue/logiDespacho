@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FileDown, CheckCircle, Package, Truck, AlertCircle } from 'lucide-react';
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const ComprobantePublico = () => {
   const { id_factura } = useParams();
@@ -132,7 +133,7 @@ const ComprobantePublico = () => {
 
     } catch (error) {
       console.error("Error generando PDF", error);
-      alert("Error al generar el comprobante. Por favor, intenta usar otro navegador o dispositivo.");
+      mostrarError("Error al generar el comprobante. Por favor, intenta usar otro navegador o dispositivo.");
     }
   };
 

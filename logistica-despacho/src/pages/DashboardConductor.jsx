@@ -5,6 +5,7 @@ import { registerPlugin, Capacitor } from '@capacitor/core';
 import { LogOut, MapPin, Phone, Calendar, AlertCircle, FileText, CheckCircle, User, PlayCircle, XCircle, Truck, X, AlertTriangle, RefreshCw, PenTool, Eraser, DollarSign, Building2, Weight, Plus, WifiOff, CloudSync } from 'lucide-react';
 import logoEmpresa from '../assets/rodeo.png';
 import { socket } from '../utils/socket'; 
+import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 let BackgroundGeolocation;
 try {
@@ -136,7 +137,7 @@ const DashboardConductor = () => {
           }
           fetchRutas(false);
         } else {
-          alert("Error del servidor, inténtalo más tarde.");
+          mostrarError("Error del servidor, inténtalo más tarde.");
         }
       } catch (error) { 
         guardarLocalmente(); 
@@ -307,7 +308,7 @@ const DashboardConductor = () => {
   const limpiarFirma = () => sigCanvas.current.clear();
 
   const confirmarEntregaConFirma = async () => {
-    if (sigCanvas.current.isEmpty()) return alert("El cliente debe firmar en el recuadro.");
+    if (sigCanvas.current.isEmpty()) return mostrarInfo("El cliente debe firmar en el recuadro.");
     const firmaBase64 = sigCanvas.current.getCanvas().toDataURL('image/png');
     let valorACobrar = parseFloat(pedidoFirma.total_despachado);
     if (isNaN(valorACobrar) || valorACobrar <= 0) valorACobrar = parseFloat(pedidoFirma.valor_factura || 0);
@@ -335,17 +336,17 @@ const DashboardConductor = () => {
   const validarDatosDevolucion = (e) => {
     e.preventDefault();
     for (let i = 0; i < devolucionesBodegas.length; i++) {
-      if (!devolucionesBodegas[i].bodegaId) return alert(`Selecciona bodega en fila ${i + 1}.`);
-      if (!devolucionesBodegas[i].peso || Number(devolucionesBodegas[i].peso) <= 0) return alert(`Ingresa peso válido en fila ${i + 1}.`);
+      if (!devolucionesBodegas[i].bodegaId) return mostrarInfo(`Selecciona bodega en fila ${i + 1}.`);
+      if (!devolucionesBodegas[i].peso || Number(devolucionesBodegas[i].peso) <= 0) return mostrarInfo(`Ingresa peso válido en fila ${i + 1}.`);
     }
-    if (!motivoDevolucion.trim()) return alert("Debes escribir el motivo de la novedad.");
+    if (!motivoDevolucion.trim()) return mostrarError("Debes escribir el motivo de la novedad.");
     
     let carga = parseFloat(pedidoDevolucion.total_despachado);
     if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);
     const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
 
-    if (valorD <= 0) return alert("El valor de la novedad no puede ser cero.");
-    if (valorD > carga) return alert(`Reportas $${valorD.toLocaleString()}, pero llevas $${carga.toLocaleString()}.`);
+    if (valorD <= 0) return mostrarInfo("El valor de la novedad no puede ser cero.");
+    if (valorD > carga) return mostrarInfo(`Reportas $${valorD.toLocaleString()}, pero llevas $${carga.toLocaleString()}.`);
 
     setPasoDevolucion(2);
   };
@@ -353,7 +354,7 @@ const DashboardConductor = () => {
   const limpiarFirmaDevolucion = () => sigCanvasDev.current.clear();
 
   const confirmarDevolucionConFirma = async () => {
-    if (sigCanvasDev.current.isEmpty()) return alert("El cliente debe firmar la novedad.");
+    if (sigCanvasDev.current.isEmpty()) return mostrarInfo("El cliente debe firmar la novedad.");
     const firmaBase64 = sigCanvasDev.current.getCanvas().toDataURL('image/png');
     let carga = parseFloat(pedidoDevolucion.total_despachado);
     if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);

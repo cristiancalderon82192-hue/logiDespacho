@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
 // --- IMPORTACIÓN DE PÁGINAS ---
 import Login from './pages/Login';
@@ -93,6 +94,7 @@ const MainLayout = ({ children }) => {
 export default function App() {
   return (
     <AuthProvider>
+      <Toaster />
       <BrowserRouter>
         <Routes>
           
