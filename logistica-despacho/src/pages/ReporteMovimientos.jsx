@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOpen } from 'lucide-react';
+import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ReporteMovimientos = () => {
@@ -42,6 +43,9 @@ const ReporteMovimientos = () => {
       return nuevosFiltros;
     });
   };
+
+  const setFechaInicioWrapper = (val) => setFiltros(prev => ({...prev, fechaInicio: val}));
+  const setFechaFinWrapper = (val) => setFiltros(prev => ({...prev, fechaFin: val}));
 
   const zonasFiltradas = filtros.ciudad 
     ? opciones.zonas.filter(z => z.ciudad === filtros.ciudad).map(z => z.zona_envio)
@@ -140,13 +144,13 @@ const ReporteMovimientos = () => {
         </h2>
         
         <form onSubmit={generarReporte} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">Fecha Inicio</label>
-            <input type="date" name="fechaInicio" value={filtros.fechaInicio} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8]" required />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">Fecha Fin</label>
-            <input type="date" name="fechaFin" value={filtros.fechaFin} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8]" required />
+          <div className="md:col-span-2">
+            <DateRangeSelector 
+              fechaInicio={filtros.fechaInicio} 
+              setFechaInicio={setFechaInicioWrapper} 
+              fechaFin={filtros.fechaFin} 
+              setFechaFin={setFechaFinWrapper} 
+            />
           </div>
           
           <div>

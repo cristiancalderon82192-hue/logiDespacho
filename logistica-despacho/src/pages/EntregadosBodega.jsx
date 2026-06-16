@@ -3,6 +3,7 @@ import { FileCheck, Download, Calendar, User, Search, Camera } from 'lucide-reac
 import { jsPDF } from 'jspdf';
 import { socket } from '../utils/socket';
 import { useAuth } from '../context/AuthContext';
+import DateRangeSelector from '../components/DateRangeSelector';
 
 const EntregadosBodega = () => {
   const { user } = useAuth();
@@ -119,22 +120,13 @@ const EntregadosBodega = () => {
             className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-slate-900"
           />
         </div>
-        <div className="flex-1 w-full">
-          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Fecha Entrega (Desde)</label>
-          <input 
-            type="date" 
-            value={fechaInicio} 
-            onChange={(e) => setFechaInicio(e.target.value)}
-            className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-slate-900"
-          />
-        </div>
-        <div className="flex-1 w-full">
-          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Fecha Entrega (Hasta)</label>
-          <input 
-            type="date" 
-            value={fechaFin} 
-            onChange={(e) => setFechaFin(e.target.value)}
-            className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-slate-900"
+        <div className="flex-[2] w-full">
+          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Rango de Fechas</label>
+          <DateRangeSelector 
+            fechaInicio={fechaInicio} 
+            setFechaInicio={setFechaInicio} 
+            fechaFin={fechaFin} 
+            setFechaFin={setFechaFin} 
           />
         </div>
       </div>

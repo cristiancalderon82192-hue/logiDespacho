@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, TrendingUp, Package, Weight, Calendar, Search, BarChart as BarIcon, Target, Truck, DollarSign, CheckCircle, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import DateRangeSelector from '../components/DateRangeSelector';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -216,15 +217,12 @@ const AdminDashboard = () => {
         </div>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2 bg-white p-3 rounded-2xl shadow-sm border border-slate-200 w-full xl:w-auto transition-all focus-within:ring-2 ring-blue-100">
-          <div className="w-full sm:w-auto">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1">Desde</label>
-            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 transition-colors font-medium"/>
-          </div>
-          <span className="hidden sm:flex text-slate-300 pb-2.5 items-center justify-center"><Calendar size={16}/></span>
-          <div className="w-full sm:w-auto">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1">Hasta</label>
-            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-500 transition-colors font-medium"/>
-          </div>
+          <DateRangeSelector 
+            fechaInicio={fechaInicio} 
+            setFechaInicio={setFechaInicio} 
+            fechaFin={fechaFin} 
+            setFechaFin={setFechaFin} 
+          />
           <button onClick={() => fetchDashboard(true)} className="w-full sm:w-auto mt-2 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-xl flex justify-center items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95">
             <Search size={18} /> <span className="sm:hidden font-bold">Analizar Periodo</span>
           </button>

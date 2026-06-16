@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, FileText, MapPin, Calendar, CheckCircle, Truck, User, X, Weight, Building2, Plus, Trash2, CheckSquare, Square } from 'lucide-react';
+import DateRangeSelector from '../components/DateRangeSelector';
 import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const ReporteParciales = () => {
@@ -233,21 +234,12 @@ const ReporteParciales = () => {
           </div>
           
           <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto justify-end">
-            <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-fit">
-              <input 
-                type="date" 
-                value={fechaInicio} 
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
-              />
-              <span className="text-slate-300">/</span>
-              <input 
-                type="date" 
-                value={fechaFin} 
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
-              />
-            </div>
+            <DateRangeSelector 
+              fechaInicio={fechaInicio} 
+              setFechaInicio={setFechaInicio} 
+              fechaFin={fechaFin} 
+              setFechaFin={setFechaFin} 
+            />
 
             <div className="bg-red-50 border border-red-200 px-4 py-3 md:px-6 md:py-3 rounded-xl text-center w-full md:w-auto">
               <p className="text-[10px] md:text-xs font-bold text-red-500 uppercase tracking-wider mb-1">Total Deuda Bodega</p>

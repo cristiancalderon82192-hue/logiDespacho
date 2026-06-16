@@ -8,6 +8,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import DateRangeSelector from '../components/DateRangeSelector';
 import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
 
 const PedidosAdmin = () => {
@@ -372,19 +373,12 @@ const PedidosAdmin = () => {
               </button>
 
               <div className="flex flex-col sm:flex-row w-full sm:w-auto items-stretch sm:items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-slate-400 hidden sm:block ml-1"/>
-                  <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Desde</span>
-                  <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
-                </div>
-                
-                <span className="text-slate-300 hidden sm:inline px-1">|</span>
-                <div className="h-px w-full bg-slate-100 sm:hidden"></div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase sm:hidden w-12">Hasta</span>
-                  <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="flex-1 text-sm border-none outline-none text-slate-600 font-medium bg-transparent cursor-pointer"/>
-                </div>
+                <DateRangeSelector 
+                  fechaInicio={fechaInicio} 
+                  setFechaInicio={setFechaInicio} 
+                  fechaFin={fechaFin} 
+                  setFechaFin={setFechaFin} 
+                />
                 
                 <button onClick={fetchPedidos} className="mt-2 sm:mt-0 w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 sm:py-1.5 rounded-md transition-colors font-bold text-sm">
                   <Search size={16} /> 

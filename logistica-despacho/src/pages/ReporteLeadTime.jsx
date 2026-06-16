@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Search, Target, CheckCircle, AlertTriangle, Truck, FileText, Loader2, User, Download } from 'lucide-react';
+import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -216,36 +217,12 @@ const ReporteLeadTime = () => {
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch lg:items-center gap-3 w-full lg:w-auto">
               
               {/* Caja de Fechas */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 sm:px-4 sm:py-2 shadow-sm focus-within:border-[#47B3A8] transition-colors w-full sm:w-auto">
-                
-                {/* Fecha Desde */}
-                <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <Calendar size={18} className="text-[#47B3A8]" />
-                    <span className="text-xs font-bold text-slate-400 uppercase">Desde</span>
-                  </div>
-                  <input 
-                    type="date" 
-                    value={fechaInicio} 
-                    onChange={(e) => setFechaInicio(e.target.value)} 
-                    className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer" 
-                  />
-                </div>
-                
-                {/* Separador */}
-                <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200 sm:bg-slate-300"></div>
-                
-                {/* Fecha Hasta */}
-                <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
-                  <span className="text-xs font-bold text-slate-400 uppercase">Hasta</span>
-                  <input 
-                    type="date" 
-                    value={fechaFin} 
-                    onChange={(e) => setFechaFin(e.target.value)} 
-                    className="bg-transparent border-none outline-none text-sm text-slate-700 font-bold cursor-pointer" 
-                  />
-                </div>
-              </div>
+              <DateRangeSelector 
+                fechaInicio={fechaInicio} 
+                setFechaInicio={setFechaInicio} 
+                fechaFin={fechaFin} 
+                setFechaFin={setFechaFin} 
+              />
 
               {/* Botón Filtrar y Exportar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto mt-1 sm:mt-0">

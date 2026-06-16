@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 // 👇 AQUÍ ESTÁ EL ARREGLO: Agregué Loader2 al final de esta lista 👇
 import { Calendar, Package, Weight, MapPin, Truck, TrendingUp, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import DateRangeSelector from '../components/DateRangeSelector';
 
 const DashboardLogistica = () => {
   // --- FUNCIÓN PARA OBTENER FECHA LOCAL EXACTA DEL PC ---
@@ -23,7 +24,7 @@ const DashboardLogistica = () => {
   const hoyLocal = obtenerFechaLocal();
   const primerDiaMes = obtenerPrimerDiaMesLocal();
   
-  const [fechaInicio, setFechaInicio] = useState(primerDiaMes);
+  const [fechaInicio, setFechaInicio] = useState(hoyLocal);
   const [fechaFin, setFechaFin] = useState(hoyLocal);
   const [loading, setLoading] = useState(false);
   
@@ -106,26 +107,12 @@ const DashboardLogistica = () => {
             <p className="text-slate-500 mt-1 text-sm md:text-base">Monitoreo de carga, rutas y ocupación por fecha de salida</p>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-50 p-2 md:p-3 rounded-xl border border-slate-200 focus-within:border-[#47B3A8] transition-colors shadow-inner">
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Calendar size={18} className="text-[#47B3A8]" />
-              <input 
-                type="date" 
-                value={fechaInicio} 
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="bg-transparent text-sm font-bold text-slate-700 outline-none w-full"
-              />
-            </div>
-            <span className="text-slate-300 hidden sm:block">/</span>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <input 
-                type="date" 
-                value={fechaFin} 
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="bg-transparent text-sm font-bold text-slate-700 outline-none w-full"
-              />
-            </div>
-          </div>
+          <DateRangeSelector 
+            fechaInicio={fechaInicio} 
+            setFechaInicio={setFechaInicio} 
+            fechaFin={fechaFin} 
+            setFechaFin={setFechaFin} 
+          />
         </div>
 
         {loading ? (

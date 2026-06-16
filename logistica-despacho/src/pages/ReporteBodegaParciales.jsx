@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Search, Calendar, FileText, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import DateRangeSelector from '../components/DateRangeSelector';
 
 const ReporteBodegaParciales = () => {
   const obtenerFechaLocal = () => {
@@ -51,21 +52,12 @@ const ReporteBodegaParciales = () => {
         </div>
         
         <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-sm w-full md:w-auto justify-center">
-            <input 
-              type="date" 
-              value={fechaInicio} 
-              onChange={(e) => setFechaInicio(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
-            />
-            <span className="text-slate-300">/</span>
-            <input 
-              type="date" 
-              value={fechaFin} 
-              onChange={(e) => setFechaFin(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-slate-700 outline-none px-2 cursor-pointer"
-            />
-          </div>
+          <DateRangeSelector 
+            fechaInicio={fechaInicio} 
+            setFechaInicio={setFechaInicio} 
+            fechaFin={fechaFin} 
+            setFechaFin={setFechaFin} 
+          />
 
           <button 
             onClick={cargarReporte} 

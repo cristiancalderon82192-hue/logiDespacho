@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, FilePlus, Calendar, Plus, Trash2, Search, User, UserPlus, X, CheckCircle, Camera, Upload, PenTool, Eye } from 'lucide-react';
+import DateRangeSelector from '../components/DateRangeSelector';
 import SignatureCanvas from 'react-signature-canvas';
 import { socket } from '../utils/socket';
 import { useAuth } from '../context/AuthContext';
@@ -362,22 +363,13 @@ const PendientesBodega = () => {
             className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-[#47B3A8]"
           />
         </div>
-        <div className="flex-1 w-full">
-          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Fecha Factura (Desde)</label>
-          <input 
-            type="date" 
-            value={fechaInicio} 
-            onChange={(e) => setFechaInicio(e.target.value)}
-            className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-[#47B3A8]"
-          />
-        </div>
-        <div className="flex-1 w-full">
-          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Fecha Factura (Hasta)</label>
-          <input 
-            type="date" 
-            value={fechaFin} 
-            onChange={(e) => setFechaFin(e.target.value)}
-            className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-[#47B3A8]"
+        <div className="flex-[2] w-full md:w-auto">
+          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Rango de Fechas</label>
+          <DateRangeSelector 
+            fechaInicio={fechaInicio} 
+            setFechaInicio={setFechaInicio} 
+            fechaFin={fechaFin} 
+            setFechaFin={setFechaFin} 
           />
         </div>
       </div>

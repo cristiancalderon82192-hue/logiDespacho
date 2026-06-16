@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Search, Package, Weight, FileText, MapPin, TrendingUp, Filter, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import DateRangeSelector from '../components/DateRangeSelector';
 
 const DashboardLider = () => {
   const { user } = useAuth();
@@ -100,24 +101,12 @@ const DashboardLider = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full xl:w-auto">
-            <div className="flex items-center gap-2 px-2 bg-white sm:bg-transparent p-2 sm:p-0 rounded border sm:border-none">
-              <Calendar size={16} className="text-slate-400 shrink-0"/>
-              <input 
-                type="date" 
-                value={fechaInicio} 
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-700 outline-none w-full"
-              />
-            </div>
-            <span className="hidden sm:block text-slate-300">/</span>
-            <div className="flex items-center gap-2 px-2 bg-white sm:bg-transparent p-2 sm:p-0 rounded border sm:border-none">
-              <input 
-                type="date" 
-                value={fechaFin} 
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-700 outline-none w-full"
-              />
-            </div>
+            <DateRangeSelector 
+              fechaInicio={fechaInicio} 
+              setFechaInicio={setFechaInicio} 
+              fechaFin={fechaFin} 
+              setFechaFin={setFechaFin} 
+            />
             <button onClick={fetchDatos} className="bg-blue-600 text-white p-2 md:px-4 md:py-2 rounded-md hover:bg-blue-700 transition-colors shadow-sm flex justify-center items-center gap-2 mt-2 sm:mt-0">
               <Search size={18} /> <span className="sm:hidden font-bold">Buscar</span>
             </button>
