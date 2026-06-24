@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Save, Truck, FileText, Calendar, User, Weight, MapPin, Search, 
   DollarSign, Phone, X, CheckCircle, Edit, RefreshCw, UserPlus, CreditCard,
-  Lock, Eye, AlertTriangle, XCircle, Printer, Plus
+  Lock, Eye, AlertTriangle, XCircle, Printer, Plus, UploadCloud, PlusCircle, Trash2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -49,8 +49,10 @@ const PedidosLider = () => {
     nombre_cliente: '', telefono: '', zona_envio: '', destino: '', destino_id: '', 
     estado_entrega: 'Pendiente', 
     peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0,
+    productos: [],
   };
   const [formData, setFormData] = useState(initialFormState);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
   const [pedidos, setPedidos] = useState([]);
   const [fechaFiltro, setFechaFiltro] = useState(hoyLocal); 
@@ -107,6 +109,125 @@ const PedidosLider = () => {
     return () => clearInterval(intervalId); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, fechaFiltro]); 
+
+  const handleUploadPdf = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      return mostrarError("Solo se permiten archivos PDF.");
+    }
+
+    setIsUploadingPdf(true);
+    const formDataPdf = new FormData();
+    formDataPdf.append('facturaPdf', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pdf/extraer-factura`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataPdf
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar PDF');
+      }
+
+      const data = await response.json();
+      
+      let matchCliente = '';
+      let matchTelefono = '';
+      if (data.cliente) {
+        const cli = listaClientes.find(c => c.nombre.toLowerCase().includes(data.cliente.toLowerCase()) || data.cliente.toLowerCase().includes(c.nombre.toLowerCase()));
+        if (cli) {
+          matchCliente = cli.nombre;
+          matchTelefono = cli.telefono;
+        } else {
+          matchCliente = data.cliente;
+          // Si no existe, pre-llenar y abrir modal para crearlo
+          setNewClientData(prev => ({ 
+            ...prev, 
+            nombre: data.cliente,
+            documento: data.nit_cliente || '',
+            telefono: data.telefono_cliente || ''
+          }));
+          setIsCreatingClient(true);
+          setShowClientModal(true);
+          mostrarInfo("El cliente extraído no existe. Por favor completa sus datos para crearlo.");
+        }
+      }
+
+      const nuevosPesos = { peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0 };
+      if (data.productos && data.productos.length > 0) {
+        data.productos.forEach(p => {
+          const bId = p.bodega_id || 1;
+          const peso = Number(p.peso) || 0;
+          if (bId >= 1 && bId <= 8) {
+            nuevosPesos[`peso_b${bId}`] += peso;
+          }
+        });
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        id_factura: data.id_factura || prev.id_factura,
+        valor_factura: data.valor_factura || prev.valor_factura,
+        nombre_cliente: matchCliente || prev.nombre_cliente,
+        telefono: matchTelefono || prev.telefono,
+        productos: data.productos || [],
+        ...nuevosPesos
+      }));
+
+      mostrarExito("PDF Procesado correctamente. Verifica los datos extraídos.");
+
+    } catch (error) {
+      console.error(error);
+      mostrarError("Error procesando PDF: " + error.message);
+    } finally {
+      setIsUploadingPdf(false);
+      e.target.value = null; 
+    }
+  };
+
+  const handleProductoChange = (index, field, value) => {
+    const nuevosProductos = [...(formData.productos || [])];
+    nuevosProductos[index][field] = value;
+
+    if (field === 'cantidad' || field === 'precio_unitario') {
+      nuevosProductos[index].precio_total = (Number(nuevosProductos[index].cantidad) || 0) * (Number(nuevosProductos[index].precio_unitario) || 0);
+    }
+
+    setFormData(prev => ({ ...prev, productos: nuevosProductos }));
+  };
+
+  const eliminarProducto = (index) => {
+    const nuevosProductos = (formData.productos || []).filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, productos: nuevosProductos }));
+  };
+
+  const agregarProducto = () => {
+    const nuevosProductos = [...(formData.productos || []), { descripcion: '', codigo_producto: '', peso: 0, bodega_id: 1, cantidad: 1, unidad_medida: 'und', precio_unitario: 0, precio_total: 0 }];
+    setFormData(prev => ({ ...prev, productos: nuevosProductos }));
+  };
+
+  const recalcularPesos = () => {
+    const nuevosPesos = { peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0 };
+    if (formData.productos && formData.productos.length > 0) {
+      formData.productos.forEach(p => {
+        const bId = Number(p.bodega_id) || 1;
+        const peso = Number(p.peso) || 0;
+        if (bId >= 1 && bId <= 8) {
+          nuevosPesos[`peso_b${bId}`] += peso;
+        }
+      });
+    }
+    setFormData(prev => ({ ...prev, ...nuevosPesos }));
+    mostrarInfo("Pesos de bodegas recalculados.");
+  };
 
   const handleChange = (e) => {
     if (isReadOnly) return; 
@@ -521,12 +642,21 @@ const PedidosLider = () => {
 
                 {/* GRUPO A: DOCUMENTO */}
                 <div className="space-y-3 md:space-y-4">
-                  <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</h3>
+                  <h3 className="text-xs md:text-sm font-bold text-slate-700 border-b pb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-2"><FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"}/> Datos del Documento</span>
+                    {!isReadOnly && (
+                      <label className="cursor-pointer bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-200 text-[10px] md:text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
+                        <UploadCloud size={16} />
+                        {isUploadingPdf ? 'Procesando PDF...' : 'Subir Factura PDF'}
+                        <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadPdf} disabled={isUploadingPdf} />
+                      </label>
+                    )}
+                  </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" /></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
-                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor *</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} required min="0" className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white placeholder:text-slate-300" placeholder="Ej: 150000"/></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor *</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} required min="0" step="any" className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white placeholder:text-slate-300" placeholder="Ej: 150000"/></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Fac.</label><input type="date" name="fecha_facturacion" value={formData.fecha_facturacion} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Hora Registro Entrega</label><input type="time" name="hora_registro" value={formData.hora_registro} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Fecha Promesa</label><input type="date" name="fecha_promesa" value={formData.fecha_promesa} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded disabled:bg-slate-100 bg-white" /></div>
@@ -583,12 +713,77 @@ const PedidosLider = () => {
                   </div>
                 </div>
 
-                {/* GRUPO C: PESOS */}
+                {/* GRUPO C: PRODUCTOS */}
+                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-lg p-3 md:p-4 shadow-sm">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-xs md:text-sm font-bold text-slate-700 flex items-center gap-2">
+                      <FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"} /> 
+                      Detalle de Productos
+                    </h3>
+                    {!isReadOnly && (
+                      <div className="flex gap-2">
+                        <button type="button" onClick={agregarProducto} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
+                          <PlusCircle size={14} /> Añadir Producto
+                        </button>
+                        <button type="button" onClick={recalcularPesos} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
+                          <RefreshCw size={14} /> Recalcular Pesos
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
+                      <thead className="bg-slate-100 text-[10px] text-slate-600 uppercase">
+                        <tr>
+                          <th className="p-2 border">Código</th>
+                          <th className="p-2 border w-1/3">Descripción</th>
+                          <th className="p-2 border text-center">Cant.</th>
+                          <th className="p-2 border text-center">Unidad</th>
+                          <th className="p-2 border text-right">Vr. Unitario</th>
+                          <th className="p-2 border text-right">Vr. Total</th>
+                          <th className="p-2 border text-center">Bodega</th>
+                          <th className="p-2 border text-center">Peso(Kg)</th>
+                          {!isReadOnly && <th className="p-2 border text-center">Acción</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="text-xs">
+                        {formData.productos && formData.productos.length > 0 ? (
+                          formData.productos.map((prod, index) => (
+                            <tr key={index} className="hover:bg-slate-50">
+                              <td className="p-1 border"><input type="text" value={prod.codigo_producto || ''} onChange={(e) => handleProductoChange(index, 'codigo_producto', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent outline-none disabled:text-slate-500" placeholder="Cód..." /></td>
+                              <td className="p-1 border"><input type="text" value={prod.descripcion || ''} onChange={(e) => handleProductoChange(index, 'descripcion', e.target.value)} disabled={isReadOnly} required className="w-full p-1 bg-transparent outline-none font-medium text-slate-700 disabled:text-slate-500" placeholder="Nombre del producto..." /></td>
+                              <td className="p-1 border"><input type="number" step="0.01" value={prod.cantidad} onChange={(e) => handleProductoChange(index, 'cantidad', e.target.value)} disabled={isReadOnly} required className="w-full p-1 bg-transparent text-center outline-none disabled:text-slate-500" /></td>
+                              <td className="p-1 border"><input type="text" value={prod.unidad_medida || ''} onChange={(e) => handleProductoChange(index, 'unidad_medida', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-center outline-none disabled:text-slate-500" placeholder="und" /></td>
+                              <td className="p-1 border"><input type="number" step="0.01" value={prod.precio_unitario} onChange={(e) => handleProductoChange(index, 'precio_unitario', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-right outline-none disabled:text-slate-500" /></td>
+                              <td className="p-1 border bg-slate-50 font-bold text-right text-slate-700">{Number(prod.precio_total || 0).toLocaleString('es-CO', {style: 'currency', currency: 'COP', minimumFractionDigits: 0})}</td>
+                              <td className="p-1 border">
+                                <select value={prod.bodega_id || 1} onChange={(e) => handleProductoChange(index, 'bodega_id', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent outline-none text-center disabled:text-slate-500">
+                                  {[1,2,3,4,5,6,7,8].map(b => <option key={b} value={b}>B{b}</option>)}
+                                </select>
+                              </td>
+                              <td className="p-1 border"><input type="number" step="0.01" value={prod.peso} onChange={(e) => handleProductoChange(index, 'peso', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-center outline-none font-bold text-blue-600 disabled:text-slate-500" /></td>
+                              {!isReadOnly && (
+                                <td className="p-1 border text-center">
+                                  <button type="button" onClick={() => eliminarProducto(index)} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"><Trash2 size={14}/></button>
+                                </td>
+                              )}
+                            </tr>
+                          ))
+                        ) : (
+                          <tr><td colSpan={isReadOnly ? "8" : "9"} className="p-4 text-center text-slate-400">No hay productos. Sube un PDF o añade manualmente.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* GRUPO D: PESOS */}
                 <div className="lg:col-span-2 bg-slate-50 p-3 md:p-4 rounded-lg border border-slate-200">
-                  <h3 className="text-xs md:text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Weight size={16} className={isReadOnly ? "text-slate-400" : ""} /> Carga (Kg)</h3>
+                  <h3 className="text-xs md:text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Weight size={16} className={isReadOnly ? "text-slate-400" : ""} /> Carga Total por Bodega (Kg)</h3>
                   <div className="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                      <div key={num}><label className="block text-[9px] md:text-[10px] font-bold text-slate-400 uppercase text-center">B{num}</label><input type="number" name={`peso_b${num}`} value={formData[`peso_b${num}`]} onChange={handleChange} disabled={isReadOnly} required className="w-full text-center py-2 md:py-1 px-1 border rounded focus:border-blue-500 font-bold text-sm text-slate-700 disabled:bg-slate-100 bg-white"/></div>
+                      <div key={num}><label className="block text-[9px] md:text-[10px] font-bold text-slate-400 uppercase text-center">B{num}</label><input type="number" name={`peso_b${num}`} value={formData[`peso_b${num}`]} onChange={handleChange} disabled={isReadOnly} required step="any" className="w-full text-center py-2 md:py-1 px-1 border rounded focus:border-blue-500 font-bold text-sm text-slate-700 disabled:bg-slate-100 bg-white"/></div>
                     ))}
                   </div>
 
@@ -619,7 +814,11 @@ const PedidosLider = () => {
                 {isCreatingClient ? <UserPlus size={18}/> : <Search size={18}/>} 
                 {isCreatingClient ? 'Registrar Nuevo Cliente' : 'Buscar Cliente'}
               </h3>
-              <button onClick={() => { setShowClientModal(false); setIsCreatingClient(false); }} className="hover:bg-white/20 p-1.5 rounded-full"><X size={18}/></button>
+              <button onClick={() => { 
+                setShowClientModal(false); 
+                setIsCreatingClient(false); 
+                setNewClientData({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
+              }} className="hover:bg-white/20 p-1.5 rounded-full"><X size={18}/></button>
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col">

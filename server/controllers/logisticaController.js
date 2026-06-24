@@ -37,6 +37,17 @@ const getPedidosPorFecha = async (req, res) => {
         p.id_factura ASC
     `;
     const [pedidos] = await db.query(sql, [fecha]);
+
+    // Cargar productos de los pedidos
+    if (pedidos.length > 0) {
+      const pedidosIds = pedidos.map(p => p.id);
+      const [productos] = await db.query(`SELECT * FROM pedidos_productos_detalle WHERE pedido_id IN (?)`, [pedidosIds]);
+      
+      pedidos.forEach(p => {
+        p.productos = productos.filter(prod => prod.pedido_id === p.id);
+      });
+    }
+
     res.json(pedidos);
   } catch (error) {
     console.error("Error al obtener pedidos:", error);
@@ -103,6 +114,16 @@ const asignarRuta = async (req, res) => {
     `;
     await db.query(sql, [conductor_id, vehiculo_id, nuevoNumeroViaje, despachado, valorFacturaPendiente, observaciones_entrega || null, id]);
     
+    // Guardar detalle de productos despachados
+    if (req.body.productos_despachados && Array.isArray(req.body.productos_despachados)) {
+      for (const prod of req.body.productos_despachados) {
+        await db.query(
+          "UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ? AND pedido_id = ?",
+          [prod.cantidad_despachada, prod.id, id]
+        );
+      }
+    }
+    
     res.json({ message: "Ruta y valores asignados exitosamente" });
   } catch (error) {
     console.error("Error al asignar ruta:", error);
@@ -147,6 +168,15 @@ const asignarLote = async (req, res) => {
               observaciones_entrega = ?
           WHERE id = ?
         `, [conductor_id, vehiculo_id, nuevoNumeroViaje, despachado, valorFacturaPendiente, observaciones_entrega || null, id]);
+
+        if (detalle.productos_despachados && Array.isArray(detalle.productos_despachados)) {
+          for (const prod of detalle.productos_despachados) {
+            await db.query(
+              "UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ? AND pedido_id = ?",
+              [prod.cantidad_despachada, prod.id, id]
+            );
+          }
+        }
       }
     }
 
@@ -210,6 +240,17 @@ const getPedidosParciales = async (req, res) => {
       ORDER BY p.fecha_agendada DESC, p.id_factura ASC
     `;
     const [pedidos] = await db.query(sql, params);
+
+    // Cargar productos de los pedidos
+    if (pedidos.length > 0) {
+      const pedidosIds = pedidos.map(p => p.id);
+      const [productos] = await db.query('SELECT * FROM pedidos_productos_detalle WHERE pedido_id IN (?)', [pedidosIds]);
+      
+      pedidos.forEach(p => {
+        p.productos = productos.filter(prod => prod.pedido_id === p.id);
+      });
+    }
+
     res.json(pedidos);
   } catch (error) {
     res.status(500).json({ error: "Error al cargar pedidos parciales" });
@@ -273,6 +314,55 @@ const despacharSaldo = async (req, res) => {
     ]);
 
     const nuevoPedidoId = insertResult.insertId;
+
+    // --- COPIAR Y ACTUALIZAR PRODUCTOS PENDIENTES ---
+    if (item.productos_despachados && Array.isArray(item.productos_despachados)) {
+      // Usar los productos elegidos desde el modal
+      for (const prod of item.productos_despachados) {
+        const cantidadQueSeEnviaAhora = Number(prod.cantidad_despachada);
+        if (cantidadQueSeEnviaAhora > 0) {
+          // 1. Insertar en el hijo (la cantidad del hijo es lo que viaja ahora)
+          await db.query(`
+            INSERT INTO pedidos_productos_detalle 
+            (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total, cantidad_despachada) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          `, [
+            nuevoPedidoId, prod.codigo_producto, prod.descripcion, prod.peso, prod.bodega_id,
+            cantidadQueSeEnviaAhora, prod.unidad_medida, prod.precio_unitario, cantidadQueSeEnviaAhora * Number(prod.precio_unitario)
+          ]);
+          
+          // 2. Actualizar el pedido original sumando la cantidad despachada
+          // Primero leemos la cantidad_despachada actual del original
+          const [originalProd] = await db.query("SELECT cantidad_despachada FROM pedidos_productos_detalle WHERE id = ?", [prod.id]);
+          if (originalProd.length > 0) {
+            const despachadoPrevio = originalProd[0].cantidad_despachada !== null ? Number(originalProd[0].cantidad_despachada) : 0;
+            const nuevoDespachadoAcumulado = despachadoPrevio + cantidadQueSeEnviaAhora;
+            await db.query("UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ?", [nuevoDespachadoAcumulado, prod.id]);
+          }
+        }
+      }
+    } else {
+      // Fallback si no mandan productos_despachados (se asume que envia todo el faltante)
+      const [productosOrig] = await db.query("SELECT * FROM pedidos_productos_detalle WHERE pedido_id = ?", [id]);
+      for (const prod of productosOrig) {
+        const despachado = prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad);
+        const faltante = Number(prod.cantidad) - despachado;
+        if (faltante > 0) {
+          await db.query(`
+            INSERT INTO pedidos_productos_detalle 
+            (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total, cantidad_despachada) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          `, [
+            nuevoPedidoId, prod.codigo_producto, prod.descripcion, prod.peso, prod.bodega_id,
+            faltante, prod.unidad_medida, prod.precio_unitario, faltante * Number(prod.precio_unitario)
+          ]);
+
+          // Actualizar original sumando todo el faltante (se enviaron todos)
+          await db.query("UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ?", [despachado + faltante, prod.id]);
+        }
+      }
+    }
+    // ------------------------------------
 
     for (const det of detalles) {
       const pesoNum = parseFloat(det.peso) || 0;
@@ -362,6 +452,49 @@ const despacharLoteSaldos = async (req, res) => {
       ]);
 
       const nuevoPedidoId = insertResult.insertId;
+
+            // --- COPIAR Y ACTUALIZAR PRODUCTOS PENDIENTES ---
+      if (item.productos_despachados && Array.isArray(item.productos_despachados)) {
+        for (const prod of item.productos_despachados) {
+          const cantidadQueSeEnviaAhora = Number(prod.cantidad_despachada);
+          if (cantidadQueSeEnviaAhora > 0) {
+            await db.query(`
+              INSERT INTO pedidos_productos_detalle 
+              (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total, cantidad_despachada) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            `, [
+              nuevoPedidoId, prod.codigo_producto, prod.descripcion, prod.peso, prod.bodega_id,
+              cantidadQueSeEnviaAhora, prod.unidad_medida, prod.precio_unitario, cantidadQueSeEnviaAhora * Number(prod.precio_unitario)
+            ]);
+            
+            const [originalProd] = await db.query("SELECT cantidad_despachada FROM pedidos_productos_detalle WHERE id = ?", [prod.id]);
+            if (originalProd.length > 0) {
+              const despachadoPrevio = originalProd[0].cantidad_despachada !== null ? Number(originalProd[0].cantidad_despachada) : 0;
+              const nuevoDespachadoAcumulado = despachadoPrevio + cantidadQueSeEnviaAhora;
+              await db.query("UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ?", [nuevoDespachadoAcumulado, prod.id]);
+            }
+          }
+        }
+      } else {
+        const [productosOrig] = await db.query("SELECT * FROM pedidos_productos_detalle WHERE pedido_id = ?", [id]);
+        for (const prod of productosOrig) {
+          const despachado = prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad);
+          const faltante = Number(prod.cantidad) - despachado;
+          if (faltante > 0) {
+            await db.query(`
+              INSERT INTO pedidos_productos_detalle 
+              (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total, cantidad_despachada) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            `, [
+              nuevoPedidoId, prod.codigo_producto, prod.descripcion, prod.peso, prod.bodega_id,
+              faltante, prod.unidad_medida, prod.precio_unitario, faltante * Number(prod.precio_unitario)
+            ]);
+
+            await db.query("UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ?", [despachado + faltante, prod.id]);
+          }
+        }
+      }
+      // ------------------------------------
 
       for (const det of detalles) {
         const pesoNum = parseFloat(det.peso) || 0;

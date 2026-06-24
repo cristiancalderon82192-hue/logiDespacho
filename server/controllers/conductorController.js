@@ -48,6 +48,16 @@ const getMisRutas = async (req, res) => {
     `;
     
     const [rutas] = await db.query(sql, [conductor_id, fecha]);
+    
+    // FETCH PRODUCTOS
+    if (rutas.length > 0) {
+      const pedidosIds = rutas.map(p => p.id);
+      const [productos] = await db.query('SELECT * FROM pedidos_productos_detalle WHERE pedido_id IN (?)', [pedidosIds]);
+      rutas.forEach(ruta => {
+        ruta.productos = productos.filter(prod => prod.pedido_id === ruta.id);
+      });
+    }
+
     res.json(rutas);
     
   } catch (error) {
@@ -60,7 +70,7 @@ const getMisRutas = async (req, res) => {
 const actualizarEstado = async (req, res) => {
   require('fs').appendFileSync('debug_wa.log', `Entro a actualizarEstado con id ${req.params.id}\n`);
   const { id } = req.params;
-  const { estado, observacion_devolucion, valor_devolucion, firma_cliente, valor_recaudado } = req.body;
+  const { estado, observacion_devolucion, valor_devolucion, firma_cliente, valor_recaudado, productos_novedad } = req.body;
 
   if (!estado) return res.status(400).json({ error: "El estado es requerido" });
 
@@ -85,7 +95,28 @@ const actualizarEstado = async (req, res) => {
       params = [estado, horaColombia, firma_cliente || null, recaudoReal, id];
     } 
     else if (estado === 'Devolución' || estado === 'Entregado Incompleto') {
-      const valorDevolver = parseFloat(valor_devolucion) || 0;
+      let valorDevolver = parseFloat(valor_devolucion) || 0;
+      
+      // Si el frontend envía productos_novedad, calculamos el valor y actualizamos BD
+      if (productos_novedad && Array.isArray(productos_novedad)) {
+        valorDevolver = 0;
+        for (const prodNov of productos_novedad) {
+          const faltante = Number(prodNov.faltante);
+          if (faltante > 0) {
+            // Obtenemos el precio unitario actual y la cantidad despachada
+            const [pDet] = await db.query("SELECT precio_unitario, cantidad_despachada FROM pedidos_productos_detalle WHERE id = ?", [prodNov.id]);
+            if (pDet.length > 0) {
+               const precioU = Number(pDet[0].precio_unitario) || 0;
+               valorDevolver += (faltante * precioU);
+               
+               // Restamos la cantidad faltante a la cantidad_despachada para que el sistema de saldos la detecte
+               const despachadoPre = pDet[0].cantidad_despachada !== null ? Number(pDet[0].cantidad_despachada) : 0;
+               const nuevoDespachado = despachadoPre - faltante;
+               await db.query("UPDATE pedidos_productos_detalle SET cantidad_despachada = ? WHERE id = ?", [nuevoDespachado >= 0 ? nuevoDespachado : 0, prodNov.id]);
+            }
+          }
+        }
+      }
       const deudaActual = parseFloat(pedido.valor_factura_pendiente) || 0;
       
       let despachadoActual = parseFloat(pedido.total_despachado);

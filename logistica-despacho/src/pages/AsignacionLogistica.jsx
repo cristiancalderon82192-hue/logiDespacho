@@ -72,14 +72,88 @@ const AsignacionLogistica = () => {
     );
   };
 
+
+  const handleProductoLoteChange = (pedidoId, prodId, nuevaCantidad) => {
+    setDetallesLote(prev => {
+      const det = prev[pedidoId];
+      if (!det) return prev;
+      const nuevosProductos = det.productos.map(p => 
+        p.id === prodId ? { ...p, cantidad_despachada: Number(nuevaCantidad) } : p
+      );
+      
+      let nuevoValor = 0;
+      const faltantes = [];
+      nuevosProductos.forEach(p => {
+        nuevoValor += p.cantidad_despachada * Number(p.precio_unitario);
+        if (p.cantidad_despachada < p.cantidad) {
+          faltantes.push(`${p.cantidad - p.cantidad_despachada}x ${p.descripcion}`);
+        }
+      });
+      
+      const observaciones = faltantes.length > 0 ? `FALTAN: ${faltantes.join(', ')}` : '';
+      
+      return {
+        ...prev,
+        [pedidoId]: {
+          ...det,
+          productos: nuevosProductos,
+          valor_despachar: nuevoValor,
+          observacion: observaciones
+        }
+      };
+    });
+  };
+
+  const handleProductoIndividualChange = (prodId, nuevaCantidad) => {
+    setAsignacionIndividual(prev => {
+      const nuevosProductos = prev.productos_despachados.map(p => 
+        p.id === prodId ? { ...p, cantidad_despachada: Number(nuevaCantidad) } : p
+      );
+      
+      let nuevoValor = 0;
+      const faltantes = [];
+      nuevosProductos.forEach(p => {
+        nuevoValor += p.cantidad_despachada * Number(p.precio_unitario);
+        if (p.cantidad_despachada < p.cantidad) {
+          faltantes.push(`${p.cantidad - p.cantidad_despachada}x ${p.descripcion}`);
+        }
+      });
+      
+      const observaciones = faltantes.length > 0 ? `FALTAN: ${faltantes.join(', ')}` : '';
+      
+      return {
+        ...prev,
+        productos_despachados: nuevosProductos,
+        total_despachado: nuevoValor,
+        observaciones_entrega: observaciones
+      };
+    });
+  };
+
+  const toggleExpandirLote = (pedidoId) => {
+    setDetallesLote(prev => ({
+      ...prev,
+      [pedidoId]: {
+        ...prev[pedidoId],
+        expandido: !prev[pedidoId].expandido
+      }
+    }));
+  };
+
   const handleAbrirModalLote = () => {
     const valoresIniciales = {};
     pedidosFiltrados
       .filter(p => pedidosSeleccionados.includes(p.id))
       .forEach(p => {
+        const productosInit = p.productos ? p.productos.map(prod => ({
+          ...prod,
+          cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad)
+        })) : [];
         valoresIniciales[p.id] = {
           valor_despachar: p.valor_factura || 0,
-          observacion: ''
+          observacion: '',
+          productos: productosInit,
+          expandido: false
         };
       });
     setDetallesLote(valoresIniciales);
@@ -120,7 +194,8 @@ const AsignacionLogistica = () => {
       payloadDetalles.push({
         id: pId,
         total_despachado: det.valor_despachar,
-        observaciones_entrega: det.observacion
+        observaciones_entrega: det.observacion,
+        productos_despachados: det.productos
       });
     }
 
@@ -160,11 +235,17 @@ const AsignacionLogistica = () => {
     if (['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedido.estado_entrega)) return;
 
     setPedidoIndividual(pedido);
+    const productosInit = pedido.productos ? pedido.productos.map(prod => ({
+      ...prod,
+      cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad)
+    })) : [];
+
     setAsignacionIndividual({ 
       conductor_id: pedido.conductor_id || '', 
       vehiculo_id: pedido.vehiculo_id || '',
       total_despachado: pedido.total_despachado || pedido.valor_factura || '',
-      observaciones_entrega: pedido.observaciones_entrega || '' 
+      observaciones_entrega: pedido.observaciones_entrega || '',
+      productos_despachados: productosInit
     });
     setShowModalIndividual(true);
   };
@@ -549,6 +630,39 @@ const AsignacionLogistica = () => {
                               />
                             </div>
                           )}
+
+                          {det.productos && det.productos.length > 0 && (
+                            <div className="mt-2 text-[10px] sm:text-xs">
+                              <button type="button" onClick={() => toggleExpandirLote(p.id)} className="w-full text-left bg-slate-200 hover:bg-slate-300 transition-colors p-2 rounded flex justify-between items-center font-bold text-slate-700">
+                                Detalle de Productos ({det.productos.length})
+                                <span>{det.expandido ? '▲' : '▼'}</span>
+                              </button>
+                              {det.expandido && (
+                                <div className="mt-1 border border-slate-200 rounded">
+                                  <table className="w-full text-left bg-white">
+                                    <thead className="bg-slate-100 border-b border-slate-200 text-slate-500">
+                                      <tr>
+                                        <th className="p-2 font-bold w-1/2">Producto</th>
+                                        <th className="p-2 font-bold text-center">Orig.</th>
+                                        <th className="p-2 font-bold text-center w-24">Despacho</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {det.productos.map(prod => (
+                                        <tr key={prod.id} className="border-b border-slate-100 last:border-0">
+                                          <td className="p-2 truncate max-w-[120px] sm:max-w-[200px]" title={prod.descripcion}>{prod.descripcion}</td>
+                                          <td className="p-2 text-center text-slate-500">{prod.cantidad}</td>
+                                          <td className="p-2">
+                                            <input type="number" min="0" max={prod.cantidad} value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} onChange={(e) => handleProductoLoteChange(p.id, prod.id, e.target.value)} className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" />
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -567,7 +681,7 @@ const AsignacionLogistica = () => {
         {/* ================= MODAL DE EDICIÓN INDIVIDUAL ================= */}
         {showModalIndividual && pedidoIndividual && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] max-h-[95vh] overflow-hidden flex flex-col">
               
               <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -580,7 +694,7 @@ const AsignacionLogistica = () => {
                 <button onClick={() => setShowModalIndividual(false)} className="hover:bg-white/10 p-1.5 rounded-full transition-colors"><X size={20}/></button>
               </div>
 
-              <form onSubmit={handleAsignarIndividual} className="p-6 space-y-6 flex-1 overflow-y-auto">
+              <form onSubmit={handleAsignarIndividual} className="p-6 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
                   <p className="text-sm font-medium text-slate-600 mb-2">Destino:</p>
                   <div className="flex items-center gap-2 mb-4">
@@ -635,6 +749,44 @@ const AsignacionLogistica = () => {
                         rows="2" 
                         required 
                       />
+                    </div>
+                  )}
+
+                  {asignacionIndividual.productos_despachados && asignacionIndividual.productos_despachados.length > 0 && (
+                    <div className="mt-4 text-[10px] sm:text-xs animate-fadeIn">
+                      <button 
+                        type="button" 
+                        onClick={() => setAsignacionIndividual({...asignacionIndividual, expandido: !asignacionIndividual.expandido})} 
+                        className="w-full text-left bg-slate-200 hover:bg-slate-300 transition-colors p-2 rounded flex justify-between items-center font-bold text-slate-700 mb-1"
+                      >
+                        Detalle de Productos ({asignacionIndividual.productos_despachados.length})
+                        <span>{asignacionIndividual.expandido ? '▲' : '▼'}</span>
+                      </button>
+                      
+                      {asignacionIndividual.expandido && (
+                        <div className="border border-slate-200 rounded overflow-hidden">
+                          <table className="w-full text-left bg-white">
+                            <thead className="bg-slate-100 border-b border-slate-200 text-slate-500">
+                              <tr>
+                                <th className="p-2 font-bold w-1/2">Producto</th>
+                                <th className="p-2 font-bold text-center">Orig.</th>
+                                <th className="p-2 font-bold text-center w-24">Despacho</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {asignacionIndividual.productos_despachados.map(prod => (
+                                <tr key={prod.id} className="border-b border-slate-100 last:border-0">
+                                  <td className="p-2 truncate max-w-[120px] sm:max-w-[180px]" title={prod.descripcion}>{prod.descripcion}</td>
+                                  <td className="p-2 text-center text-slate-500">{prod.cantidad}</td>
+                                  <td className="p-2">
+                                    <input type="number" min="0" max={prod.cantidad} value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} onChange={(e) => handleProductoIndividualChange(prod.id, e.target.value)} className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -70,6 +70,49 @@ const ReporteParciales = () => {
     );
   };
 
+
+  const handleProductoLoteChange = (pedidoId, prodId, nuevaCantidad) => {
+    setDetallesLote(prev => {
+      const det = prev[pedidoId];
+      if (!det || !det.productos) return prev;
+      
+      const nuevosProductos = det.productos.map(p => 
+        p.id === prodId ? { ...p, cantidad_despachada: Number(nuevaCantidad) } : p
+      );
+      
+      let nuevoValor = 0;
+      const faltantes = [];
+      nuevosProductos.forEach(p => {
+        nuevoValor += p.cantidad_despachada * Number(p.precio_unitario);
+        if (p.cantidad_despachada < p.faltante) {
+          faltantes.push(`${p.faltante - p.cantidad_despachada}x ${p.descripcion}`);
+        }
+      });
+      
+      const observaciones = faltantes.length > 0 ? `FALTAN: ${faltantes.join(', ')}` : '';
+      
+      return {
+        ...prev,
+        [pedidoId]: {
+          ...det,
+          productos: nuevosProductos,
+          valor_despachar: nuevoValor,
+          observacion: observaciones
+        }
+      };
+    });
+  };
+
+  const toggleExpandirLote = (pedidoId) => {
+    setDetallesLote(prev => ({
+      ...prev,
+      [pedidoId]: {
+        ...prev[pedidoId],
+        expandido: !prev[pedidoId].expandido
+      }
+    }));
+  };
+
   const handleAbrirModalLote = () => {
     const valoresIniciales = {};
     pedidos
@@ -108,10 +151,27 @@ const ReporteParciales = () => {
           detallesPrecargados = [{ bodega_id: '', peso: '' }];
         }
 
+        const productosInit = [];
+        if (p.productos) {
+          p.productos.forEach(prod => {
+            const despachadoPreviamente = prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad);
+            const faltante = Number(prod.cantidad) - despachadoPreviamente;
+            if (faltante > 0) {
+              productosInit.push({
+                ...prod,
+                faltante: faltante,
+                cantidad_despachada: faltante // Por defecto asume que enviará todo el saldo restante
+              });
+            }
+          });
+        }
+        
         valoresIniciales[p.id] = {
           valor_despachar: p.valor_factura_pendiente || 0,
           observacion: '',
-          detalles: detallesPrecargados // Precarga lista
+          detalles: detallesPrecargados,
+          productos: productosInit,
+          expandido: false
         };
       });
     setDetallesLote(valoresIniciales);
@@ -167,18 +227,37 @@ const ReporteParciales = () => {
         return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} sigue incompleta. Es OBLIGATORIO escribir una justificación.`);
       }
 
-      const detallesValidos = det.detalles.every(d => d.bodega_id !== '' && d.peso !== '' && Number(d.peso) > 0);
-      if (!detallesValidos) {
-        return mostrarError(`❌ ALERTA: Verifica las bodegas y pesos de la factura ${pedidoOriginal.id_factura}. Deben ser válidos.`);
-      }
+
 
       // Agrupamos la info de esta factura
+      // Autogenerar "detalles" para compatibilidad con backend (agrupando por bodega el peso de productos seleccionados)
+      const bodegasMap = {};
+      if (det.productos && det.productos.length > 0) {
+        det.productos.forEach(prod => {
+          const despachado = Number(prod.cantidad_despachada || 0);
+          if (despachado > 0) {
+            const pesoUnitario = Number(prod.cantidad) > 0 ? Number(prod.peso) / Number(prod.cantidad) : 0;
+            const pesoEnviar = pesoUnitario * despachado;
+            if (prod.bodega_id) {
+              if (!bodegasMap[prod.bodega_id]) bodegasMap[prod.bodega_id] = 0;
+              bodegasMap[prod.bodega_id] += pesoEnviar;
+            }
+          }
+        });
+      }
+      
+      const detallesAuto = Object.keys(bodegasMap).map(bid => ({
+        bodega_id: bid,
+        peso: bodegasMap[bid]
+      }));
+
       payloadDetalles.push({
         id: pId,
         valor_despachar: det.valor_despachar,
         observaciones_entrega: det.observacion,
-        detalles: det.detalles,
-        nota_despacho: "(LOTE SALDOS)" 
+        detalles: detallesAuto.length > 0 ? detallesAuto : [],
+        nota_despacho: "(LOTE SALDOS)",
+        productos_despachados: det.productos
       });
     }
 
@@ -343,7 +422,7 @@ const ReporteParciales = () => {
         {/* ================= MODAL LOTE DE SALDOS ================= */}
         {showModalLote && (
           <div className="fixed inset-0 bg-slate-900/80 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[95vh]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1200px] overflow-hidden flex flex-col max-h-[95vh]">
               
               <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -423,28 +502,6 @@ const ReporteParciales = () => {
                             </div>
                           </div>
                           
-                          {/* Control de Bodegas por Factura */}
-                          <div className="space-y-2 mb-3 bg-white p-2 rounded border border-slate-200">
-                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Building2 size={10} className="text-orange-500"/> Origen</label>
-                                <button type="button" onClick={() => handleAddDetalleLote(p.id)} className="text-[9px] text-blue-600 font-bold hover:underline">+ Fila</button>
-                             </div>
-                             {det.detalles.map((filaBodega, iBod) => (
-                               <div key={iBod} className="flex gap-2">
-                                 <select value={filaBodega.bodega_id} onChange={(e) => handleDetalleLoteChange(p.id, iBod, 'bodega_id', e.target.value)} className="flex-1 border border-slate-300 p-1.5 rounded text-xs outline-none bg-slate-50" required>
-                                   <option value="">Bodega...</option>
-                                   {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
-                                 </select>
-                                 <div className="w-20 relative">
-                                   <input type="number" value={filaBodega.peso} onChange={(e) => handleDetalleLoteChange(p.id, iBod, 'peso', e.target.value)} className="w-full border border-slate-300 p-1.5 rounded text-xs outline-none bg-slate-50 text-center" placeholder="Kg" required />
-                                 </div>
-                                 {det.detalles.length > 1 && (
-                                   <button type="button" onClick={() => handleRemoveDetalleLote(p.id, iBod)} className="text-red-500"><Trash2 size={12}/></button>
-                                 )}
-                               </div>
-                             ))}
-                          </div>
-
                           {/* Valor a Despachar de esta factura */}
                           <div className="relative mb-2">
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 font-bold pointer-events-none">$</span>
@@ -466,6 +523,52 @@ const ReporteParciales = () => {
                                 className="w-full border border-red-300 bg-red-50 p-2 rounded text-xs outline-none focus:border-red-500 text-slate-800 resize-none"
                                 rows="2" required={esParcial}
                               />
+                            </div>
+                          )}
+
+                          {det.productos && det.productos.length > 0 && (
+                            <div className="mt-3 text-[10px] sm:text-xs">
+                              <button type="button" onClick={() => toggleExpandirLote(p.id)} className="w-full text-left bg-slate-200 hover:bg-slate-300 transition-colors p-2 rounded flex justify-between items-center font-bold text-slate-700">
+                                Detalle de Productos Pendientes ({det.productos.length})
+                                <span>{det.expandido ? '▲' : '▼'}</span>
+                              </button>
+                              {det.expandido && (
+                                <div className="mt-1 border border-slate-200 rounded">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left bg-white text-[10px] sm:text-xs">
+                                      <thead className="bg-slate-100 border-b border-slate-200 text-slate-500">
+                                        <tr>
+                                          <th className="p-2 font-bold text-[10px]">Código</th>
+                                          <th className="p-2 font-bold w-1/3 text-[10px]">Producto</th>
+                                          <th className="p-2 font-bold text-[10px]">Bodega</th>
+                                          <th className="p-2 font-bold text-center text-[10px]">Peso</th>
+                                          <th className="p-2 font-bold text-center text-[10px]">Unitario</th>
+                                          <th className="p-2 font-bold text-center text-[10px] text-red-500">Deuda</th>
+                                          <th className="p-2 font-bold text-center w-20 text-[10px] text-blue-600">Despacho</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {det.productos.map(prod => {
+                                          const bodegaNombre = bodegas.find(b => b.id === Number(prod.bodega_id))?.nombre || 'N/A';
+                                          return (
+                                            <tr key={prod.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                              <td className="p-2 text-[10px] text-slate-500">{prod.codigo_producto || '-'}</td>
+                                              <td className="p-2 truncate max-w-[150px] text-[10px]" title={prod.descripcion}>{prod.descripcion}</td>
+                                              <td className="p-2 text-[10px] text-slate-600 truncate max-w-[100px]" title={bodegaNombre}>{bodegaNombre}</td>
+                                              <td className="p-2 text-center text-[10px] text-slate-500">{prod.peso} Kg</td>
+                                              <td className="p-2 text-center text-[10px] text-slate-500">${Number(prod.precio_unitario || 0).toLocaleString()}</td>
+                                              <td className="p-2 text-center text-[11px] font-bold text-red-500">{prod.faltante}</td>
+                                              <td className="p-2">
+                                                <input type="number" min="0" max={prod.faltante} value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.faltante} onChange={(e) => handleProductoLoteChange(p.id, prod.id, e.target.value)} className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8] text-[11px]" />
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

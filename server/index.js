@@ -21,6 +21,7 @@ const logisticaRoutes = require('./routes/logisticaRoutes');
 const conductorRoutes = require('./routes/conductorRoutes');
 const movimientosRoutes = require('./routes/movimientosRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
 const whatsappService = require('./services/whatsappService');
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/reportes/movimientos', movimientosRoutes);
 app.use('/api/assistant', require('./routes/assistantRoutes'));
 app.use('/api/test', require('./routes/testRoutes'));
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/pdf', pdfRoutes);
 // ==============================================================
 // 4. CONFIGURACIÓN DE WEBSOCKETS (GPS EN TIEMPO REAL Y SESIONES)
 // ==============================================================

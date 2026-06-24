@@ -49,7 +49,7 @@ const DashboardConductor = () => {
   const [pedidoDevolucion, setPedidoDevolucion] = useState(null);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [valorDevolucion, setValorDevolucion] = useState('');
-  const [devolucionesBodegas, setDevolucionesBodegas] = useState([{ bodegaId: '', peso: '' }]);
+  const [productosNovedad, setProductosNovedad] = useState([]);
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
   const sigCanvasDev = useRef({}); 
 
@@ -323,30 +323,28 @@ const DashboardConductor = () => {
 
   const abrirModalDevolucion = (pedido) => {
     setPedidoDevolucion(pedido);
-    setMotivoDevolucion(''); setValorDevolucion(''); setDevolucionesBodegas([{ bodegaId: '', peso: '' }]); setPasoDevolucion(1); 
+    setMotivoDevolucion('');
+    
+    if (pedido.productos) {
+      const prodIniciales = pedido.productos.map(p => ({ ...p, faltante: 0 }));
+      setProductosNovedad(prodIniciales);
+    } else {
+      setProductosNovedad([]);
+    }
+    
+    setPasoDevolucion(1); 
     setShowModalDevolucion(true);
-  };
-
-  const agregarBodegaDevolucion = () => setDevolucionesBodegas([...devolucionesBodegas, { bodegaId: '', peso: '' }]);
-  const eliminarBodegaDevolucion = (index) => setDevolucionesBodegas(devolucionesBodegas.filter((_, i) => i !== index));
-  const actualizarBodegaDevolucion = (index, campo, valor) => {
-    const nuevo = [...devolucionesBodegas]; nuevo[index][campo] = valor; setDevolucionesBodegas(nuevo);
   };
 
   const validarDatosDevolucion = (e) => {
     e.preventDefault();
-    for (let i = 0; i < devolucionesBodegas.length; i++) {
-      if (!devolucionesBodegas[i].bodegaId) return mostrarInfo(`Selecciona bodega en fila ${i + 1}.`);
-      if (!devolucionesBodegas[i].peso || Number(devolucionesBodegas[i].peso) <= 0) return mostrarInfo(`Ingresa peso válido en fila ${i + 1}.`);
-    }
     if (!motivoDevolucion.trim()) return mostrarError("Debes escribir el motivo de la novedad.");
     
-    let carga = parseFloat(pedidoDevolucion.total_despachado);
-    if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);
-    const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
+    const hayFaltante = productosNovedad.some(p => Number(p.faltante) > 0);
+    if (!hayFaltante) return mostrarInfo("Debes reportar al menos 1 producto faltante o roto.");
 
-    if (valorD <= 0) return mostrarInfo("El valor de la novedad no puede ser cero.");
-    if (valorD > carga) return mostrarInfo(`Reportas $${valorD.toLocaleString()}, pero llevas $${carga.toLocaleString()}.`);
+    const superaDespacho = productosNovedad.some(p => Number(p.faltante) > Number(p.cantidad_despachada !== null ? p.cantidad_despachada : p.cantidad));
+    if (superaDespacho) return mostrarInfo("No puedes reportar más faltantes de los que llevas en el camión.");
 
     setPasoDevolucion(2);
   };
@@ -359,15 +357,16 @@ const DashboardConductor = () => {
     let carga = parseFloat(pedidoDevolucion.total_despachado);
     if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);
     
-    const valorD = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0; 
-    const valorRecaudado = carga - valorD;
+    const valorD = productosNovedad.reduce((acc, p) => acc + (Number(p.faltante) * Number(p.precio_unitario)), 0);
+    const valorRecaudado = Math.max(0, carga - valorD);
     const estadoReal = valorRecaudado > 0 ? 'Entregado Incompleto' : 'Devolución';
 
-    const detallesBodegas = devolucionesBodegas.map(dev => {
-      const nombreBodega = bodegas.find(b => String(b.id) === String(dev.bodegaId))?.nombre || 'Bodega';
-      return `${nombreBodega}: ${dev.peso}Kg`;
-    }).join(' | ');
-    const notaEnriquecida = `[Retornos -> ${detallesBodegas}] ${motivoDevolucion}`;
+    const detallesNovedad = productosNovedad
+      .filter(p => Number(p.faltante) > 0)
+      .map(p => `${p.faltante}x ${p.descripcion}`)
+      .join(', ');
+
+    const notaEnriquecida = `[Faltó/Devuelto: ${detallesNovedad}] ${motivoDevolucion}`;
 
     const payloadAlerta = {
       factura: pedidoDevolucion.id_factura,
@@ -377,7 +376,15 @@ const DashboardConductor = () => {
       conductor: user?.nombre_completo || user?.email || 'Conductor'
     };
 
-    const body = { estado: estadoReal, observaciones_entrega: notaEnriquecida, observacion_devolucion: notaEnriquecida, valor_devolucion: valorD, valor_recaudado: valorRecaudado, firma_cliente: firmaBase64 };
+    const body = { 
+      estado: estadoReal, 
+      observaciones_entrega: notaEnriquecida, 
+      observacion_devolucion: notaEnriquecida, 
+      valor_devolucion: valorD, 
+      valor_recaudado: valorRecaudado, 
+      firma_cliente: firmaBase64,
+      productos_novedad: productosNovedad
+    };
     const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`;
 
     setShowModalDevolucion(false);
@@ -389,7 +396,7 @@ const DashboardConductor = () => {
 
   let totalModal = parseFloat(pedidoDevolucion?.total_despachado);
   if (isNaN(totalModal) || totalModal <= 0) totalModal = parseFloat(pedidoDevolucion?.valor_factura || 0);
-  const devModal = parseFloat(String(valorDevolucion).replace(/[^0-9]/g, '')) || 0;
+  const devModal = productosNovedad.reduce((acc, p) => acc + (Number(p.faltante) * Number(p.precio_unitario)), 0);
   const aRecaudarModal = Math.max(0, totalModal - devModal);
 
   const totalPeso = rutas.reduce((acc, r) => acc + Number(r.total_peso || 0), 0);
@@ -658,74 +665,39 @@ const DashboardConductor = () => {
             {pasoDevolucion === 1 ? (
               <form onSubmit={validarDatosDevolucion} className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                 
-                <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
-                  <label className="text-[11px] font-bold text-red-800 uppercase mb-2 block">¿Cuánta plata en mercancía hizo falta o se devuelve?</label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-red-700 font-bold"><DollarSign size={18}/></span>
-                    <input 
-                      type="text" 
-                      inputMode="numeric"
-                      value={valorDevolucion ? Number(String(valorDevolucion).replace(/[^0-9]/g, '')).toLocaleString('es-CO') : ''} 
-                      onChange={(e) => setValorDevolucion(e.target.value.replace(/[^0-9]/g, ''))} 
-                      className="w-full pl-9 border-2 border-red-200 p-3 rounded-xl focus:border-red-500 outline-none text-red-900 font-extrabold text-lg bg-white transition-colors" 
-                      placeholder="Ej: 350000" 
-                      required 
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="text-[11px] font-bold text-orange-800 uppercase block">Datos para Reenvío (Logística)</label>
-                    <button 
-                      type="button" 
-                      onClick={agregarBodegaDevolucion} 
-                      className="text-[10px] bg-orange-200 text-orange-800 px-2 py-1 rounded font-bold uppercase hover:bg-orange-300 transition-colors flex items-center gap-1 shadow-sm"
-                    >
-                      <Plus size={12}/> Agregar
-                    </button>
-                  </div>
-
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm max-h-64 overflow-y-auto custom-scrollbar">
+                  <label className="text-[11px] font-bold text-orange-800 uppercase mb-3 block">Productos de la Factura</label>
                   <div className="space-y-3">
-                    {devolucionesBodegas.map((dev, index) => (
-                      <div key={index} className="flex gap-2 items-end">
-                        <div className="flex-1">
-                          {index === 0 && <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Building2 size={12}/> Bodega</label>}
-                          <select 
-                            value={dev.bodegaId} 
-                            onChange={(e) => actualizarBodegaDevolucion(index, 'bodegaId', e.target.value)} 
-                            className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold" 
-                            required
-                          >
-                            <option value="">Selecciona...</option>
-                            {bodegas.map(b => (<option key={b.id} value={b.id}>{b.nombre}</option>))}
-                          </select>
+                    {productosNovedad.length === 0 ? (
+                       <p className="text-xs text-orange-700 text-center py-2">No hay productos registrados para este pedido.</p>
+                    ) : productosNovedad.map((prod, index) => {
+                      const maxLlevado = prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad);
+                      return (
+                      <div key={prod.id} className="flex gap-2 items-center bg-white p-2 rounded-lg border border-orange-100 shadow-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] text-slate-500 font-bold uppercase truncate">{prod.codigo_producto || 'S/N'}</p>
+                          <p className="text-xs font-bold text-slate-800 leading-tight truncate">{prod.descripcion}</p>
+                          <p className="text-[10px] text-slate-400 font-medium truncate">Llevas: {maxLlevado} {prod.unidad_medida} | ${(Number(prod.precio_unitario)).toLocaleString('es-CO')}</p>
                         </div>
-                        <div className="w-[70px] shrink-0">
-                          {index === 0 && <label className="text-[10px] font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><Weight size={12}/> Kg</label>}
+                        <div className="w-[80px] shrink-0 text-center">
+                          <label className="text-[9px] font-bold text-red-600 uppercase mb-1 block leading-tight">Faltante</label>
                           <input 
                             type="number" 
-                            step="0.1" 
-                            min="0.1"
-                            value={dev.peso} 
-                            onChange={(e) => actualizarBodegaDevolucion(index, 'peso', e.target.value)} 
-                            className="w-full border-2 border-orange-200 p-2.5 rounded-lg focus:border-orange-500 outline-none text-slate-700 bg-white text-xs font-bold px-1 text-center" 
-                            placeholder="Ej: 50" 
-                            required 
+                            min="0"
+                            max={maxLlevado}
+                            value={prod.faltante === 0 ? '' : prod.faltante} 
+                            onChange={(e) => {
+                              const nuevo = [...productosNovedad];
+                              const val = e.target.value === '' ? 0 : Number(e.target.value);
+                              nuevo[index].faltante = val > maxLlevado ? maxLlevado : val;
+                              setProductosNovedad(nuevo);
+                            }} 
+                            className="w-full border-2 border-red-200 p-2 rounded-lg focus:border-red-500 outline-none text-red-700 bg-red-50 text-xs font-bold text-center transition-colors" 
+                            placeholder="0" 
                           />
                         </div>
-                        {devolucionesBodegas.length > 1 && (
-                          <button 
-                            type="button" 
-                            onClick={() => eliminarBodegaDevolucion(index)} 
-                            className={`p-2 text-red-500 bg-red-100 hover:bg-red-200 rounded-lg shrink-0 border border-red-200 ${index === 0 ? 'mb-0' : ''}`}
-                            style={index === 0 ? { marginBottom: '2px' } : {}}
-                          >
-                            <X size={18} />
-                          </button>
-                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
 
