@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, FilePlus, Calendar, Plus, Trash2, Search, User, UserPlus, X, CheckCircle, Camera, Upload, PenTool, Eye } from 'lucide-react';
+import { Package, FilePlus, Calendar, Plus, Trash2, Search, User, UserPlus, X, CheckCircle, Camera, Upload, PenTool, Eye, UploadCloud, Weight } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
 import SignatureCanvas from 'react-signature-canvas';
 import { socket } from '../utils/socket';
 import { useAuth } from '../context/AuthContext';
 import { mostrarExito, mostrarError, mostrarInfo, confirmarAccion, alertaModal } from '../utils/alertas';
-
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 const PendientesBodega = () => {
   const { user } = useAuth();
   const [pendientes, setPendientes] = useState([]);
@@ -26,8 +27,9 @@ const PendientesBodega = () => {
   const [fechaFin, setFechaFin] = useState(hoy);
   const [filtroFactura, setFiltroFactura] = useState('');
   
-  const [formMaster, setFormMaster] = useState({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega' });
-  const [items, setItems] = useState([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '' }]);
+  const [formMaster, setFormMaster] = useState({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '' });
+  const [items, setItems] = useState([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
   // ESTADOS MODAL DE CLIENTES
   const [showClientModal, setShowClientModal] = useState(false);
@@ -36,7 +38,6 @@ const PendientesBodega = () => {
   const [newClientData, setNewClientData] = useState({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
   const [savingClient, setSavingClient] = useState(false);
   const [clienteSeleccionadoNombre, setClienteSeleccionadoNombre] = useState('');
-
   // ESTADOS MODAL DE CONFIRMAR ENTREGA
   const [modalEntrega, setModalEntrega] = useState(false);
   const [pendienteSeleccionado, setPendienteSeleccionado] = useState(null);
@@ -44,6 +45,16 @@ const PendientesBodega = () => {
   const [firmaSoporte, setFirmaSoporte] = useState(null);
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
   
+  // ESTADOS MODAL AGENDAR DOMICILIO
+  const [modalDomicilio, setModalDomicilio] = useState(false);
+  const [pendienteParaDomicilio, setPendienteParaDomicilio] = useState(null);
+  const [domicilioForm, setDomicilioForm] = useState({ 
+    destino_id: '', tipo_documento: '', prioridad: 'Media', valor_factura: '', fecha_agendada: '', nota_manual: '' 
+  });
+  const [listaDestinos, setListaDestinos] = useState([]);
+  const [listaTiposDoc, setListaTiposDoc] = useState([]);
+  const [procesandoDomicilio, setProcesandoDomicilio] = useState(false);
+
   // ESTADOS CÁMARA NATIVA Y FIRMA
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
@@ -55,10 +66,14 @@ const PendientesBodega = () => {
     const resPend = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes`);
     const resBodegas = await fetch(`${import.meta.env.VITE_API_URL}/api/bodegas`);
     const resClientes = await fetch(`${import.meta.env.VITE_API_URL}/api/clientes`);
+    const resDest = await fetch(`${import.meta.env.VITE_API_URL}/api/destinos`);
+    const resTipos = await fetch(`${import.meta.env.VITE_API_URL}/api/tipos-documento`);
 
     if (resPend.ok) setPendientes(await resPend.json());
     if (resBodegas.ok) setBodegasExistentes(await resBodegas.json());
     if (resClientes.ok) setClientesExistentes(await resClientes.json());
+    if (resDest.ok) setListaDestinos(await resDest.json());
+    if (resTipos.ok) setListaTiposDoc(await resTipos.json());
   };
 
   useEffect(() => { 
@@ -76,19 +91,135 @@ const PendientesBodega = () => {
     return () => socket.off('actualizacion_bodega', handleActualizacion);
   }, []);
 
-  const handleAddItem = () => setItems([...items, { codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '' }]);
+  const handleAddItem = () => setItems([...items, { codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
   const handleRemoveItem = (index) => setItems(items.filter((_, i) => i !== index));
 
   const handleItemChange = (index, field, value) => {
     const list = [...items];
     list[index][field] = value;
+
+    // Autocalculate valor_total if cantidad or precio_unitario changes
+    if (field === 'cantidad' || field === 'precio_unitario') {
+      const cant = parseFloat(list[index].cantidad) || 0;
+      const unit = parseFloat(list[index].precio_unitario) || 0;
+      if (cant > 0 && unit > 0) {
+        list[index].valor_total = cant * unit;
+      }
+    }
+
     setItems(list);
+  };
+
+  const handleUploadPdf = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      return mostrarError("Solo se permiten archivos PDF.");
+    }
+
+    setIsUploadingPdf(true);
+    const formDataPdf = new FormData();
+    formDataPdf.append('facturaPdf', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pdf/extraer-factura`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataPdf
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar PDF');
+      }
+
+      const data = await response.json();
+      
+      let matchCliente = '';
+      let matchClienteId = '';
+      if (data.cliente) {
+        const cli = clientesExistentes.find(c => c.nombre.toLowerCase().includes(data.cliente.toLowerCase()) || data.cliente.toLowerCase().includes(c.nombre.toLowerCase()));
+        if (cli) {
+          matchCliente = cli.nombre;
+          matchClienteId = cli.id;
+        } else {
+          matchCliente = data.cliente;
+          setNewClientData(prev => ({ 
+            ...prev, 
+            nombre: data.cliente,
+            documento: data.nit_cliente || '',
+            telefono: data.telefono_cliente || ''
+          }));
+          setIsCreatingClient(true);
+          setShowClientModal(true);
+          mostrarInfo("El cliente extraído no existe. Por favor completa sus datos para crearlo.");
+        }
+      } else {
+        setIsCreatingClient(false);
+        setShowClientModal(true);
+        mostrarInfo("No se detectó un cliente en el PDF. Por favor selecciónalo o créalo.");
+      }
+
+      let nuevosItems = [];
+      if (data.productos && data.productos.length > 0) {
+        nuevosItems = data.productos.map(p => ({
+          codigo: p.codigo_producto || '',
+          nombre: p.descripcion || '',
+          cantidad: p.cantidad || 1,
+          unidad: p.unidad_medida || 'UND',
+          bodega_id: p.bodega_id || 1,
+          precio_unitario: p.precio_unitario || '',
+          valor_total: p.precio_total || '',
+          peso_kg: p.peso || ''
+        }));
+      } else {
+        nuevosItems = [{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }];
+      }
+
+      setFormMaster(prev => ({
+        ...prev,
+        factura_num: data.id_factura || prev.factura_num,
+        fecha_factura: data.fecha_facturacion ? data.fecha_facturacion.split('T')[0] : prev.fecha_factura,
+        fecha_promesa: data.fecha_promesa ? data.fecha_promesa.split('T')[0] : prev.fecha_promesa,
+        cliente_id: matchClienteId || prev.cliente_id,
+        valor_factura: data.valor_factura || prev.valor_factura
+      }));
+      
+      if(matchCliente) {
+         setClienteSeleccionadoNombre(matchCliente);
+      }
+
+      setItems(nuevosItems);
+      mostrarExito("PDF Procesado correctamente. Verifica los datos extraídos.");
+
+    } catch (error) {
+      console.error(error);
+      mostrarError("Error procesando PDF: " + error.message);
+    } finally {
+      setIsUploadingPdf(false);
+      e.target.value = null; 
+    }
+  };
+
+  const cerrarModalRegistro = () => {
+    setModalAbierto(false);
+    setItems([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
+    setFormMaster({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '' });
+    setClienteSeleccionadoNombre('');
   };
 
   const handleGuardar = async (e) => {
     e.preventDefault();
-    if (!formMaster.punto_venta_id || !formMaster.cliente_id || items.some(i => !i.bodega_id)) {
-      mostrarInfo("Por favor selecciona opciones de las listas");
+    if (!formMaster.cliente_id) {
+      mostrarInfo("El cliente no está registrado o no ha sido seleccionado correctamente. Haz clic en el campo de cliente para crearlo o buscarlo.");
+      setShowClientModal(true);
+      return;
+    }
+    
+    if (!formMaster.punto_venta_id || items.some(i => !i.bodega_id)) {
+      mostrarInfo("Por favor selecciona el punto de venta y la bodega para cada material.");
       return;
     }
 
@@ -103,14 +234,119 @@ const PendientesBodega = () => {
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      setModalAbierto(false);
-      setItems([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '' }]);
-      setFormMaster({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega' });
-      setClienteSeleccionadoNombre('');
+      cerrarModalRegistro();
       cargarDatos();
     } else {
       const errorData = await res.json();
       mostrarError(`❌ Error: ${errorData.error || errorData.message || 'No se pudo guardar el registro'}`);
+    }
+  };
+
+  const abrirModalDomicilio = async (pendiente) => {
+    setPendienteParaDomicilio(pendiente);
+    
+    // Traer el detalle completo del pendiente para mandarlo a pedidos
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes/${pendiente.id}`);
+      if(res.ok) {
+        const data = await res.json();
+        
+        const calcValorTotal = (data.productos || []).reduce((acc, p) => acc + (parseFloat(p.valor_total) || parseFloat(p.precio_total) || 0), 0);
+        const calcPesoTotal = (data.productos || []).reduce((acc, p) => acc + (parseFloat(p.peso_kg) || parseFloat(p.peso) || 0), 0);
+        const valorFinal = parseFloat(data.valor_factura) > 0 ? parseFloat(data.valor_factura) : calcValorTotal;
+
+        const pesoPorBodega = {};
+        (data.productos || []).forEach(p => {
+          const bId = p.bodega_id;
+          if (!pesoPorBodega[bId]) pesoPorBodega[bId] = 0;
+          pesoPorBodega[bId] += (parseFloat(p.peso_kg) || parseFloat(p.peso) || 0);
+        });
+
+        setPendienteParaDomicilio({ ...pendiente, productos: data.productos, valor_factura: valorFinal, peso_total: calcPesoTotal, peso_por_bodega: pesoPorBodega }); 
+        setDomicilioForm({ 
+          destino_id: '', tipo_documento: '', prioridad: 'Media', valor_factura: valorFinal || 0, fecha_agendada: '', nota_manual: '', telefono: pendiente.telefono || '',
+          hora_registro: new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit" })
+        });
+      } else {
+        setDomicilioForm({ 
+          destino_id: '', tipo_documento: '', prioridad: 'Media', valor_factura: 0, fecha_agendada: '', nota_manual: '', telefono: pendiente.telefono || '',
+          hora_registro: new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit" })
+        });
+      }
+    } catch(e) { 
+      console.error(e); 
+      setDomicilioForm({ 
+        destino_id: '', tipo_documento: '', prioridad: 'Media', valor_factura: '', fecha_agendada: '', nota_manual: '', telefono: '',
+        hora_registro: new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit" })
+      });
+    }
+
+    setModalDomicilio(true);
+  };
+
+  const handleGuardarDomicilio = async (e) => {
+    e.preventDefault();
+    setProcesandoDomicilio(true);
+    try {
+      const payloadPedido = {
+        usuario_id: user?.id,
+        id_factura: pendienteParaDomicilio.factura_num,
+        nombre_cliente: pendienteParaDomicilio.nombre_cliente || 'Cliente Bodega',
+        telefono: domicilioForm.telefono || 'Sin teléfono', 
+        destino_id: domicilioForm.destino_id,
+        tipo_documento: domicilioForm.tipo_documento,
+        prioridad: domicilioForm.prioridad,
+        valor_factura: domicilioForm.valor_factura || 0,
+        fecha_facturacion: pendienteParaDomicilio.fecha_factura ? String(pendienteParaDomicilio.fecha_factura).substring(0, 10) : null,
+        fecha_promesa: pendienteParaDomicilio.fecha_promesa ? String(pendienteParaDomicilio.fecha_promesa).substring(0, 10) : null,
+        fecha_agendada: domicilioForm.fecha_agendada,
+        hora_registro: domicilioForm.hora_registro || new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit" }),
+        nota_manual: domicilioForm.nota_manual,
+        productos: (pendienteParaDomicilio.productos || []).map(p => ({
+          codigo_producto: p.codigo || p.codigo_producto,
+          descripcion: p.nombre || p.nombre_producto,
+          cantidad: p.cantidad || p.cantidad_original,
+          unidad_medida: p.unidad || p.unidad_medida,
+          bodega_id: p.bodega_id,
+          precio_unitario: p.precio_unitario || 0,
+          precio_total: p.valor_total || 0,
+          peso: p.peso_kg || 0
+        }))
+      };
+
+      for (let i = 1; i <= 8; i++) {
+        const peso_bodega = (pendienteParaDomicilio.productos || [])
+          .filter(p => p.bodega_id === i || p.bodega_id === String(i))
+          .reduce((acc, p) => acc + (parseFloat(p.peso_kg) || 0), 0);
+        payloadPedido[`peso_b${i}`] = peso_bodega;
+      }
+
+      const resPedido = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify(payloadPedido)
+      });
+
+      if (!resPedido.ok) {
+        const errData = await resPedido.json();
+        throw new Error(errData.error || 'Error al crear el pedido en logística');
+      }
+
+      const resBodega = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes/${pendienteParaDomicilio.id}/tipo-entrega`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo_entrega: 'Domicilio' })
+      });
+
+      if (!resBodega.ok) throw new Error('Pedido creado en logística, pero falló la actualización en bodega.');
+
+      mostrarExito('¡Domicilio agendado correctamente en Logística!');
+      setModalDomicilio(false);
+      cargarDatos();
+    } catch (error) {
+      mostrarError(`Error: ${error.message}`);
+    } finally {
+      setProcesandoDomicilio(false);
     }
   };
 
@@ -131,10 +367,22 @@ const PendientesBodega = () => {
       initialProductos = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : []);
     } catch(e) { initialProductos = []; }
 
-    // Inyectamos la variable editable 'cantidad_a_entregar_ahora'
+    // Inyectamos la variable editable 'cantidad_a_entregar_ahora' y validamos rol
     const productosListos = initialProductos.map(p => {
+      let puedeEntregar = true;
+      if (user?.bodega_id) {
+        if (p.bodega_id) {
+          if (String(p.bodega_id) !== String(user.bodega_id)) puedeEntregar = false;
+        } else if (p.bodega_nombre) {
+          const miBodega = bodegasExistentes.find(b => String(b.id) === String(user.bodega_id));
+          if (miBodega && miBodega.nombre.toLowerCase() !== p.bodega_nombre.toLowerCase()) {
+            puedeEntregar = false;
+          }
+        }
+      }
+      
       const max = parseFloat(p.cant_a_entregar !== undefined ? p.cant_a_entregar : (p.cantidad || p.peso || 0));
-      return { ...p, cantidad_a_entregar_ahora: max };
+      return { ...p, cantidad_a_entregar_ahora: puedeEntregar ? max : 0, puede_entregar: puedeEntregar };
     });
 
     setPendienteSeleccionado({ ...pendiente, productos: productosListos });
@@ -150,10 +398,25 @@ const PendientesBodega = () => {
       if (res.ok) {
         const dataDetalle = await res.json();
         if (dataDetalle.productos) {
-          dataDetalle.productos = dataDetalle.productos.map(p => ({
-            ...p,
-            cantidad_a_entregar_ahora: parseFloat(p.cant_a_entregar !== undefined ? p.cant_a_entregar : (p.cantidad || 0))
-          }));
+          dataDetalle.productos = dataDetalle.productos.map(p => {
+            let puedeEntregar = true;
+            if (user?.bodega_id) {
+              if (p.bodega_id) {
+                if (String(p.bodega_id) !== String(user.bodega_id)) puedeEntregar = false;
+              } else if (p.bodega_nombre) {
+                const miBodega = bodegasExistentes.find(b => String(b.id) === String(user.bodega_id));
+                if (miBodega && miBodega.nombre.toLowerCase() !== p.bodega_nombre.toLowerCase()) {
+                  puedeEntregar = false;
+                }
+              }
+            }
+            
+            return {
+              ...p,
+              cantidad_a_entregar_ahora: puedeEntregar ? parseFloat(p.cant_a_entregar !== undefined ? p.cant_a_entregar : (p.cantidad || 0)) : 0,
+              puede_entregar: puedeEntregar
+            };
+          });
         }
         setPendienteSeleccionado(prev => ({ ...prev, ...dataDetalle, productos: dataDetalle.productos || prev.productos }));
       }
@@ -257,12 +520,77 @@ const PendientesBodega = () => {
       });
       if (res.ok) {
         mostrarExito("✅ Entrega confirmada exitosamente.");
+        // generarSoporteEntregaPDF(pendienteSeleccionado, pendienteSeleccionado.productos, firmaSoporte);
         cerrarModalEntrega();
         cargarDatos();
       } else {
         const data = await res.json(); mostrarError(`❌ Error: ${data.error || 'No se pudo confirmar la entrega'}`);
       }
     } catch (error) { mostrarError("Error de conexión al confirmar la entrega."); } finally { setProcesandoEntrega(false); }
+  };
+
+  const generarSoporteEntregaPDF = (pendiente, productosEntregados, firmaDigital) => {
+    try {
+      const doc = new jsPDF();
+      const colorHeader = [71, 179, 168]; 
+      
+      doc.setFillColor(colorHeader[0], colorHeader[1], colorHeader[2]); 
+      doc.rect(0, 0, 210, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("SOPORTE DE ENTREGA BODEGA", 105, 18, { align: 'center' });
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(12);
+      doc.text(`Documento / Factura: ${pendiente.factura_num}`, 14, 45);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Fecha Entrega: ${obtenerFechaLocal()}`, 14, 52);
+      
+      autoTable(doc, {
+          startY: 60,
+          head: [['Cliente', 'Bodega de Retiro']],
+          body: [
+              [`Nombre: ${pendiente.nombre_cliente}\nTeléfono: ${pendiente.telefono || 'N/A'}`, `${pendiente.nombre_punto_venta || 'Principal'}`]
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: colorHeader } 
+      });
+
+      const bodyProductos = productosEntregados
+        .filter(p => parseFloat(p.cantidad_a_entregar_ahora) > 0)
+        .map(p => [
+          p.codigo || p.codigo_producto || '-',
+          p.nombre || p.nombre_producto || '-',
+          `${p.cantidad_a_entregar_ahora} ${p.unidad || p.unidad_medida || 'UND'}`
+        ]);
+
+      autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 10,
+          head: [['Código', 'Producto Entregado', 'Cantidad']],
+          body: bodyProductos,
+          theme: 'grid',
+          headStyles: { fillColor: [50, 50, 50] }
+      });
+
+      const finalY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Firma del Cliente de Recibido:", 14, finalY);
+      
+      if (firmaDigital) {
+          doc.addImage(firmaDigital, 'PNG', 14, finalY + 5, 80, 40);
+          doc.setDrawColor(200, 200, 200);
+          doc.rect(14, finalY + 5, 80, 40);
+      } 
+      
+      doc.save(`Soporte_Bodega_${pendiente.factura_num}.pdf`);
+
+    } catch (error) {
+      console.error("Error generando PDF soporte", error);
+      mostrarError("Error al generar el PDF de soporte.");
+    }
   };
 
   const handleSelectCliente = (cliente) => {
@@ -405,12 +733,22 @@ const PendientesBodega = () => {
                     <td className="p-4"><span className={`px-2 py-1 rounded-full text-[10px] font-extrabold uppercase ${p.estado === 'Pendiente' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{p.estado}</span></td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
+                        {p.tipo_entrega !== 'Domicilio' && (
+                          <button 
+                            onClick={() => abrirModalDomicilio(p)} 
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
+                            title="Agendar Domicilio"
+                          >
+                            Domicilio
+                          </button>
+                        )}
                         {!isLectura ? (
                           <button 
-                            onClick={() => abrirModalEntrega(p)} 
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
+                            onClick={() => p.tipo_entrega !== 'Domicilio' && abrirModalEntrega(p)} 
+                            disabled={p.tipo_entrega === 'Domicilio'}
+                            className={`${p.tipo_entrega === 'Domicilio' ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'} px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1`}
                           >
-                            <CheckCircle size={14}/> Entregar
+                            <CheckCircle size={14}/> {p.tipo_entrega === 'Domicilio' ? 'Agendado' : 'Entregar'}
                           </button>
                         ) : (
                           <button 
@@ -465,8 +803,11 @@ const PendientesBodega = () => {
                   {user?.role === 'admin' && (
                     <button onClick={() => eliminarPendiente(p.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors flex items-center justify-center shrink-0"><Trash2 size={16}/></button>
                   )}
+                  {p.tipo_entrega !== 'Domicilio' && (
+                    <button onClick={() => abrirModalDomicilio(p)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2">Domicilio</button>
+                  )}
                   {!isLectura ? (
-                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"><CheckCircle size={16}/> Entregar</button>
+                    <button onClick={() => p.tipo_entrega !== 'Domicilio' && abrirModalEntrega(p)} disabled={p.tipo_entrega === 'Domicilio'} className={`flex-1 ${p.tipo_entrega === 'Domicilio' ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'} py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2`}><CheckCircle size={16}/> {p.tipo_entrega === 'Domicilio' ? 'Agendado' : 'Entregar'}</button>
                   ) : (
                     <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"><Eye size={16}/> Ver Detalle</button>
                   )}
@@ -480,20 +821,31 @@ const PendientesBodega = () => {
       {modalAbierto && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="p-5 bg-slate-900 text-white flex justify-between"><h3 className="font-bold">Cargar Registro</h3><button onClick={() => setModalAbierto(false)}>✕</button></div>
+            <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+              <h3 className="font-bold">Cargar Registro</h3>
+              <div className="flex items-center gap-4">
+                <label className="cursor-pointer bg-[#47B3A8] hover:bg-[#3d9a90] px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+                  <UploadCloud size={16} />
+                  {isUploadingPdf ? 'Procesando...' : 'Cargar de PDF'}
+                  <input type="file" accept="application/pdf" className="hidden" onChange={handleUploadPdf} disabled={isUploadingPdf} />
+                </label>
+                <button onClick={cerrarModalRegistro} className="hover:bg-white/20 p-1 rounded-full"><X size={18}/></button>
+              </div>
+            </div>
             <form onSubmit={handleGuardar} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div><label className="text-xs font-bold text-slate-500">Factura</label><input type="text" className="w-full border p-2 rounded-lg" required onChange={(e) => setFormMaster({...formMaster, factura_num: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-slate-500">Fecha</label><input type="date" className="w-full border p-2 rounded-lg" required onChange={(e) => setFormMaster({...formMaster, fecha_factura: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-slate-500">Promesa</label><input type="date" className="w-full border p-2 rounded-lg" required onChange={(e) => setFormMaster({...formMaster, fecha_promesa: e.target.value})} /></div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div><label className="text-xs font-bold text-slate-500">#Factura</label><input type="text" className="w-full border p-2 rounded-lg" required value={formMaster.factura_num} onChange={(e) => setFormMaster({...formMaster, factura_num: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-slate-500">Valor Factura</label><input type="number" step="any" className="w-full border p-2 rounded-lg" value={formMaster.valor_factura || ''} onChange={(e) => setFormMaster({...formMaster, valor_factura: e.target.value})} placeholder="Opcional" /></div>
+                <div><label className="text-xs font-bold text-slate-500">Fecha Factura</label><input type="date" className="w-full border p-2 rounded-lg" required value={formMaster.fecha_factura} onChange={(e) => setFormMaster({...formMaster, fecha_factura: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-slate-500">Promesa De Entrega</label><input type="date" className="w-full border p-2 rounded-lg" required value={formMaster.fecha_promesa} onChange={(e) => setFormMaster({...formMaster, fecha_promesa: e.target.value})} /></div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500">Origen</label>
-                  <select className="w-full border p-2 rounded-lg" required onChange={(e) => setFormMaster({...formMaster, punto_venta_id: e.target.value})}>
+                  <label className="text-xs font-bold text-slate-500">Punto De Venta</label>
+                  <select className="w-full border p-2 rounded-lg" required value={formMaster.punto_venta_id} onChange={(e) => setFormMaster({...formMaster, punto_venta_id: e.target.value})}>
                     <option value="">Selecciona Bodega</option>
                     {bodegasExistentes.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
                   </select>
                 </div>
-                <div className="md:col-span-4">
+                <div className="md:col-span-5">
                   <label className="text-xs font-bold text-slate-500">Cliente Solicitante</label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -517,24 +869,72 @@ const PendientesBodega = () => {
 
               <div className="border-t pt-4">
                 <h4 className="font-extrabold text-sm mb-3">Materiales en Espera</h4>
-                {items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-2 md:flex gap-2 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg md:p-0 md:bg-transparent md:border-0 md:mb-2 relative">
-                    <input type="text" placeholder="Código" className="border p-2 rounded w-full md:w-24 text-sm" required value={item.codigo} onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} />
-                    <input type="text" placeholder="Descripción" className="border p-2 rounded col-span-2 md:col-span-1 md:flex-1 text-sm" required value={item.nombre} onChange={(e) => handleItemChange(index, 'nombre', e.target.value)} />
-                    <input type="number" step="any" placeholder="Cant" className="border p-2 rounded w-full md:w-20 text-sm" required value={item.cantidad} onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)} />
-                    <select className="border p-2 rounded w-full md:w-24 text-sm" value={item.unidad} onChange={(e) => handleItemChange(index, 'unidad', e.target.value)}><option>UND</option><option>MTS2</option><option>KG</option></select>
-                    <select className="border p-2 rounded col-span-2 md:col-span-1 md:w-36 text-purple-700 text-sm" required value={item.bodega_id} onChange={(e) => handleItemChange(index, 'bodega_id', e.target.value)}>
-                      <option value="">Bodega Ubicación</option>
-                      {bodegasExistentes.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                    </select>
-                    {items.length > 1 && <button type="button" onClick={() => handleRemoveItem(index)} className="absolute -top-2 -right-2 md:relative md:top-0 md:right-0 text-red-500 bg-white border md:border-0 rounded-full p-1 md:p-0"><Trash2 size={16}/></button>}
-                  </div>
-                ))}
-                <button type="button" onClick={handleAddItem} className="text-[#47B3A8] text-xs font-bold mt-2"><Plus size={14} className="inline"/> Añadir línea</button>
+                <div className="overflow-x-auto border border-slate-200 rounded-lg shadow-sm bg-white mb-3">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead className="bg-slate-50 text-[10px] text-slate-600 uppercase border-b border-slate-200">
+                      <tr>
+                        <th className="p-2 border-r border-slate-200 text-center w-20 font-bold">Código</th>
+                        <th className="p-2 border-r border-slate-200 font-bold">Descripción</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-16 font-bold">Cant.</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-20 font-bold">Unidad</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-24 font-bold">Vr. Unitario</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-24 font-bold">Vr. Total</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-20 font-bold">Peso(KG)</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-28 font-bold">Bodega</th>
+                        <th className="p-2 text-center w-12"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs divide-y divide-slate-100">
+                      {items.map((item, index) => (
+                        <tr key={index} className="hover:bg-slate-50">
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="text" placeholder="Cód..." className="w-full p-1.5 bg-transparent outline-none text-center" required value={item.codigo} onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="text" placeholder="Descripción del material..." className="w-full p-1.5 bg-transparent outline-none font-medium text-slate-700 uppercase" required value={item.nombre} onChange={(e) => handleItemChange(index, 'nombre', e.target.value)} />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="number" step="any" placeholder="0" className="w-full p-1.5 bg-transparent outline-none text-center" required value={item.cantidad} onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)} />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <select className="w-full p-1.5 bg-transparent outline-none text-center" value={item.unidad} onChange={(e) => handleItemChange(index, 'unidad', e.target.value)}>
+                              <option>UND</option><option>MTS2</option><option>KG</option>
+                            </select>
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.precio_unitario} onChange={(e) => handleItemChange(index, 'precio_unitario', e.target.value)} />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.valor_total} onChange={(e) => handleItemChange(index, 'valor_total', e.target.value)} />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.peso_kg} onChange={(e) => handleItemChange(index, 'peso_kg', e.target.value)} />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <select className="w-full p-1.5 bg-transparent outline-none text-center font-bold text-slate-700" required value={item.bodega_id} onChange={(e) => handleItemChange(index, 'bodega_id', e.target.value)}>
+                              <option value="">Bodega...</option>
+                              {bodegasExistentes.map(b => <option key={b.id} value={b.id}>B{b.id}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-1 text-center">
+                            {items.length > 1 && (
+                              <button type="button" onClick={() => handleRemoveItem(index)} className="text-red-500 hover:text-red-700 p-1.5 transition-colors">
+                                <Trash2 size={16}/>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button type="button" onClick={handleAddItem} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
+                  <Plus size={14} className="inline"/> Añadir Material
+                </button>
               </div>
 
               <div className="flex justify-end gap-2 border-t pt-4">
-                <button type="button" onClick={() => setModalAbierto(false)} className="px-4 py-2 bg-slate-100 rounded-lg">Cancelar</button>
+                <button type="button" onClick={cerrarModalRegistro} className="px-4 py-2 bg-slate-100 rounded-lg">Cancelar</button>
                 <button type="submit" className="px-5 py-2 bg-[#47B3A8] text-white rounded-lg">Guardar Pendiente</button>
               </div>
             </form>
@@ -633,7 +1033,7 @@ const PendientesBodega = () => {
       {/* ================= MODAL DE ENTREGA (CONFIRMACIÓN) ================= */}
       {modalEntrega && pendienteSeleccionado && (
         <div className="fixed inset-0 bg-black/60 z-[70] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh]">
             
             <div className="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-bold flex items-center gap-2">
@@ -663,11 +1063,20 @@ const PendientesBodega = () => {
                 <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
                   {/* ESCRITORIO */}
                   <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-100 text-slate-500 text-xs uppercase">
-                        <tr><th className="p-3 font-bold">Código</th><th className="p-3 font-bold">Descripción</th><th className="p-3 text-center font-bold">Cantidad</th></tr>
+                    <table className="w-full text-left border-collapse min-w-[800px]">
+                      <thead className="bg-slate-100 text-[10px] text-slate-600 uppercase">
+                        <tr>
+                          <th className="p-2 border font-bold">Código</th>
+                          <th className="p-2 border font-bold w-1/3">Descripción</th>
+                          <th className="p-2 border text-center font-bold text-blue-600">Cant. a Entregar</th>
+                          <th className="p-2 border text-center font-bold">Unidad</th>
+                          <th className="p-2 border text-right font-bold">Vr. Unitario</th>
+                          <th className="p-2 border text-right font-bold">Vr. Total</th>
+                          <th className="p-2 border text-center font-bold">Bodega</th>
+                          <th className="p-2 border text-center font-bold">Peso(Kg)</th>
+                        </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="text-xs">
                         {pendienteSeleccionado.productos && pendienteSeleccionado.productos.length > 0 ? (
                           pendienteSeleccionado.productos.map((item, idx) => {
                             const codigo = item.codigo || item.codigo_producto || item.id_producto || item.cod || '';
@@ -677,32 +1086,39 @@ const PendientesBodega = () => {
                             const unidad = item.unidad || item.unidad_medida || item.medida || '';
                             
                             return (
-                              <tr key={idx} className="hover:bg-slate-50">
-                                <td className="p-3 font-mono text-slate-600 text-xs">{codigo || '-'}</td>
-                                <td className="p-3 font-medium text-slate-800">{nombre}</td>
-                                <td className="p-3 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    {isLectura ? (
-                                      <span className="text-sm font-bold text-[#47B3A8]">{actualVal}</span>
-                                    ) : (
-                                      <input 
-                                        type="number" min="0" max={maxVal} step="any"
-                                        value={actualVal === 0 && actualVal !== '0' ? '' : actualVal} 
-                                        onChange={(e) => handleCantidadCambio(idx, e.target.value)}
-                                        className="w-20 border border-slate-300 bg-white rounded p-1 text-center text-sm font-bold text-[#47B3A8] outline-none focus:ring-2 focus:ring-[#47B3A8] transition-all"
-                                      />
+                              <tr key={idx} className="hover:bg-slate-50 text-[11px]">
+                                <td className="p-1.5 border font-mono text-slate-600">{codigo || '-'}</td>
+                                <td className="p-1.5 border font-medium text-slate-800 leading-tight">{nombre}</td>
+                                <td className="p-1.5 border text-center bg-blue-50/30">
+                                  <div className="flex flex-col items-center justify-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      {isLectura ? (
+                                        <span className="text-sm font-bold text-[#47B3A8]">{actualVal}</span>
+                                      ) : (
+                                        <input 
+                                          type="number" min="0" max={maxVal} step="any"
+                                          value={actualVal === 0 && actualVal !== '0' ? '' : actualVal} 
+                                          onChange={(e) => handleCantidadCambio(idx, e.target.value)}
+                                          disabled={item.puede_entregar === false}
+                                          className={`w-20 border rounded p-1 text-center text-sm font-bold outline-none shadow-sm transition-all ${item.puede_entregar === false ? 'border-slate-200 text-slate-400 bg-slate-100 cursor-not-allowed' : 'border-blue-300 bg-white text-blue-700 focus:ring-2 focus:ring-blue-400'}`}
+                                        />
+                                      )}
+                                    </div>
+                                    {!isLectura && actualVal !== '' && actualVal < maxVal && (
+                                      <p className="text-[9px] text-orange-600 mt-1 font-bold tracking-tight">Queda saldo: {parseFloat((maxVal - actualVal).toFixed(2))}</p>
                                     )}
-                                    <span className="text-[10px] text-slate-400">{unidad}</span>
                                   </div>
-                                  {!isLectura && actualVal !== '' && actualVal < maxVal && (
-                                    <p className="text-[9px] text-orange-600 mt-1 font-bold tracking-tight">Queda saldo: {parseFloat((maxVal - actualVal).toFixed(2))}</p>
-                                  )}
                                 </td>
+                                <td className="p-1.5 border text-center text-slate-500">{unidad}</td>
+                                <td className="p-1.5 border text-right text-slate-500">{Number(item.precio_unitario || 0).toLocaleString('es-CO', {style: 'currency', currency: 'COP', minimumFractionDigits: 0})}</td>
+                                <td className="p-1.5 border text-right font-bold text-slate-700 bg-slate-50">{Number(item.valor_total || item.precio_total || 0).toLocaleString('es-CO', {style: 'currency', currency: 'COP', minimumFractionDigits: 0})}</td>
+                                <td className="p-1.5 border text-center font-bold text-indigo-600 uppercase">{item.bodega_nombre || `B${item.bodega_id}` || 'N/A'}</td>
+                                <td className="p-1.5 border text-center font-bold text-blue-600">{Number(item.peso_kg || item.peso || 0).toFixed(2)}</td>
                               </tr>
                             );
                           })
                         ) : (
-                          <tr><td colSpan="3" className="p-4 text-center text-slate-400">No hay detalle de productos disponible para esta factura.</td></tr>
+                          <tr><td colSpan="8" className="p-4 text-center text-slate-400">No hay detalle de productos disponible para esta factura.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -721,11 +1137,21 @@ const PendientesBodega = () => {
                         return (
                           <div key={idx} className="p-3 flex flex-col gap-2 bg-slate-50">
                             <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">Código: <span className="font-mono text-slate-600 normal-case">{codigo || '-'}</span></p>
-                              <p className="font-bold text-slate-800 text-sm mt-1">{nombre}</p>
+                              <div className="flex justify-between items-center mb-1">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">Código: <span className="font-mono text-slate-600 normal-case">{codigo || '-'}</span></p>
+                                <p className="text-[9px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded">{item.bodega_nombre || `B${item.bodega_id}` || 'N/A'}</p>
+                              </div>
+                              <p className="font-bold text-slate-800 text-sm">{nombre}</p>
                             </div>
-                            <div className="flex items-center justify-between border-t border-slate-200 pt-2 mt-1">
-                              <p className="text-xs font-bold text-slate-500 uppercase">A entregar:</p>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-xs mt-1 bg-white p-2 rounded border border-slate-100 shadow-sm">
+                              <div><span className="text-slate-400">Vr. Unitario:</span> <span className="font-medium text-slate-700">{Number(item.precio_unitario || 0).toLocaleString('es-CO', {style: 'currency', currency: 'COP', minimumFractionDigits: 0})}</span></div>
+                              <div className="text-right"><span className="text-slate-400">Vr. Total:</span> <span className="font-bold text-slate-700">{Number(item.valor_total || item.precio_total || 0).toLocaleString('es-CO', {style: 'currency', currency: 'COP', minimumFractionDigits: 0})}</span></div>
+                              <div className="col-span-2 text-center"><span className="text-slate-400">Peso:</span> <span className="font-bold text-blue-600">{Number(item.peso_kg || item.peso || 0).toFixed(2)} Kg</span></div>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-slate-200 pt-2 mt-2">
+                              <p className="text-xs font-bold text-blue-600 uppercase">A entregar:</p>
                               <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-1">
                                   {isLectura ? (
@@ -735,10 +1161,11 @@ const PendientesBodega = () => {
                                       type="number" min="0" max={maxVal} step="any"
                                       value={actualVal === 0 && actualVal !== '0' ? '' : actualVal} 
                                       onChange={(e) => handleCantidadCambio(idx, e.target.value)}
-                                      className="w-16 border border-slate-300 bg-white rounded p-1 text-center text-sm font-bold text-[#47B3A8] outline-none focus:ring-2 focus:ring-[#47B3A8] transition-all"
+                                      disabled={item.puede_entregar === false}
+                                      className={`w-20 border rounded p-1.5 text-center text-sm font-bold outline-none transition-all shadow-sm ${item.puede_entregar === false ? 'border-slate-200 text-slate-400 bg-slate-100 cursor-not-allowed' : 'border-blue-300 bg-white text-blue-700 focus:ring-2 focus:ring-blue-400'}`}
                                     />
                                   )}
-                                  <span className="text-[10px] text-slate-400 font-bold">{unidad}</span>
+                                  <span className="text-[10px] text-slate-500 font-bold">{unidad}</span>
                                 </div>
                                 {!isLectura && actualVal !== '' && actualVal < maxVal && (
                                   <p className="text-[9px] text-orange-600 mt-1 font-bold tracking-tight">Saldo: {parseFloat((maxVal - actualVal).toFixed(2))}</p>
@@ -838,6 +1265,197 @@ const PendientesBodega = () => {
           </div>
         </div>
       )}
+      {/* ================= MODAL DE AGENDAR DOMICILIO ================= */}
+      {/* ================= MODAL DE AGENDAR DOMICILIO (ESTILO LOGÍSTICA) ================= */}
+      {modalDomicilio && (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex justify-center items-center p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#f8fafc] rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh]">
+            
+            {/* HEADER */}
+            <div className="p-4 md:p-5 border-b bg-[#1e293b] text-white flex justify-between items-center shrink-0">
+              <div className="flex flex-col">
+                <h3 className="font-extrabold text-lg flex items-center gap-2">
+                  <Package size={18}/> Registrar Nuevo Despacho
+                </h3>
+                <span className="text-xs text-slate-300">Administración general</span>
+              </div>
+              <button onClick={() => setModalDomicilio(false)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+            </div>
+            
+            <form onSubmit={handleGuardarDomicilio} className="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+              
+              {/* FORMULARIO SUPERIOR (Grid estilo Logística) */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                
+                {/* ID_FACTURA */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">ID_FACTURA</label>
+                  <input type="text" readOnly value={pendienteParaDomicilio?.factura_num || ''} className="w-full border p-2 rounded text-sm bg-slate-50 outline-none font-bold text-slate-700" />
+                </div>
+                
+                {/* TIPO DOC */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">TIPO DOC</label>
+                  <select name="tipo_documento" value={domicilioForm.tipo_documento} onChange={(e) => setDomicilioForm({...domicilioForm, tipo_documento: e.target.value})} className="w-full border p-2 rounded text-sm outline-none bg-white">
+                    <option value="">-- Seleccione --</option>
+                    {listaTiposDoc.map(t => <option key={t.id} value={t.nombre}>{t.nombre}</option>)}
+                  </select>
+                </div>
+                
+                {/* CLIENTE */}
+                <div className="col-span-6">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">CLIENTE</label>
+                  <div className="flex gap-2">
+                    <input type="text" readOnly value={pendienteParaDomicilio?.nombre_cliente || ''} className="w-full border p-2 rounded text-sm bg-blue-50/50 outline-none font-bold text-slate-700" />
+                  </div>
+                </div>
+
+                {/* PRIORIDAD */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">PRIORIDAD</label>
+                  <select name="prioridad" value={domicilioForm.prioridad} onChange={(e) => setDomicilioForm({...domicilioForm, prioridad: e.target.value})} className="w-full border p-2 rounded text-sm outline-none bg-white">
+                    <option value="Alta">Alta</option>
+                    <option value="Media">Media</option>
+                    <option value="Baja">Baja</option>
+                  </select>
+                </div>
+                
+                {/* VALOR */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase text-blue-600">$ VALOR *</label>
+                  <input type="number" min="0" step="any" required value={domicilioForm.valor_factura} onChange={(e) => setDomicilioForm({...domicilioForm, valor_factura: e.target.value})} className="w-full border p-2 rounded text-sm outline-none bg-white" placeholder="Ej: 150000" />
+                </div>
+                
+                {/* TELÉFONO */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">TELÉFONO</label>
+                  <input type="text" value={domicilioForm.telefono} onChange={(e) => setDomicilioForm({...domicilioForm, telefono: e.target.value})} className="w-full border p-2 rounded text-sm outline-none bg-white" placeholder="Ej: 3001234567" />
+                </div>
+                
+                {/* ZONA */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">ZONA</label>
+                  <input type="text" readOnly value={listaDestinos.find(d => d.id === parseInt(domicilioForm.destino_id))?.zona_nombre || ''} className="w-full border p-2 rounded text-sm bg-slate-50 outline-none" />
+                </div>
+
+                {/* FECHA FAC. */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">FECHA FAC.</label>
+                  <input type="date" readOnly value={pendienteParaDomicilio?.fecha_factura ? String(pendienteParaDomicilio.fecha_factura).substring(0, 10) : ''} className="w-full border p-2 rounded text-sm bg-slate-50 outline-none" />
+                </div>
+                
+                {/* HORA REGISTRO ENTREGA */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">HORA REGISTRO ENTREGA</label>
+                  <div className="relative">
+                    <input type="time" value={domicilioForm.hora_registro || ''} onChange={(e) => setDomicilioForm({...domicilioForm, hora_registro: e.target.value})} className="w-full border border-slate-300 p-2 rounded text-sm outline-none bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+                  </div>
+                </div>
+                
+                {/* DESTINO */}
+                <div className="col-span-6">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">DESTINO *</label>
+                  <select name="destino_id" value={domicilioForm.destino_id} onChange={(e) => setDomicilioForm({...domicilioForm, destino_id: e.target.value})} required className="w-full border p-2 rounded text-sm outline-none bg-white">
+                    <option value="">-- Seleccione --</option>
+                    {listaDestinos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* FECHA PROMESA */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">FECHA PROMESA</label>
+                  <input type="date" readOnly value={pendienteParaDomicilio?.fecha_promesa ? String(pendienteParaDomicilio.fecha_promesa).substring(0, 10) : ''} className="w-full border p-2 rounded text-sm bg-slate-50 outline-none" />
+                </div>
+                
+                {/* FECHA AGENDADA */}
+                <div className="col-span-3">
+                  <label className="text-[10px] font-bold text-blue-600 uppercase">FECHA AGENDADA *</label>
+                  <input type="date" required value={domicilioForm.fecha_agendada} onChange={(e) => setDomicilioForm({...domicilioForm, fecha_agendada: e.target.value})} className="w-full border p-2 rounded text-sm bg-blue-50/50 border-blue-200 outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                
+                {/* NOTA MANUAL */}
+                <div className="col-span-6">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">NOTA MANUAL</label>
+                  <input type="text" value={domicilioForm.nota_manual} onChange={(e) => setDomicilioForm({...domicilioForm, nota_manual: e.target.value})} className="w-full border p-2 rounded text-sm outline-none bg-white" placeholder="Instrucciones especiales para logística..." />
+                </div>
+              </div>
+
+              {/* DETALLE DE PRODUCTOS */}
+              <div className="bg-white border border-slate-200 rounded-lg p-3 md:p-4 shadow-sm">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xs md:text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <FilePlus size={16} className="text-blue-600" /> Detalle de Productos
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[800px]">
+                    <thead className="bg-slate-100 text-[10px] text-slate-600 uppercase">
+                      <tr>
+                        <th className="p-2 border">Código</th>
+                        <th className="p-2 border w-1/3">Descripción</th>
+                        <th className="p-2 border text-center">Cant.</th>
+                        <th className="p-2 border text-center">Unidad</th>
+                        <th className="p-2 border text-right">Vr. Unitario</th>
+                        <th className="p-2 border text-right">Vr. Total</th>
+                        <th className="p-2 border text-center">Bodega</th>
+                        <th className="p-2 border text-center">Peso(Kg)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs">
+                      {pendienteParaDomicilio?.productos && pendienteParaDomicilio.productos.length > 0 ? (
+                        pendienteParaDomicilio.productos.map((prod, index) => (
+                          <tr key={index} className="hover:bg-slate-50">
+                            <td className="p-1 border"><input type="text" readOnly value={prod.codigo || prod.codigo_producto || ''} className="w-full p-1 bg-transparent outline-none text-slate-500" /></td>
+                            <td className="p-1 border"><input type="text" readOnly value={prod.nombre || prod.nombre_producto || prod.descripcion || ''} className="w-full p-1 bg-transparent outline-none font-medium text-slate-700" /></td>
+                            <td className="p-1 border"><input type="number" readOnly value={prod.cantidad || prod.cantidad_original || 0} className="w-full p-1 bg-transparent text-center outline-none text-slate-500" /></td>
+                            <td className="p-1 border"><input type="text" readOnly value={prod.unidad || prod.unidad_medida || ''} className="w-full p-1 bg-transparent text-center outline-none text-slate-500" /></td>
+                            <td className="p-1 border"><input type="number" readOnly value={prod.precio_unitario || 0} className="w-full p-1 bg-transparent text-right outline-none text-slate-500" /></td>
+                            <td className="p-1 border bg-slate-50 font-bold text-right text-slate-700">{Number(prod.valor_total || prod.precio_total || 0).toLocaleString('es-CO', {style: 'currency', currency: 'COP', minimumFractionDigits: 0})}</td>
+                            <td className="p-1 border text-center font-bold text-slate-500">B{prod.bodega_id}</td>
+                            <td className="p-1 border"><input type="number" readOnly value={prod.peso_kg || prod.peso || 0} className="w-full p-1 bg-transparent text-center outline-none font-bold text-blue-600" /></td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="8" className="p-4 text-center text-slate-500 italic">No hay productos. Sube un PDF o añade manualmente.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* PESOS POR BODEGA */}
+              <div className="bg-white border border-slate-200 rounded-lg p-4 mb-4 shadow-sm">
+                <h3 className="text-xs md:text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                  <Weight size={16} className="text-slate-500" /> Carga Total por Bodega (Kg)
+                </h3>
+                <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                    <div key={`peso_b${num}`} className="flex flex-col">
+                      <label className="text-[10px] font-bold text-slate-400 text-center mb-1">B{num}</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={pendienteParaDomicilio?.peso_por_bodega?.[num] ? pendienteParaDomicilio.peso_por_bodega[num].toFixed(2).replace('.', ',') : '0'} 
+                        className="w-full border border-slate-300 p-1.5 rounded text-center font-bold text-slate-700 bg-slate-50 text-xs outline-none shadow-inner"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t pt-4 mt-4 flex justify-end gap-3 pb-2">
+                <button type="button" onClick={() => setModalDomicilio(false)} className="px-5 py-2.5 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors text-sm">Cancelar</button>
+                <button type="submit" disabled={procesandoDomicilio} className="px-6 py-2.5 bg-[#47B3A8] text-white font-bold rounded-lg hover:bg-[#3d9a90] shadow-md transition-colors disabled:opacity-50 text-sm">
+                  {procesandoDomicilio ? 'Enviando...' : 'Guardar y Agendar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

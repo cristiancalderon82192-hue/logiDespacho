@@ -41,7 +41,12 @@ const getPedidosPorFecha = async (req, res) => {
     // Cargar productos de los pedidos
     if (pedidos.length > 0) {
       const pedidosIds = pedidos.map(p => p.id);
-      const [productos] = await db.query(`SELECT * FROM pedidos_productos_detalle WHERE pedido_id IN (?)`, [pedidosIds]);
+      const [productos] = await db.query(`
+        SELECT ppd.*, b.nombre AS bodega_nombre 
+        FROM pedidos_productos_detalle ppd
+        LEFT JOIN bodegas b ON ppd.bodega_id = b.id
+        WHERE ppd.pedido_id IN (?)
+      `, [pedidosIds]);
       
       pedidos.forEach(p => {
         p.productos = productos.filter(prod => prod.pedido_id === p.id);

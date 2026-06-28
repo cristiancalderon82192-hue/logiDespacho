@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOpen } from 'lucide-react';
+import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOpen, DollarSign } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -120,11 +120,33 @@ const ReporteMovimientos = () => {
     return Object.values(agrupado);
   };
 
+  // ==========================================
+  // PROCESAMIENTO DE GRÁFICA 3: VALOR BODEGA
+  // ==========================================
+  const procesarDatosBodegasValor = () => {
+    if (datos.length === 0) return [{ name: 'Sin Datos', 'Total COP': 0 }];
+
+    const agrupado = datos.reduce((acc, pedido) => {
+      const bodega = pedido.bodega || 'Sin Bodega';
+      const zona = pedido.zona_envio || 'Sin Zona';
+      const valor = parseFloat(pedido.valor_factura) || 0;
+
+      if (!acc[bodega]) acc[bodega] = { name: bodega };
+      if (!acc[bodega][zona]) acc[bodega][zona] = 0;
+      
+      acc[bodega][zona] += valor;
+      return acc;
+    }, {});
+
+    return Object.values(agrupado);
+  };
+
   const datosGraficaEstados = procesarDatosEstados();
   const datosGraficaBodegas = procesarDatosBodegas();
+  const datosGraficaBodegasValor = procesarDatosBodegasValor();
   
   // Extraemos las zonas únicas que tienen peso para generar los colores dinámicos de las barras
-  const zonasConPeso = [...new Set(datos.filter(d => d.peso > 0).map(d => d.zona_envio))].filter(Boolean);
+  const zonasConPeso = [...new Set(datos.filter(d => d.peso > 0 || d.valor_factura > 0).map(d => d.zona_envio))].filter(Boolean);
   const coloresZonas = ['#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#84cc16']; // Tonos vibrantes
 
   return (
@@ -143,50 +165,55 @@ const ReporteMovimientos = () => {
           <Filter size={16} /> Filtros Dinámicos
         </h2>
         
-        <form onSubmit={generarReporte} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div className="md:col-span-2">
-            <DateRangeSelector 
-              fechaInicio={filtros.fechaInicio} 
-              setFechaInicio={setFechaInicioWrapper} 
-              fechaFin={filtros.fechaFin} 
-              setFechaFin={setFechaFinWrapper} 
-            />
-          </div>
-          
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Ciudad</label>
-            <select name="ciudad" value={filtros.ciudad} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8] cursor-pointer">
-              <option value="">Todas las ciudades</option>
-              {opciones.ciudades.map((c, index) => <option key={index} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">Zona {filtros.ciudad && <span className="text-[9px] text-[#47B3A8] ml-1 bg-[#47B3A8]/10 px-1 rounded">Filtrado</span>}</label>
-            <select name="zona" value={filtros.zona} onChange={handleInputChange} disabled={zonasFiltradas.length === 0 && filtros.ciudad !== ''} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-              <option value="">Todas las zonas</option>
-              {zonasFiltradas.map((z, index) => <option key={index} value={z}>{z}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><Truck size={12}/> Vehículo (Placa)</label>
-            <select name="vehiculo" value={filtros.vehiculo} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8] cursor-pointer">
-              <option value="">Toda la flota</option>
-              {opciones.vehiculos.map((v, index) => <option key={index} value={v}>{v}</option>)}
-            </select>
-          </div>
-
-          <div className="md:col-span-5 flex justify-end mt-2">
-            <button type="submit" disabled={loading} className="bg-[#47B3A8] hover:bg-[#3d9a90] text-white px-8 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-md transition-transform active:scale-95 disabled:opacity-50">
-              <Search size={18} /> {loading ? 'Consultando...' : 'Generar Reporte'}
-            </button>
-          </div>
-        </form>
+        <form onSubmit={generarReporte} className="flex flex-col gap-5">
+            {/* Fila 1: Fechas */}
+            <div className="w-full">
+              <DateRangeSelector 
+                fechaInicio={filtros.fechaInicio} 
+                setFechaInicio={setFechaInicioWrapper} 
+                fechaFin={filtros.fechaFin} 
+                setFechaFin={setFechaFinWrapper} 
+              />
+            </div>
+            
+            {/* Fila 2: Selects */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="w-full">
+                <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Ciudad</label>
+                <select name="ciudad" value={filtros.ciudad} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8] cursor-pointer">
+                  <option value="">Todas las ciudades</option>
+                  {opciones.ciudades.map((c, index) => <option key={index} value={c}>{c}</option>)}
+                </select>
+              </div>
+    
+              <div className="w-full">
+                <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">Zona {filtros.ciudad && <span className="text-[9px] text-[#47B3A8] ml-1 bg-[#47B3A8]/10 px-1 rounded">Filtrado</span>}</label>
+                <select name="zona" value={filtros.zona} onChange={handleInputChange} disabled={zonasFiltradas.length === 0 && filtros.ciudad !== ''} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                  <option value="">Todas las zonas</option>
+                  {zonasFiltradas.map((z, index) => <option key={index} value={z}>{z}</option>)}
+                </select>
+              </div>
+    
+              <div className="w-full">
+                <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><Truck size={12}/> Vehículo (Placa)</label>
+                <select name="vehiculo" value={filtros.vehiculo} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white transition-colors outline-none focus:border-[#47B3A8] cursor-pointer">
+                  <option value="">Toda la flota</option>
+                  {opciones.vehiculos.map((v, index) => <option key={index} value={v}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+  
+            {/* Fila 3: Botón */}
+            <div className="flex justify-end pt-2">
+              <button type="submit" disabled={loading} className="bg-[#47B3A8] hover:bg-[#3d9a90] text-white px-8 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-md transition-transform active:scale-95 disabled:opacity-50 w-full sm:w-auto justify-center">
+                <Search size={18} /> {loading ? 'Consultando...' : 'Generar Reporte'}
+              </button>
+            </div>
+          </form>
       </div>
 
-      {/* 👇 CONTENEDOR GRID PARA LAS DOS GRÁFICAS 👇 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {/* 👇 CONTENEDOR GRID PARA LAS TRES GRÁFICAS 👇 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
         
         {/* GRÁFICA 1: RENDIMIENTO POR ZONA */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative">
@@ -244,6 +271,49 @@ const ReporteMovimientos = () => {
                   ))
                 ) : (
                   <Bar dataKey="Total Kg" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* GRÁFICA 3: VALOR MOVIDO POR BODEGA */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative lg:col-span-2 xl:col-span-1">
+          <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
+            <DollarSign size={18} className="text-[#f59e0b]" /> Valor Movido por Bodega ($)
+          </h2>
+          {datos.length === 0 && !loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none mt-8">
+              <span className="bg-slate-100/80 px-4 py-2 rounded-lg text-slate-500 font-bold text-sm backdrop-blur-sm border border-slate-200">
+                Aún no hay movimientos
+              </span>
+            </div>
+          )}
+          <div className={`h-80 w-full transition-opacity duration-500 ${datos.length === 0 ? 'opacity-40' : 'opacity-100'}`}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={datosGraficaBodegasValor} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} dy={10} />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 12 }} 
+                  tickFormatter={(value) => new Intl.NumberFormat('es-CO', { notation: "compact", compactDisplay: "short" }).format(value)}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f1f5f9' }} 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                  formatter={(value) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
+                
+                {/* Dibujamos una barra apilada dinámica por cada zona */}
+                {datos.length > 0 ? (
+                  zonasConPeso.map((zona, index) => (
+                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
+                  ))
+                ) : (
+                  <Bar dataKey="Total COP" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
                 )}
               </BarChart>
             </ResponsiveContainer>

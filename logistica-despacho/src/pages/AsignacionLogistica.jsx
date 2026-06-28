@@ -199,6 +199,7 @@ const AsignacionLogistica = () => {
       });
     }
 
+    window.dispatchEvent(new CustomEvent('show-loader', { detail: { message: 'Asignando ruta por lote...' } }));
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/asignar-lote`, {
         method: 'PUT',
@@ -228,6 +229,8 @@ const AsignacionLogistica = () => {
       }
     } catch (error) {
       mostrarError("Error de conexión al asignar el lote.");
+    } finally {
+      window.dispatchEvent(new CustomEvent('hide-loader'));
     }
   };
 
@@ -264,6 +267,7 @@ const AsignacionLogistica = () => {
       return mostrarError(`❌ ALERTA:\nEl valor a despachar no puede superar la factura.`);
     }
 
+    window.dispatchEvent(new CustomEvent('show-loader', { detail: { message: 'Actualizando asignación...' } }));
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoIndividual.id}/asignar`, {
         method: 'PUT',
@@ -289,20 +293,30 @@ const AsignacionLogistica = () => {
         mostrarExito("✅ Ruta actualizada exitosamente");
         fetchData(true); 
       }
-    } catch (error) { mostrarError("Error de conexión"); }
+    } catch (error) { 
+      mostrarError("Error de conexión"); 
+    } finally {
+      window.dispatchEvent(new CustomEvent('hide-loader'));
+    }
   };
 
   const handleQuitarAsignacion = async (pedidoId) => {
     if (!(await confirmarAccion("Confirmar", "¿Estás seguro de quitar la asignación?"))) return;
+    window.dispatchEvent(new CustomEvent('show-loader', { detail: { message: 'Desasignando...' } }));
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos/${pedidoId}/desasignar`, {
         method: 'PUT'
       });
       if (res.ok) {
+        mostrarExito("Asignación removida correctamente");
+        fetchData(true);
         setShowModalIndividual(false);
-        fetchData(true); 
       }
-    } catch (error) { mostrarError("Error de conexión"); }
+    } catch (error) { 
+      mostrarError("Error al desasignar"); 
+    } finally {
+      window.dispatchEvent(new CustomEvent('hide-loader'));
+    }
   };
 
   const obtenerPesoFormateado = (p) => Number(p.total_peso || p.peso || 0).toLocaleString();
@@ -339,6 +353,39 @@ const AsignacionLogistica = () => {
   
   const vehiculoLoteSelec = vehiculos.find(v => String(v.id) === String(asignacionLote.vehiculo_id));
   const excedeCapacidadLote = vehiculoLoteSelec && pesoLoteTotal > Number(vehiculoLoteSelec.capacidad_kg);
+
+  // Lógica para Consolidar la Mercancía por Bodega
+  const bodegasConsolidadasMap = {};
+  pedidosFiltrados.forEach(pedido => {
+    if (pedido.productos && Array.isArray(pedido.productos)) {
+      pedido.productos.forEach(prod => {
+        const bodegaFinal = prod.bodega_nombre || (prod.bodega_id ? `Bodega ${prod.bodega_id}` : 'Bodega Principal');
+        
+        if (!bodegasConsolidadasMap[bodegaFinal]) {
+          bodegasConsolidadasMap[bodegaFinal] = {};
+        }
+        
+        const codigo = prod.codigo_producto || 'S/C';
+        if (!bodegasConsolidadasMap[bodegaFinal][codigo]) {
+          bodegasConsolidadasMap[bodegaFinal][codigo] = {
+            codigo: codigo,
+            descripcion: prod.descripcion || prod.nombre_producto || 'Sin descripción',
+            cantidad: 0,
+            unidad_medida: prod.unidad_medida || 'UND'
+          };
+        }
+        
+        bodegasConsolidadasMap[bodegaFinal][codigo].cantidad += parseFloat(prod.cantidad_despachada || prod.cantidad_pendiente || 0);
+      });
+    }
+  });
+
+  const bodegasConsolidadasArr = Object.keys(bodegasConsolidadasMap).map(bodegaName => {
+    return {
+      bodega: bodegaName,
+      productos: Object.values(bodegasConsolidadasMap[bodegaName])
+    };
+  });
 
   const handleImprimir = () => {
     const tituloOriginal = document.title; 
@@ -823,10 +870,71 @@ const AsignacionLogistica = () => {
             </thead>
             <tbody>
               {pedidosFiltrados.map(p => (
-                <tr key={p.id}><td className="border border-black p-1 text-center font-bold">{p.id_factura}</td><td className="border border-black p-1">{p.nombre_cliente}</td><td className="border border-black p-1">{p.destino}</td><td className="border border-black p-1 text-center">{obtenerPesoFormateado(p)} Kg</td><td className="border border-black p-1 text-center">${Number(p.total_despachado || 0).toLocaleString('es-CO')}</td><td className="border border-black p-1"></td></tr>
+                <tr key={p.id}>
+                  <td className="border border-black p-1 text-center font-bold leading-tight">
+                    {p.id_factura}
+                    {p.tipo_documento && <span className="block text-[8px] font-normal text-gray-600 mt-0.5">{p.tipo_documento}</span>}
+                  </td>
+                  <td className="border border-black p-1 leading-tight">
+                    <span className="font-bold">{p.nombre_cliente}</span>
+                    {p.telefono && <span className="block text-[8px] text-gray-600 mt-0.5">Tel: {p.telefono}</span>}
+                    {p.nota_manual && <span className="block text-[8px] text-gray-600 mt-0.5 italic max-w-[180px]">Nota: {p.nota_manual}</span>}
+                  </td>
+                  <td className="border border-black p-1">{p.destino}</td>
+                  <td className="border border-black p-1 text-center">{obtenerPesoFormateado(p)} Kg</td>
+                  <td className="border border-black p-1 text-center">${Number(p.total_despachado || 0).toLocaleString('es-CO')}</td>
+                  <td className="border border-black p-1"></td>
+                </tr>
               ))}
             </tbody>
           </table>
+
+          {/* NUEVA PÁGINA PARA CONSOLIDADOS */}
+          <div style={{ pageBreakBefore: 'always' }} className="pt-4">
+            <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-end">
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight uppercase">Consolidado de Cargue</h1>
+                <p className="text-xs font-bold mt-1 text-gray-600">Conductor: {conductorSeleccionadoInfo?.nombre || 'Múltiples'}</p>
+              </div>
+              <div className="text-right text-xs">
+                <p><strong>Fecha:</strong> {fechaFiltro}</p>
+                <p><strong>Generado:</strong> {new Date().toLocaleTimeString()}</p>
+              </div>
+            </div>
+
+            {bodegasConsolidadasArr.map((bodegaGrp, bIdx) => (
+              <div key={bIdx} className="mb-8" style={{ pageBreakInside: 'avoid' }}>
+                <h2 className="text-md font-bold uppercase mb-2 bg-gray-200 p-2 border border-black inline-block">
+                  Bodega: {bodegaGrp.bodega}
+                </h2>
+                <table className="w-full text-left text-[10px] border-collapse border border-black">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border border-black p-1 text-center w-24">CÓDIGO</th>
+                      <th className="border border-black p-1">DESCRIPCIÓN DEL PRODUCTO</th>
+                      <th className="border border-black p-1 text-center w-24">CANT. TOTAL</th>
+                      <th className="border border-black p-1 text-center w-20">MEDIDA</th>
+                      <th className="border border-black p-1 text-center w-20">CHECK</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bodegaGrp.productos.map((prod, idx) => (
+                      <tr key={idx}>
+                        <td className="border border-black p-1 text-center font-bold text-gray-700">{prod.codigo}</td>
+                        <td className="border border-black p-1 font-semibold">{prod.descripcion}</td>
+                        <td className="border border-black p-1 text-center font-extrabold text-[12px]">{prod.cantidad}</td>
+                        <td className="border border-black p-1 text-center text-gray-600">{prod.unidad_medida}</td>
+                        <td className="border border-black p-1"></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+            {bodegasConsolidadasArr.length === 0 && (
+              <p className="text-center text-gray-500 italic mt-4">No hay detalles de productos para consolidar en este viaje.</p>
+            )}
+          </div>
         </div>
       )}
     </>

@@ -26,9 +26,9 @@ const getPendientesLista = async (req, res) => {
 const crearPendiente = async (req, res) => {
   const connection = await pool.getConnection();
   try {
-    const { fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, productos, usuario_id } = req.body;
+    const { fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, productos, usuario_id } = req.body;
 
-    // 👇 NUEVA VALIDACIÓN: Evitar que se duplique el número de factura 👇
+    // 🚩 NUEVA VALIDACIÓN: Evitar que se duplique el número de factura 🚩
     const [facturaExiste] = await connection.query("SELECT id FROM bodega_pendientes WHERE factura_num = ?", [factura_num]);
     if (facturaExiste.length > 0) {
       return res.status(400).json({ error: `La factura '${factura_num}' ya se encuentra registrada en el sistema.` });
@@ -37,13 +37,13 @@ const crearPendiente = async (req, res) => {
     await connection.beginTransaction();
 
     const [master] = await connection.query(
-      `INSERT INTO bodega_pendientes (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    , [fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, usuario_id]);
+      `INSERT INTO bodega_pendientes (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    , [fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura || 0, usuario_id]);
 
     for (let prod of productos) {
       await connection.query(
-        `INSERT INTO bodega_pendientes_detalle (pendiente_id, codigo_producto, nombre_producto, cantidad_pendiente, unidad_medida, bodega_id) VALUES (?, ?, ?, ?, ?, ?)`
-      , [master.insertId, prod.codigo, prod.nombre, prod.cantidad, prod.unidad, prod.bodega_id]);
+        `INSERT INTO bodega_pendientes_detalle (pendiente_id, codigo_producto, nombre_producto, cantidad_pendiente, unidad_medida, bodega_id, precio_unitario, valor_total, peso_kg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      , [master.insertId, prod.codigo, prod.nombre, prod.cantidad, prod.unidad, prod.bodega_id, prod.precio_unitario || 0, prod.valor_total || prod.precio_total || 0, prod.peso_kg || prod.peso || 0]);
     }
 
     await connection.commit();
@@ -61,26 +61,36 @@ const crearPendiente = async (req, res) => {
   }
 };
 
-// 3. Traer el detalle EXACTO de una factura para el Modal (AQUÍ ESTÁ LA MAGIA QUE ARREGLA TU ERROR)
+// 3. Traer el detalle EXACTO de una factura para el Modal
 const getPendientePorId = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const [master] = await pool.query(`SELECT valor_factura FROM bodega_pendientes WHERE id = ?`, [id]);
+
     const [productos] = await pool.query(`
       SELECT 
-        id,
-        codigo_producto AS codigo, 
-        nombre_producto AS nombre, 
-        cantidad_pendiente AS cantidad, 
-        unidad_medida AS unidad,
-        COALESCE(cantidad_entregada, 0) as cantidad_entregada,
-        (cantidad_pendiente - COALESCE(cantidad_entregada, 0)) AS cant_a_entregar
-      FROM bodega_pendientes_detalle 
-      WHERE pendiente_id = ? AND cantidad_pendiente > COALESCE(cantidad_entregada, 0)
+        d.id,
+        d.codigo_producto AS codigo, 
+        d.nombre_producto AS nombre, 
+        d.cantidad_pendiente AS cantidad, 
+        d.unidad_medida AS unidad,
+        d.precio_unitario,
+        d.valor_total,
+        d.peso_kg,
+        COALESCE(d.cantidad_entregada, 0) as cantidad_entregada,
+        (d.cantidad_pendiente - COALESCE(d.cantidad_entregada, 0)) AS cant_a_entregar,
+        COALESCE(b1.nombre, b2.nombre) AS bodega_nombre,
+        COALESCE(d.bodega_id, p.punto_venta_id) AS bodega_id
+      FROM bodega_pendientes_detalle d
+      JOIN bodega_pendientes p ON d.pendiente_id = p.id
+      LEFT JOIN bodegas b1 ON d.bodega_id = b1.id
+      LEFT JOIN bodegas b2 ON p.punto_venta_id = b2.id
+      WHERE d.pendiente_id = ? AND d.cantidad_pendiente > COALESCE(d.cantidad_entregada, 0)
     `, [id]);
 
-    // Lo devolvemos dentro de un objeto con la llave "productos" para que React lo entienda
-    res.json({ productos: productos });
+    // Lo devolvemos dentro de un objeto con la llave "productos" y "valor_factura"
+    res.json({ productos, valor_factura: master[0]?.valor_factura || 0 });
 
   } catch (error) {
     console.error("Error al obtener detalle del pendiente:", error);
@@ -135,10 +145,19 @@ const entregarPendiente = async (req, res) => {
     
     let haySaldos = false;
     let itemsSaldo = [];
+    let poolDespacho = [...itemsADespachar];
 
     for (let det of todosDetalles) {
-      const itemDespachado = itemsADespachar.find(i => i.id === det.id || (i.codigo_producto === det.codigo_producto));
-      const cantDespachada = itemDespachado ? itemDespachado.cant_a_entregar : 0;
+      let index = poolDespacho.findIndex(i => i.id && String(i.id) === String(det.id));
+      if (index === -1) {
+        index = poolDespacho.findIndex(i => i.codigo_producto === det.codigo_producto);
+      }
+
+      let cantDespachada = 0;
+      if (index !== -1) {
+        cantDespachada = poolDespacho[index].cant_a_entregar;
+        poolDespacho.splice(index, 1); // Remover para no duplicar asignaciones
+      }
       
       const cantPendienteAnterior = parseFloat(det.cantidad_pendiente);
       const cantEntregadaAnterior = parseFloat(det.cantidad_entregada || 0);
@@ -228,11 +247,38 @@ const despacharMaterial = async (req, res) => {
   res.status(400).json({ message: "Por favor usa la ruta PUT /:id/entregar" });
 };
 
+// 👇 NUEVO ENDPOINT PARA ACTUALIZAR TIPO DE ENTREGA 👇
+const actualizarTipoEntrega = async (req, res) => {
+  const { id } = req.params;
+  const { tipo_entrega } = req.body;
+  
+  if (!tipo_entrega) {
+    return res.status(400).json({ error: "Falta el tipo_entrega" });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE bodega_pendientes SET tipo_entrega = ? WHERE id = ?`,
+      [tipo_entrega, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Pendiente no encontrado" });
+    }
+
+    res.json({ message: "Tipo de entrega actualizado a " + tipo_entrega });
+  } catch (error) {
+    console.error("Error actualizando tipo_entrega:", error);
+    res.status(500).json({ error: "Error de base de datos" });
+  }
+};
+
 module.exports = { 
   getPendientesLista, 
   crearPendiente, 
   despacharMaterial,
   getPendientePorId,
   entregarPendiente,
-  eliminarPendiente
+  eliminarPendiente,
+  actualizarTipoEntrega
 };

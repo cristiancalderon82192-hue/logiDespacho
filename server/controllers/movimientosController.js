@@ -20,7 +20,8 @@ const getReporteMovimientos = async (req, res) => {
         p.estado_entrega, 
         p.created_at AS fecha_creacion,
         b.nombre AS bodega, 
-        pd.peso 
+        pd.peso,
+        p.valor_factura
       FROM pedidos p
       LEFT JOIN clientes c ON p.cliente_id = c.id
       LEFT JOIN destinos d ON p.destino_id = d.id

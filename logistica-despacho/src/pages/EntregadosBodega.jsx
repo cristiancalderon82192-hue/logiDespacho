@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileCheck, Download, Calendar, User, Search, Camera } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { socket } from '../utils/socket';
 import { useAuth } from '../context/AuthContext';
 import DateRangeSelector from '../components/DateRangeSelector';
@@ -37,45 +38,70 @@ const EntregadosBodega = () => {
   }, []);
 
   const descargarPDFSupport = (entrega) => {
-    const doc = new jsPDF();
-    
-    doc.setFillColor(71, 179, 168);
-    doc.rect(0, 0, 210, 30, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("COMPROBANTE DE ENTREGA EN BODEGA", 15, 20);
+    try {
+      const doc = new jsPDF();
+      const colorHeader = [71, 179, 168]; 
+      
+      doc.setFillColor(colorHeader[0], colorHeader[1], colorHeader[2]); 
+      doc.rect(0, 0, 210, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("SOPORTE DE ENTREGA BODEGA", 105, 18, { align: 'center' });
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(12);
+      doc.text(`Documento / Factura: ${entrega.factura_num}`, 14, 45);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Fecha Entrega: ${new Date(entrega.fecha_entrega).toLocaleString()}`, 14, 52);
+      
+      autoTable(doc, {
+          startY: 60,
+          head: [['Despachador']],
+          body: [
+              [`Nombre: ${entrega.despachador}${entrega.bodega_nombre ? ' - Bodega: ' + entrega.bodega_nombre : ''}`]
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: colorHeader } 
+      });
 
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(11);
-    doc.text(`Número de Factura: ${entrega.factura_num}`, 15, 45);
-    doc.text(`Fecha: ${new Date(entrega.fecha_entrega).toLocaleString()}`, 15, 52);
-    doc.text(`Bodeguero: ${entrega.despachador}`, 15, 59);
+      let itemsDespachados = [];
+      try {
+        itemsDespachados = JSON.parse(entrega.productos_entregados || '[]');
+      } catch (e) {
+        console.error("Error parseando productos:", e);
+      }
 
-    doc.setFillColor(30, 41, 59);
-    doc.rect(15, 70, 180, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text("Código", 18, 75);
-    doc.text("Descripción Material", 60, 75);
-    doc.text("Cant. Entregada", 155, 75);
+      const bodyProductos = itemsDespachados.map(p => [
+        p.codigo || p.codigo_producto || '-',
+        p.nombre || p.nombre_producto || '-',
+        `${p.cant_a_entregar || p.cantidad_a_entregar_ahora || 0} ${p.unidad || p.unidad_medida || 'UND'}`
+      ]);
 
-    doc.setTextColor(70, 70, 70);
-    let itemsDespachados = JSON.parse(entrega.productos_entregados);
-    let currentY = 85;
+      autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 10,
+          head: [['Código', 'Producto Entregado', 'Cantidad']],
+          body: bodyProductos.length > 0 ? bodyProductos : [['-', 'Sin productos', '-']],
+          theme: 'grid',
+          headStyles: { fillColor: [50, 50, 50] }
+      });
 
-    itemsDespachados.forEach((item) => {
-      doc.text(String(item.codigo_producto), 18, currentY);
-      doc.text(String(item.nombre_producto), 60, currentY);
-      doc.text(`${item.cant_a_entregar} ${item.unidad_medida}`, 155, currentY);
-      currentY += 8;
-    });
-
-    // Se elimina la firma del bodeguero del PDF
-    doc.line(70, 180, 145, 180); // Centrado
-    doc.text("Firma Cliente", 95, 185);
-    if (entrega.firma_cliente) doc.addImage(entrega.firma_cliente, 'PNG', 70, 145, 75, 32);
-
-    doc.save(`Soporte_${entrega.factura_num}.pdf`);
+      const finalY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Firma del Cliente de Recibido:", 14, finalY);
+      
+      if (entrega.firma_cliente) {
+          doc.addImage(entrega.firma_cliente, 'PNG', 14, finalY + 5, 80, 40);
+          doc.setDrawColor(200, 200, 200);
+          doc.rect(14, finalY + 5, 80, 40);
+      } 
+      
+      doc.save(`Soporte_Bodega_${entrega.factura_num}.pdf`);
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+    }
   };
 
   const descargarEvidencia = (entrega) => {
@@ -94,7 +120,14 @@ const EntregadosBodega = () => {
 
     const cumpleFactura = filtroFactura ? h.factura_num?.toLowerCase().includes(filtroFactura.toLowerCase()) : true;
     
-    const fecha = h.fecha_entrega ? h.fecha_entrega.split('T')[0] : '';
+    let fecha = '';
+    if (h.fecha_entrega) {
+      const d = new Date(h.fecha_entrega);
+      const año = d.getFullYear();
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      fecha = `${año}-${mes}-${dia}`;
+    }
     let cumpleFecha = true;
     if (fechaInicio && fecha) cumpleFecha = cumpleFecha && fecha >= fechaInicio;
     if (fechaFin && fecha) cumpleFecha = cumpleFecha && fecha <= fechaFin;

@@ -38,8 +38,8 @@ const crearPedido = async (req, res) => {
       cliente_id = clientes[0].id;
     } else {
       const [resC] = await db.query(
-        "INSERT INTO clientes (nombre, telefono) VALUES (?, ?)",
-        [data.nombre_cliente, data.telefono || 'Sin telefono']
+        "INSERT INTO clientes (nombre, telefono, documento) VALUES (?, ?, ?)",
+        [data.nombre_cliente, data.telefono || 'Sin telefono', 'Sin documento']
       );
       cliente_id = resC.insertId;
     }
@@ -51,7 +51,14 @@ const crearPedido = async (req, res) => {
       if (tipos.length > 0) tipoDocId = tipos[0].id;
     }
 
-    // D. INSERTAR PEDIDO
+    // D. VALIDAR USUARIO_ID (para evitar FK error si viene de un bodeguero)
+    let finalUsuarioId = data.usuario_id || 1;
+    const [uCheck] = await db.query("SELECT id FROM usuarios WHERE id = ?", [finalUsuarioId]);
+    if (uCheck.length === 0) {
+      finalUsuarioId = 1;
+    }
+
+    // E. INSERTAR PEDIDO
     const sql = `
       INSERT INTO pedidos (
         usuario_id, cliente_id, destino_id, id_factura, tipo_documento_id, 
@@ -61,7 +68,7 @@ const crearPedido = async (req, res) => {
     `;
 
     const values = [
-      data.usuario_id || 1, 
+      finalUsuarioId, 
       cliente_id,
       destinoId,
       data.id_factura,
@@ -280,7 +287,7 @@ const actualizarPedido = async (req, res) => {
       if (clientes.length > 0) {
         cliente_id = clientes[0].id;
       } else {
-        const [resC] = await db.query("INSERT INTO clientes (nombre, telefono) VALUES (?, ?)", [data.nombre_cliente, data.telefono || 'Sin telefono']);
+        const [resC] = await db.query("INSERT INTO clientes (nombre, telefono, documento) VALUES (?, ?, ?)", [data.nombre_cliente, data.telefono || 'Sin telefono', 'Sin documento']);
         cliente_id = resC.insertId;
       }
     }
@@ -375,8 +382,18 @@ const actualizarPedido = async (req, res) => {
 const eliminarPedido = async (req, res) => {
   const { id } = req.params;
   try {
+    // 1. Get id_factura before deleting
+    const [pedidoRows] = await db.query("SELECT id_factura FROM pedidos WHERE id = ?", [id]);
+    const idFactura = pedidoRows.length > 0 ? pedidoRows[0].id_factura : null;
+
     await db.query("DELETE FROM pedidos_detalle WHERE pedido_id = ?", [id]);
     await db.query("DELETE FROM pedidos WHERE id = ?", [id]);
+
+    // 2. Revert tipo_entrega in bodega_pendientes to make it available again
+    if (idFactura) {
+      await db.query("UPDATE bodega_pendientes SET tipo_entrega = NULL WHERE factura_num = ?", [idFactura]);
+    }
+
     res.json({ message: "Pedido eliminado correctamente" });
   } catch (error) {
     res.status(500).json({ error: "Error al eliminar pedido" });

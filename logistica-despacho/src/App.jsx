@@ -45,6 +45,7 @@ import PendientesBodega from './pages/PendientesBodega';
 import EntregadosBodega from './pages/EntregadosBodega';
 import ReporteBodegaParciales from './pages/ReporteBodegaParciales';
 import ChatAssistant from './components/ChatAssistant';
+import GlobalLoader from './components/GlobalLoader';
 
 // REDIRECT INTELIGENTE
 const RootRedirect = () => {
@@ -87,6 +88,7 @@ const MainLayout = ({ children }) => {
       </main>
       
       <ChatAssistant />
+      <GlobalLoader />
     </div>
   );
 };

@@ -75,6 +75,7 @@ const login = async (req, res) => {
       role: usuario.rol_id,      
       rol_nombre: usuario.rol_nombre,
       estado: usuario.estado,
+      bodega_id: usuario.bodega_id,
       token: token 
     });
 

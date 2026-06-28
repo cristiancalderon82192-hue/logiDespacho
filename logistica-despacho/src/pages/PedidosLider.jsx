@@ -159,6 +159,10 @@ const PedidosLider = () => {
           setShowClientModal(true);
           mostrarInfo("El cliente extraído no existe. Por favor completa sus datos para crearlo.");
         }
+      } else {
+        setIsCreatingClient(false);
+        setShowClientModal(true);
+        mostrarInfo("No se detectó un cliente en el PDF. Por favor selecciónalo o créalo.");
       }
 
       const nuevosPesos = { peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0 };

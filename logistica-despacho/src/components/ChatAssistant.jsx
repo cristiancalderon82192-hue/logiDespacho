@@ -102,7 +102,7 @@ export default function ChatAssistant() {
   return (
     <>
       {/* Floating Button */}
-      <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
+      <div className={`print:hidden fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
         <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-60" style={{ animationDuration: '3s' }}></div>
         <button
           onClick={() => setIsOpen(true)}
