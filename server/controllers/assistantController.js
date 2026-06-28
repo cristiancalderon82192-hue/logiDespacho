@@ -16,7 +16,7 @@ if (apiKey && apiKey.startsWith('gsk_')) {
 
 const DB_SCHEMA = `
 ESQUEMA DE LA BASE DE DATOS LOGIDESPACHO:
-- pedidos: id, usuario_id, cliente_id, id_factura (el numero alfanumerico de la guia), tipo_documento_id, prioridad, valor_factura, destino_id, conductor_id, vehiculo_id, estado_entrega ('Pendiente','Asignado','En Ruta','Entregado','Entregado Incompleto','Devolución'), fecha_agendada, fecha_entrega_conductor, observaciones_entrega, fecha_facturacion, nota_manual, total_despachado, valor_factura_pendiente, numero_viaje
+- pedidos: id, usuario_id, cliente_id, id_factura (el numero alfanumerico de la guia), tipo_documento_id, prioridad, valor_factura, destino_id, conductor_id, vehiculo_id, estado_entrega ('Pendiente','Asignado','En Ruta','Entregado','Entregado Incompleto','Devolución'), fecha_agendada, fecha_entrega_conductor, observaciones_entrega, fecha_facturacion, nota_manual, total_despachado, valor_factura_pendiente, numero_viaje, tipo_entrega ('Bodega', 'Domicilio')
 - clientes: id, documento, nombre, telefono, direccion_exacta
 - usuarios (los conductores tienen rol_id=4): id, nombre_completo, email, rol_id, estado, bodega_id
 - vehiculos: id, placa, modelo, capacidad_kg, estado
