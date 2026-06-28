@@ -90,7 +90,8 @@ export default function ChatAssistant() {
       if (response.ok && data.success) {
         setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, hubo un problema. ' + (data.error || '') }]);
+        const errorMessage = data.details ? `${data.error} (Detalles: ${data.details})` : (data.error || '');
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Lo siento, hubo un problema. ' + errorMessage }]);
       }
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error de red. Asegúrate de que el servidor esté funcionando.' }]);
