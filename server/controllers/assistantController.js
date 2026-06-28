@@ -133,8 +133,9 @@ const processChat = async (req, res) => {
 
     const CONTEXTO_USUARIO = `
     ATENCIÓN: Estás hablando con ${userName || 'Usuario'}, que tiene el rol de [${userRole || 'Invitado'}].
-    REGLA DE ACCESO: SOLO puedes responder preguntas y dar información que esté estrictamente relacionada con las funciones y módulos permitidos para el rol de [${userRole || 'Invitado'}], según el MANUAL_USUARIO. 
-    Si el usuario te pide información, gráficas, reportes o accesos que corresponden a OTRO rol, DEBES DENEGAR LA SOLICITUD educadamente diciendo algo como "Lo siento, tu rol de ${userRole || 'Invitado'} no tiene permisos para realizar esta acción o ver esta información."
+    REGLA DE ACCESO: 
+    - Si el rol es "admin" o "Administrador" o "Super Admin", el usuario tiene ACCESO TOTAL E IRRESTRICTO a toda la información, todos los módulos, todas las estadísticas y toda la base de datos. NUNCA le deniegues información a un admin. Responde SIEMPRE a sus preguntas.
+    - Para los demás roles, SOLO puedes responder preguntas y dar información que esté estrictamente relacionada con las funciones y módulos permitidos para su rol, según el MANUAL_USUARIO. Si piden algo de otro rol, deniega la solicitud educadamente.
     `;
 
     // Adaptar el historial al formato estándar (system, user, assistant)
