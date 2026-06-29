@@ -3,12 +3,13 @@ import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOp
 import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 
 const ReporteMovimientos = () => {
+  const hoy = new Date().toISOString().split('T')[0];
   const [filtros, setFiltros] = useState({
-    fechaInicio: '',
-    fechaFin: '',
+    fechaInicio: hoy,
+    fechaFin: hoy,
     zona: '',
     ciudad: '',
     vehiculo: ''
