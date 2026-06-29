@@ -168,10 +168,6 @@ const ReporteMovimientos = () => {
       doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
       // 2. TARJETAS NATIVAS DE TOTALES (KPIs)
-      const totalPedidos = datos.length;
-      const totalPeso = datos.reduce((acc, curr) => acc + (parseFloat(curr.peso) || 0), 0);
-      const totalValor = datos.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
-
       let startY = 48;
 
       // Tarjeta 1: Total Movimientos
@@ -250,6 +246,11 @@ const ReporteMovimientos = () => {
   const datosGraficaBodegas = procesarDatosBodegas();
   const datosGraficaBodegasValor = procesarDatosBodegasValor();
   
+  // Totales para la UI y el PDF
+  const totalPedidos = datos.length;
+  const totalPeso = datos.reduce((acc, curr) => acc + (parseFloat(curr.peso) || 0), 0);
+  const totalValor = datos.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
+  
   // Extraemos las zonas únicas que tienen peso para generar los colores dinámicos de las barras
   const zonasConPeso = [...new Set(datos.filter(d => d.peso > 0 || d.valor_factura > 0).map(d => d.zona_envio))].filter(Boolean);
   const coloresZonas = ['#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#84cc16']; // Tonos vibrantes
@@ -326,9 +327,12 @@ const ReporteMovimientos = () => {
         <div ref={chartsRef} className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6 print-container">
         
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative">
-          <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
-            <BarChart2 size={18} className="text-[#47B3A8]" /> Rendimiento por Zona
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
+              <BarChart2 size={18} className="text-[#47B3A8]" /> Rendimiento por Zona
+            </h2>
+            {datos.length > 0 && <span className="text-xs bg-[#47B3A8]/10 text-[#47B3A8] font-bold px-3 py-1 rounded-full">{totalPedidos} Movimientos</span>}
+          </div>
           {datos.length === 0 && !loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none mt-8">
               <span className="bg-slate-100/80 px-4 py-2 rounded-lg text-slate-500 font-bold text-sm backdrop-blur-sm border border-slate-200">
@@ -353,9 +357,12 @@ const ReporteMovimientos = () => {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative">
-          <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
-            <PackageOpen size={18} className="text-[#8b5cf6]" /> Peso Movido por Bodega (Kg)
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
+              <PackageOpen size={18} className="text-[#8b5cf6]" /> Peso Movido por Bodega
+            </h2>
+            {datos.length > 0 && <span className="text-xs bg-[#8b5cf6]/10 text-[#8b5cf6] font-bold px-3 py-1 rounded-full">{totalPeso.toFixed(2)} Kg</span>}
+          </div>
           {datos.length === 0 && !loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none mt-8">
               <span className="bg-slate-100/80 px-4 py-2 rounded-lg text-slate-500 font-bold text-sm backdrop-blur-sm border border-slate-200">
@@ -385,9 +392,12 @@ const ReporteMovimientos = () => {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative lg:col-span-2 xl:col-span-1">
-          <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
-            <DollarSign size={18} className="text-[#f59e0b]" /> Valor Movido por Bodega ($)
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-sm font-bold text-slate-600 uppercase flex items-center gap-2">
+              <DollarSign size={18} className="text-[#f59e0b]" /> Valor Movido por Bodega
+            </h2>
+            {datos.length > 0 && <span className="text-xs bg-[#f59e0b]/10 text-[#f59e0b] font-bold px-3 py-1 rounded-full">${totalValor.toLocaleString()}</span>}
+          </div>
           {datos.length === 0 && !loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none mt-8">
               <span className="bg-slate-100/80 px-4 py-2 rounded-lg text-slate-500 font-bold text-sm backdrop-blur-sm border border-slate-200">
