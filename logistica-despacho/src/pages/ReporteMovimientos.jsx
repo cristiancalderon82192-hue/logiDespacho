@@ -3,6 +3,7 @@ import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOp
 import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas-pro';
 
 const ReporteMovimientos = () => {
@@ -15,7 +16,7 @@ const ReporteMovimientos = () => {
     vehiculo: ''
   });
 
-  const reporteRef = useRef(null);
+  const chartsRef = useRef(null);
   const [generandoPDF, setGenerandoPDF] = useState(false);
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -147,38 +148,78 @@ const ReporteMovimientos = () => {
   };
 
   const exportarPDF = async () => {
-    if (!reporteRef.current) return;
     try {
       setGenerandoPDF(true);
-      const canvas = await html2canvas(reporteRef.current, {
-        scale: 2, 
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
+      const doc = new jsPDF('landscape');
       
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      // 1. HEADER (Fondo Oscuro Corporativo)
+      doc.setFillColor(15, 23, 42); 
+      doc.rect(0, 0, 300, 40, 'F');
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("Reporte de Movimientos Zona", 14, 20);
       
-      let heightLeft = pdfHeight;
-      let position = 0;
+      doc.setTextColor(148, 163, 184); 
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Rango evaluado: ${filtros.fechaInicio} hasta ${filtros.fechaFin}`, 14, 30);
+      doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
-      // Add first page
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pdf.internal.pageSize.getHeight();
+      let startY = 48;
 
-      // Add extra pages if content is taller than one A4 page
-      while (heightLeft >= 0) {
-        position = heightLeft - pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pdf.internal.pageSize.getHeight();
+      // 2. INCORPORAR GRÁFICAS (con html2canvas-pro)
+      if (chartsRef.current && datos.length > 0) {
+        const canvas = await html2canvas(chartsRef.current, {
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
+        
+        const imgData = canvas.toDataURL('image/png');
+        const pdfWidth = 268; // Dejar margen de 14mm a cada lado (297 - 28)
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        doc.addImage(imgData, 'PNG', 14, startY, pdfWidth, pdfHeight);
+        startY += pdfHeight + 10;
+      }
+
+      // 3. TABLA DE DATOS NATIVO
+      if (datos.length > 0) {
+        const columnas = ["Factura", "Bodega / Peso / Valor", "Ciudad / Zona", "Contacto", "Vehículo", "Estado"];
+        const filas = datos.map(p => [
+          p.id_factura || 'N/A',
+          `${p.bodega || 'N/A'}\n${p.peso ? `${p.peso} Kg` : '0 Kg'}\n$${parseFloat(p.valor_factura || 0).toLocaleString()}`,
+          `${p.ciudad || 'N/A'}\n${p.zona_envio || 'N/A'}`,
+          `${p.nombre_cliente || 'N/A'}\n${p.telefono || 'N/A'}`,
+          p.placa || 'N/A',
+          p.estado_entrega || 'N/A'
+        ]);
+
+        autoTable(doc, {
+          startY: startY,
+          head: [columnas],
+          body: filas,
+          theme: 'grid',
+          headStyles: { 
+            fillColor: [71, 179, 168], 
+            textColor: 255,
+            fontStyle: 'bold' 
+          },
+          styles: { 
+            fontSize: 8,
+            cellPadding: 3,
+            overflow: 'linebreak' 
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252] 
+          },
+        });
       }
       
-      pdf.save(`Reporte_Movimientos_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
+      doc.save(`Reporte_Movimientos_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
     } catch (error) {
       console.error("Error generando PDF:", error);
     } finally {
@@ -262,7 +303,7 @@ const ReporteMovimientos = () => {
           </form>
         </div>
 
-      <div ref={reporteRef} className="bg-slate-50 print-container">
+      <div ref={chartsRef} className="bg-slate-50 print-container">
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
         
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative">
