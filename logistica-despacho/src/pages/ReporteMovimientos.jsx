@@ -201,6 +201,42 @@ const ReporteMovimientos = () => {
 
       startY += 45; // Espacio debajo de las tarjetas
 
+      // 2.5 RESUMEN POR ZONA
+      const zonasSummary = [...new Set(datos.map(d => d.zona_envio))].filter(Boolean);
+      if (zonasSummary.length > 0) {
+        const resumenZonas = zonasSummary.map(zona => {
+          const ped = datos.filter(d => d.zona_envio === zona);
+          const movs = ped.length;
+          const peso = ped.reduce((acc, curr) => acc + (parseFloat(curr.peso) || 0), 0);
+          const valor = ped.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
+          return [
+            zona,
+            movs.toString(),
+            `${peso.toFixed(2)} Kg`,
+            `$${valor.toLocaleString()}`
+          ];
+        });
+
+        doc.setTextColor(71, 179, 168); // Color primario
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Resumen por Zona", 14, startY);
+        startY += 4;
+        
+        autoTable(doc, {
+          startY: startY,
+          head: [["Zona", "Movimientos", "Peso Movido", "Valor Movido"]],
+          body: resumenZonas,
+          theme: 'grid',
+          headStyles: { fillColor: [248, 250, 252], textColor: [71, 179, 168], fontStyle: 'bold' },
+          styles: { fontSize: 9, cellPadding: 3 },
+          alternateRowStyles: { fillColor: [255, 255, 255] },
+          margin: { left: 14 }
+        });
+        
+        startY = doc.lastAutoTable.finalY + 15;
+      }
+
       // 3. TABLA DE DATOS NATIVO
       if (datos.length > 0) {
         const columnas = ["Factura", "Bodega / Peso / Valor", "Ciudad / Zona", "Contacto", "Vehículo", "Estado"];
