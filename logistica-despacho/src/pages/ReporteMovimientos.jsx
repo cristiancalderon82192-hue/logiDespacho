@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOpen, DollarSign } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const ReporteMovimientos = () => {
   const [filtros, setFiltros] = useState({
-    fechaInicio: new Date().toISOString().split('T')[0],
-    fechaFin: new Date().toISOString().split('T')[0],
+    fechaInicio: '',
+    fechaFin: '',
     zona: '',
     ciudad: '',
     vehiculo: ''
   });
 
+  const reporteRef = useRef(null);
+  const [generandoPDF, setGenerandoPDF] = useState(false);
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [opciones, setOpciones] = useState({ ciudades: [], zonas: [], vehiculos: [] });
@@ -141,6 +145,46 @@ const ReporteMovimientos = () => {
     return Object.values(agrupado);
   };
 
+  const exportarPDF = async () => {
+    if (!reporteRef.current) return;
+    try {
+      setGenerandoPDF(true);
+      const canvas = await html2canvas(reporteRef.current, {
+        scale: 2, 
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+
+      // Add extra pages if content is taller than one A4 page
+      while (heightLeft >= 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pdf.internal.pageSize.getHeight();
+      }
+      
+      pdf.save(`Reporte_Movimientos_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+    } finally {
+      setGenerandoPDF(false);
+    }
+  };
+
   const datosGraficaEstados = procesarDatosEstados();
   const datosGraficaBodegas = procesarDatosBodegas();
   const datosGraficaBodegasValor = procesarDatosBodegasValor();
@@ -155,9 +199,17 @@ const ReporteMovimientos = () => {
         <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
           <FileText className="text-[#47B3A8]" /> Reporte de Movimientos
         </h1>
-        <button className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-md">
-          <Download size={18} /> Exportar Excel
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={exportarPDF}
+            disabled={generandoPDF || datos.length === 0}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+            <Download size={18} /> {generandoPDF ? 'Generando...' : 'Exportar PDF'}
+          </button>
+          <button className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-md">
+            <Download size={18} /> Exportar Excel
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6">
@@ -166,7 +218,6 @@ const ReporteMovimientos = () => {
         </h2>
         
         <form onSubmit={generarReporte} className="flex flex-col gap-5">
-            {/* Fila 1: Fechas */}
             <div className="w-full">
               <DateRangeSelector 
                 fechaInicio={filtros.fechaInicio} 
@@ -176,7 +227,6 @@ const ReporteMovimientos = () => {
               />
             </div>
             
-            {/* Fila 2: Selects */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="w-full">
                 <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Ciudad</label>
@@ -203,19 +253,17 @@ const ReporteMovimientos = () => {
               </div>
             </div>
   
-            {/* Fila 3: Botón */}
             <div className="flex justify-end pt-2">
               <button type="submit" disabled={loading} className="bg-[#47B3A8] hover:bg-[#3d9a90] text-white px-8 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-md transition-transform active:scale-95 disabled:opacity-50 w-full sm:w-auto justify-center">
                 <Search size={18} /> {loading ? 'Consultando...' : 'Generar Reporte'}
               </button>
             </div>
           </form>
-      </div>
+        </div>
 
-      {/* 👇 CONTENEDOR GRID PARA LAS TRES GRÁFICAS 👇 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
+      <div ref={reporteRef} className="bg-slate-50 print-container">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
         
-        {/* GRÁFICA 1: RENDIMIENTO POR ZONA */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative">
           <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
             <BarChart2 size={18} className="text-[#47B3A8]" /> Rendimiento por Zona
@@ -243,7 +291,6 @@ const ReporteMovimientos = () => {
           </div>
         </div>
 
-        {/* GRÁFICA 2: PESO MOVIDO POR BODEGA */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative">
           <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
             <PackageOpen size={18} className="text-[#8b5cf6]" /> Peso Movido por Bodega (Kg)
@@ -264,7 +311,6 @@ const ReporteMovimientos = () => {
                 <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
                 
-                {/* Dibujamos una barra apilada dinámica por cada zona que tenga peso */}
                 {datos.length > 0 ? (
                   zonasConPeso.map((zona, index) => (
                     <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
@@ -277,7 +323,6 @@ const ReporteMovimientos = () => {
           </div>
         </div>
 
-        {/* GRÁFICA 3: VALOR MOVIDO POR BODEGA */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative lg:col-span-2 xl:col-span-1">
           <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
             <DollarSign size={18} className="text-[#f59e0b]" /> Valor Movido por Bodega ($)
@@ -307,7 +352,6 @@ const ReporteMovimientos = () => {
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
                 
-                {/* Dibujamos una barra apilada dinámica por cada zona */}
                 {datos.length > 0 ? (
                   zonasConPeso.map((zona, index) => (
                     <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
@@ -319,10 +363,8 @@ const ReporteMovimientos = () => {
             </ResponsiveContainer>
           </div>
         </div>
-
       </div>
 
-      {/* TABLA DE RESULTADOS */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -386,6 +428,7 @@ const ReporteMovimientos = () => {
           </table>
         </div>
       </div>
+    </div>
     </div>
   );
 };
