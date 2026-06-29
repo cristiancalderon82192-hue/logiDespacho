@@ -4,7 +4,6 @@ import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import html2canvas from 'html2canvas-pro';
 
 const ReporteMovimientos = () => {
   const hoy = new Date().toISOString().split('T')[0];
@@ -18,7 +17,6 @@ const ReporteMovimientos = () => {
 
   const chartsRef = useRef(null);
   const [generandoPDF, setGenerandoPDF] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [opciones, setOpciones] = useState({ ciudades: [], zonas: [], vehiculos: [] });
@@ -151,10 +149,6 @@ const ReporteMovimientos = () => {
   const exportarPDF = async () => {
     try {
       setGenerandoPDF(true);
-      setIsExporting(true); // Disable animations
-      
-      // Allow React to re-render with animations disabled
-      await new Promise(resolve => setTimeout(resolve, 300));
       
       const doc = new jsPDF('landscape');
       
@@ -173,34 +167,43 @@ const ReporteMovimientos = () => {
       doc.text(`Rango evaluado: ${filtros.fechaInicio} hasta ${filtros.fechaFin}`, 14, 30);
       doc.text(`Generado el: ${new Date().toLocaleString()}`, 200, 30);
 
+      // 2. TARJETAS NATIVAS DE TOTALES (KPIs)
+      const totalPedidos = datos.length;
+      const totalPeso = datos.reduce((acc, curr) => acc + (parseFloat(curr.peso) || 0), 0);
+      const totalValor = datos.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
+
       let startY = 48;
 
-      // 2. INCORPORAR GRÁFICAS (con html2canvas-pro)
-      if (chartsRef.current && datos.length > 0) {
-        // Truco para que Recharts (ResponsiveContainer) no se colapse
-        const originalWidth = chartsRef.current.style.width;
-        chartsRef.current.style.width = '1200px';
-        
-        // Pausa extra para asegurar que el DOM tomó el ancho de 1200px
-        await new Promise(resolve => setTimeout(resolve, 300));
+      // Tarjeta 1: Total Movimientos
+      doc.setFillColor(30, 41, 59); 
+      doc.roundedRect(14, startY, 85, 35, 3, 3, 'F');
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL MOVIMIENTOS", 20, startY + 8);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.text(`${totalPedidos}`, 20, startY + 22);
 
-        const canvas = await html2canvas(chartsRef.current, {
-          scale: 2, 
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#f8fafc',
-          windowWidth: 1200
-        });
-        
-        chartsRef.current.style.width = originalWidth;
+      // Tarjeta 2: Peso Movido
+      doc.setFillColor(243, 232, 255); // f3e8ff (morado suave)
+      doc.roundedRect(105, startY, 85, 35, 3, 3, 'F');
+      doc.setTextColor(107, 33, 168); // 6b21a8
+      doc.setFontSize(10);
+      doc.text("PESO TOTAL MOVIDO", 111, startY + 8);
+      doc.setFontSize(20);
+      doc.text(`${totalPeso.toFixed(2)} Kg`, 111, startY + 22);
 
-        const imgData = canvas.toDataURL('image/png');
-        const pdfWidth = 268; // Dejar margen de 14mm a cada lado (297 - 28)
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        
-        doc.addImage(imgData, 'PNG', 14, startY, pdfWidth, pdfHeight);
-        startY += pdfHeight + 10;
-      }
+      // Tarjeta 3: Valor Movido
+      doc.setFillColor(254, 243, 199); // fef3c7 (ambar suave)
+      doc.roundedRect(196, startY, 85, 35, 3, 3, 'F');
+      doc.setTextColor(180, 83, 9); // b45309
+      doc.setFontSize(10);
+      doc.text("VALOR TOTAL MOVIDO", 202, startY + 8);
+      doc.setFontSize(20);
+      doc.text(`$${totalValor.toLocaleString()}`, 202, startY + 22);
+
+      startY += 45; // Espacio debajo de las tarjetas
 
       // 3. TABLA DE DATOS NATIVO
       if (datos.length > 0) {
@@ -210,7 +213,7 @@ const ReporteMovimientos = () => {
           `${p.bodega || 'N/A'}\n${p.peso ? `${p.peso} Kg` : '0 Kg'}\n$${parseFloat(p.valor_factura || 0).toLocaleString()}`,
           `${p.ciudad || 'N/A'}\n${p.zona_envio || 'N/A'}`,
           `${p.nombre_cliente || 'N/A'}\n${p.telefono || 'N/A'}`,
-          p.placa || 'N/A',
+          p.placa || p.vehiculo_placa || 'No asignado',
           p.estado_entrega || 'N/A'
         ]);
 
@@ -240,7 +243,6 @@ const ReporteMovimientos = () => {
       console.error("Error generando PDF:", error);
     } finally {
       setGenerandoPDF(false);
-      setIsExporting(false); // Re-enable animations
     }
   };
 
@@ -342,9 +344,9 @@ const ReporteMovimientos = () => {
                 <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
-                <Bar dataKey="Entregados" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} animationDuration={1500} />
-                <Bar dataKey="Devoluciones" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} animationDuration={1500} />
-                <Bar dataKey="Pendientes" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} animationDuration={1500} />
+                <Bar dataKey="Entregados" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={1500} />
+                <Bar dataKey="Devoluciones" fill="#ef4444" radius={[4, 4, 0, 0]} animationDuration={1500} />
+                <Bar dataKey="Pendientes" fill="#3b82f6" radius={[4, 4, 0, 0]} animationDuration={1500} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -372,10 +374,10 @@ const ReporteMovimientos = () => {
                 
                 {datos.length > 0 ? (
                   zonasConPeso.map((zona, index) => (
-                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} isAnimationActive={!isExporting} animationDuration={1500} />
+                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
                   ))
                 ) : (
-                  <Bar dataKey="Total Kg" fill="#cbd5e1" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} />
+                  <Bar dataKey="Total Kg" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
                 )}
               </BarChart>
             </ResponsiveContainer>
@@ -413,10 +415,10 @@ const ReporteMovimientos = () => {
                 
                 {datos.length > 0 ? (
                   zonasConPeso.map((zona, index) => (
-                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} isAnimationActive={!isExporting} animationDuration={1500} />
+                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
                   ))
                 ) : (
-                  <Bar dataKey="Total COP" fill="#cbd5e1" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} />
+                  <Bar dataKey="Total COP" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
                 )}
               </BarChart>
             </ResponsiveContainer>
@@ -465,10 +467,10 @@ const ReporteMovimientos = () => {
                       <span className="text-xs text-slate-500 font-medium">{fila.telefono}</span>
                     </td>
                     <td className="p-4 font-bold text-[#47B3A8]">
-                      {fila.vehiculo_placa ? (
-                        <span className="bg-[#47B3A8]/10 px-2 py-1 rounded border border-[#47B3A8]/20">{fila.vehiculo_placa}</span>
+                      {(fila.placa || fila.vehiculo_placa) ? (
+                        <span className="bg-[#47B3A8]/10 px-2 py-1 rounded border border-[#47B3A8]/20">{fila.placa || fila.vehiculo_placa}</span>
                       ) : (
-                        <span className="text-slate-400">N/A</span>
+                        <span className="text-slate-400">No asignado</span>
                       )}
                     </td>
                     <td className="p-4">
