@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, FileText, Download, Filter, MapPin, Truck, BarChart2, PackageOpen, DollarSign } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
