@@ -442,7 +442,7 @@ const ReporteMovimientos = () => {
             <thead>
               <tr className="bg-slate-900 text-white text-xs uppercase tracking-wider">
                 <th className="p-4 font-bold">Factura</th>
-                <th className="p-4 font-bold">Bodega / Peso</th>
+                <th className="p-4 font-bold">Bodega / Peso / Valor</th>
                 <th className="p-4 font-bold">Ciudad / Zona</th>
                 <th className="p-4 font-bold">Contacto</th>
                 <th className="p-4 font-bold">Vehículo</th>
@@ -467,6 +467,7 @@ const ReporteMovimientos = () => {
                     <td className="p-4">
                       <span className="block font-bold text-[#8b5cf6]">{fila.bodega || 'N/A'}</span>
                       <span className="text-xs text-slate-600 font-medium">{fila.peso ? `${fila.peso} Kg` : '0 Kg'}</span>
+                      <span className="text-xs text-slate-500 font-bold block mt-0.5">${parseFloat(fila.valor_factura || 0).toLocaleString()}</span>
                     </td>
                     <td className="p-4">
                       <span className="block font-bold">{fila.ciudad}</span>
