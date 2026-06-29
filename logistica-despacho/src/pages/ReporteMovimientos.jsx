@@ -18,6 +18,7 @@ const ReporteMovimientos = () => {
 
   const chartsRef = useRef(null);
   const [generandoPDF, setGenerandoPDF] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [datos, setDatos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [opciones, setOpciones] = useState({ ciudades: [], zonas: [], vehiculos: [] });
@@ -150,6 +151,11 @@ const ReporteMovimientos = () => {
   const exportarPDF = async () => {
     try {
       setGenerandoPDF(true);
+      setIsExporting(true); // Disable animations
+      
+      // Allow React to re-render with animations disabled
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const doc = new jsPDF('landscape');
       
       // 1. HEADER (Fondo Oscuro Corporativo)
@@ -171,22 +177,21 @@ const ReporteMovimientos = () => {
 
       // 2. INCORPORAR GRÁFICAS (con html2canvas-pro)
       if (chartsRef.current && datos.length > 0) {
-        // Truco para que Recharts (ResponsiveContainer) no se colapse a 0 en el clon
+        // Truco para que Recharts (ResponsiveContainer) no se colapse
         const originalWidth = chartsRef.current.style.width;
         chartsRef.current.style.width = '1200px';
         
-        // Pequeña pausa para que Recharts recalcule sus tamaños
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Pausa extra para asegurar que el DOM tomó el ancho de 1200px
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         const canvas = await html2canvas(chartsRef.current, {
           scale: 2, 
           useCORS: true,
           logging: false,
-          backgroundColor: '#f8fafc', // bg-slate-50
+          backgroundColor: '#f8fafc',
           windowWidth: 1200
         });
         
-        // Restaurar el tamaño original
         chartsRef.current.style.width = originalWidth;
 
         const imgData = canvas.toDataURL('image/png');
@@ -235,6 +240,7 @@ const ReporteMovimientos = () => {
       console.error("Error generando PDF:", error);
     } finally {
       setGenerandoPDF(false);
+      setIsExporting(false); // Re-enable animations
     }
   };
 
@@ -314,10 +320,10 @@ const ReporteMovimientos = () => {
           </form>
         </div>
 
-      <div ref={chartsRef} className="bg-slate-50 print-container">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
+      <div className="bg-slate-50">
+        <div ref={chartsRef} className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6 print-container">
         
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 animate-fade-in relative">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative">
           <h2 className="text-sm font-bold text-slate-600 uppercase mb-6 flex items-center gap-2">
             <BarChart2 size={18} className="text-[#47B3A8]" /> Rendimiento por Zona
           </h2>
@@ -336,9 +342,9 @@ const ReporteMovimientos = () => {
                 <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 'bold' }} />
-                <Bar dataKey="Entregados" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={1500} />
-                <Bar dataKey="Devoluciones" fill="#ef4444" radius={[4, 4, 0, 0]} animationDuration={1500} />
-                <Bar dataKey="Pendientes" fill="#3b82f6" radius={[4, 4, 0, 0]} animationDuration={1500} />
+                <Bar dataKey="Entregados" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} animationDuration={1500} />
+                <Bar dataKey="Devoluciones" fill="#ef4444" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} animationDuration={1500} />
+                <Bar dataKey="Pendientes" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} animationDuration={1500} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -366,10 +372,10 @@ const ReporteMovimientos = () => {
                 
                 {datos.length > 0 ? (
                   zonasConPeso.map((zona, index) => (
-                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
+                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} isAnimationActive={!isExporting} animationDuration={1500} />
                   ))
                 ) : (
-                  <Bar dataKey="Total Kg" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Total Kg" fill="#cbd5e1" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} />
                 )}
               </BarChart>
             </ResponsiveContainer>
@@ -407,10 +413,10 @@ const ReporteMovimientos = () => {
                 
                 {datos.length > 0 ? (
                   zonasConPeso.map((zona, index) => (
-                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} animationDuration={1500} />
+                    <Bar key={zona} dataKey={zona} stackId="a" fill={coloresZonas[index % coloresZonas.length]} isAnimationActive={!isExporting} animationDuration={1500} />
                   ))
                 ) : (
-                  <Bar dataKey="Total COP" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Total COP" fill="#cbd5e1" radius={[4, 4, 0, 0]} isAnimationActive={!isExporting} />
                 )}
               </BarChart>
             </ResponsiveContainer>
