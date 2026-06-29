@@ -171,13 +171,24 @@ const ReporteMovimientos = () => {
 
       // 2. INCORPORAR GRÁFICAS (con html2canvas-pro)
       if (chartsRef.current && datos.length > 0) {
+        // Truco para que Recharts (ResponsiveContainer) no se colapse a 0 en el clon
+        const originalWidth = chartsRef.current.style.width;
+        chartsRef.current.style.width = '1200px';
+        
+        // Pequeña pausa para que Recharts recalcule sus tamaños
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         const canvas = await html2canvas(chartsRef.current, {
           scale: 2, 
           useCORS: true,
           logging: false,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#f8fafc', // bg-slate-50
+          windowWidth: 1200
         });
         
+        // Restaurar el tamaño original
+        chartsRef.current.style.width = originalWidth;
+
         const imgData = canvas.toDataURL('image/png');
         const pdfWidth = 268; // Dejar margen de 14mm a cada lado (297 - 28)
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
