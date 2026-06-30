@@ -29,7 +29,7 @@ const getReporteMovimientos = async (req, res) => {
       LEFT JOIN vehiculos v ON p.vehiculo_id = v.id
       LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
       LEFT JOIN bodegas b ON pd.bodega_id = b.id
-      WHERE DATE(p.created_at) BETWEEN ? AND ?
+      WHERE p.fecha_agendada BETWEEN ? AND ?
     `;
     
     let queryParams = [fechaInicio, fechaFin];

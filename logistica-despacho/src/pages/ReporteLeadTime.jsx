@@ -24,10 +24,19 @@ const ReporteLeadTime = () => {
   // Meta de la empresa basada en el Excel (2 días)
   const SLA_META_DIAS = 2; 
 
+  const abortControllerRef = React.useRef(null);
+
   const fetchLeadTime = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos-rango?inicio=${fechaInicio}&fin=${fechaFin}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos-rango?inicio=${fechaInicio}&fin=${fechaFin}`, {
+        signal: abortControllerRef.current.signal
+      });
       const pedidos = await res.json();
 
       const procesados = pedidos
@@ -46,16 +55,19 @@ const ReporteLeadTime = () => {
 
       setDatos(procesados);
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error("Error al cargar Lead Time:", error);
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchLeadTime();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fechaInicio, fechaFin]);
 
   const totalEntregas = datos.length;
   const promedioLeadTime = totalEntregas > 0 

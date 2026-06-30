@@ -83,17 +83,32 @@ const ReporteMovimientos = () => {
     }
   };
 
+  useEffect(() => {
+    generarReporte();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.fechaInicio, filtros.fechaFin]);
+
+  // ==========================================
+  // DATOS ÚNICOS PARA EVITAR DUPLICACIÓN POR PRODUCTO EN TOTALES
+  // ==========================================
+  const seenIds = new Set();
+  const datosUnicos = datos.filter(d => {
+    if (!d.id_factura || seenIds.has(d.id_factura)) return false;
+    seenIds.add(d.id_factura);
+    return true;
+  });
+
   // ==========================================
   // PROCESAMIENTO DE GRÁFICA 1: ESTADOS
   // ==========================================
   const procesarDatosEstados = () => {
-    if (datos.length === 0) {
+    if (datosUnicos.length === 0) {
       const zonasParaGraficar = zonasFiltradas.length > 0 ? zonasFiltradas : [...new Set(opciones.zonas.map(z => z.zona_envio))];
       if (zonasParaGraficar.length === 0) return [{ name: 'Cargando...', Entregados: 0, Devoluciones: 0, Pendientes: 0 }];
       return zonasParaGraficar.map(zona => ({ name: zona, Entregados: 0, Devoluciones: 0, Pendientes: 0 }));
     }
 
-    const agrupado = datos.reduce((acc, pedido) => {
+    const agrupado = datosUnicos.reduce((acc, pedido) => {
       const zona = pedido.zona_envio || 'Sin Zona';
       if (!acc[zona]) acc[zona] = { name: zona, Entregados: 0, Devoluciones: 0, Pendientes: 0 };
       if (pedido.estado_entrega === 'Entregado') acc[zona].Entregados += 1;
@@ -179,7 +194,7 @@ const ReporteMovimientos = () => {
       doc.text("TOTAL MOVIMIENTOS", 20, startY + 8);
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(24);
-      doc.text(`${totalPedidos}`, 20, startY + 22);
+      doc.text(`${datosUnicos.length}`, 20, startY + 22);
 
       // Tarjeta 2: Peso Movido
       doc.setFillColor(243, 232, 255); // f3e8ff (morado suave)
@@ -202,13 +217,14 @@ const ReporteMovimientos = () => {
       startY += 45; // Espacio debajo de las tarjetas
 
       // 2.5 RESUMEN POR ZONA
-      const zonasSummary = [...new Set(datos.map(d => d.zona_envio))].filter(Boolean);
+      const zonasSummary = [...new Set(datosUnicos.map(d => d.zona_envio))].filter(Boolean);
       if (zonasSummary.length > 0) {
         const resumenZonas = zonasSummary.map(zona => {
           const ped = datos.filter(d => d.zona_envio === zona);
-          const movs = ped.length;
+          const pedUnicos = datosUnicos.filter(d => d.zona_envio === zona);
+          const movs = pedUnicos.length;
           const peso = ped.reduce((acc, curr) => acc + (parseFloat(curr.peso) || 0), 0);
-          const valor = ped.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
+          const valor = pedUnicos.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
           return [
             zona,
             movs.toString(),
@@ -283,9 +299,9 @@ const ReporteMovimientos = () => {
   const datosGraficaBodegasValor = procesarDatosBodegasValor();
   
   // Totales para la UI y el PDF
-  const totalPedidos = datos.length;
+  const totalPedidos = datosUnicos.length;
   const totalPeso = datos.reduce((acc, curr) => acc + (parseFloat(curr.peso) || 0), 0);
-  const totalValor = datos.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
+  const totalValor = datosUnicos.reduce((acc, curr) => acc + (parseFloat(curr.valor_factura) || 0), 0);
   
   // Extraemos las zonas únicas que tienen peso para generar los colores dinámicos de las barras
   const zonasConPeso = [...new Set(datos.filter(d => d.peso > 0 || d.valor_factura > 0).map(d => d.zona_envio))].filter(Boolean);
@@ -503,7 +519,7 @@ const ReporteMovimientos = () => {
                     <td className="p-4">
                       <span className="block font-bold text-[#8b5cf6]">{fila.bodega || 'N/A'}</span>
                       <span className="text-xs text-slate-600 font-medium">{fila.peso ? `${fila.peso} Kg` : '0 Kg'}</span>
-                      <span className="text-xs text-slate-500 font-bold block mt-0.5">${parseFloat(fila.valor_factura || 0).toLocaleString()}</span>
+                      <span className="text-xs text-[#47B3A8] font-bold block mt-0.5">${parseFloat(fila.valor_factura || 0).toLocaleString()}</span>
                     </td>
                     <td className="p-4">
                       <span className="block font-bold">{fila.ciudad}</span>

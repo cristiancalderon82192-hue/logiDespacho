@@ -31,14 +31,23 @@ const ReporteFinanciero = () => {
     }).format(valor || 0);
   };
 
+  const abortControllerRef = React.useRef(null);
+
   useEffect(() => {
     const obtenerDatos = async () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setCargando(true);
       setError(null);
       setAnimacionBarra(0);
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        const respuesta = await fetch(`${apiUrl}/api/reportes/financiero?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
+        const respuesta = await fetch(`${apiUrl}/api/reportes/financiero?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`, {
+          signal: abortControllerRef.current.signal
+        });
         
         if (!respuesta.ok) throw new Error('Error al cargar los datos financieros');
         
@@ -132,9 +141,12 @@ const ReporteFinanciero = () => {
           setTimeout(() => setAnimacionBarra(porcentajeLiquidez > 100 ? 100 : porcentajeLiquidez), 200);
         }
       } catch (err) {
+        if (err.name === 'AbortError') return;
         setError(err.message);
       } finally {
-        setCargando(false);
+        if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+          setCargando(false);
+        }
       }
     };
 

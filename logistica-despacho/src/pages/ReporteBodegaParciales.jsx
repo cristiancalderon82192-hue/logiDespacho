@@ -19,18 +19,30 @@ const ReporteBodegaParciales = () => {
   const [cargando, setCargando] = useState(true);
   const [filtroFactura, setFiltroFactura] = useState('');
 
+  const abortControllerRef = React.useRef(null);
+
   const cargarReporte = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setCargando(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/reportes/parciales?inicio=${fechaInicio}&fin=${fechaFin}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/reportes/parciales?inicio=${fechaInicio}&fin=${fechaFin}`, {
+        signal: abortControllerRef.current.signal
+      });
       if (res.ok) {
         const data = await res.json();
         setReporte(data);
       }
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error("Error al cargar reporte:", error);
     } finally {
-      setCargando(false);
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        setCargando(false);
+      }
     }
   };
 

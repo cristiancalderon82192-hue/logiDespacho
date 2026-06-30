@@ -30,13 +30,28 @@ const ReporteParciales = () => {
   });
   const [detallesLote, setDetallesLote] = useState({});
 
+  const abortControllerRef = React.useRef(null);
+
   const fetchParciales = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales?inicio=${fechaInicio}&fin=${fechaFin}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/logistica/pedidos-parciales?inicio=${fechaInicio}&fin=${fechaFin}`, {
+        signal: abortControllerRef.current.signal
+      });
       if (response.ok) setPedidos(await response.json());
-    } catch (error) { console.error("Error:", error); } 
-    finally { setLoading(false); }
+    } catch (error) { 
+      if (error.name === 'AbortError') return;
+      console.error("Error:", error); 
+    } finally { 
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        setLoading(false); 
+      }
+    }
   };
 
   const fetchCatalogos = async () => {

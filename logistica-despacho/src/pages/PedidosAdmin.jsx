@@ -89,12 +89,28 @@ const PedidosAdmin = () => {
     fetchCatalogos();
   }, []);
 
+  const abortControllerRef = React.useRef(null);
+
   const fetchPedidos = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos-rango?inicio=${fechaInicio}&fin=${fechaFin}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/pedidos-rango?inicio=${fechaInicio}&fin=${fechaFin}`, {
+        signal: abortControllerRef.current.signal
+      });
       setPedidos(await response.json());
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { 
+      if (err.name === 'AbortError') return;
+      console.error(err); 
+    } finally { 
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        setLoading(false); 
+      }
+    }
   };
 
   useEffect(() => { fetchPedidos(); }, [fechaInicio, fechaFin]);
@@ -106,6 +122,12 @@ const PedidosAdmin = () => {
   };
 
   const handleUploadPdf = async (e) => {
+    if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
+      mostrarError("❌ Primero se debe ingresar los datos del cliente antes de subir el archivo PDF.");
+      e.target.value = null;
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 

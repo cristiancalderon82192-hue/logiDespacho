@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, FilePlus, Calendar, Plus, Trash2, Search, User, UserPlus, X, CheckCircle, Camera, Upload, PenTool, Eye, UploadCloud, Weight } from 'lucide-react';
+import { Package, FilePlus, Calendar, Plus, Trash2, Search, User, UserPlus, X, CheckCircle, Camera, Upload, PenTool, Eye, UploadCloud, Weight, Edit2 } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
 import SignatureCanvas from 'react-signature-canvas';
 import { socket } from '../utils/socket';
@@ -13,6 +13,8 @@ const PendientesBodega = () => {
   const [bodegasExistentes, setBodegasExistentes] = useState([]); 
   const [clientesExistentes, setClientesExistentes] = useState([]); 
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   const obtenerFechaLocal = () => {
     const fecha = new Date();
@@ -26,6 +28,11 @@ const PendientesBodega = () => {
   const [fechaInicio, setFechaInicio] = useState(hoy);
   const [fechaFin, setFechaFin] = useState(hoy);
   const [filtroFactura, setFiltroFactura] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState({
+    pendiente: false,
+    inmediata: false,
+    domicilio: false
+  });
   
   const [formMaster, setFormMaster] = useState({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '' });
   const [items, setItems] = useState([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
@@ -44,6 +51,9 @@ const PendientesBodega = () => {
   const [imagenSoporte, setImagenSoporte] = useState(null);
   const [firmaSoporte, setFirmaSoporte] = useState(null);
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
+  
+  // ESTADO ACCIÓN POST-GUARDADO EN CARGAR REGISTRO
+  const [modalAction, setModalAction] = useState('Pendiente');
   
   // ESTADOS MODAL AGENDAR DOMICILIO
   const [modalDomicilio, setModalDomicilio] = useState(false);
@@ -111,6 +121,12 @@ const PendientesBodega = () => {
   };
 
   const handleUploadPdf = async (e) => {
+    if (!formMaster.cliente_id) {
+      mostrarError("❌ Primero se debe ingresar los datos del cliente antes de subir el archivo PDF.");
+      e.target.value = null;
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 
@@ -204,10 +220,47 @@ const PendientesBodega = () => {
   };
 
   const cerrarModalRegistro = () => {
+    setEditId(null);
     setModalAbierto(false);
     setItems([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
     setFormMaster({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '' });
     setClienteSeleccionadoNombre('');
+    setModalAction('Pendiente');
+  };
+
+  const abrirModalEdicion = async (pendiente) => {
+    setEditId(pendiente.id);
+    setFormMaster({
+      fecha_factura: pendiente.fecha_factura ? new Date(pendiente.fecha_factura).toISOString().split('T')[0] : '',
+      factura_num: pendiente.factura_num,
+      punto_venta_id: pendiente.punto_venta_id,
+      cliente_id: pendiente.cliente_id,
+      fecha_promesa: pendiente.fecha_promesa ? new Date(pendiente.fecha_promesa).toISOString().split('T')[0] : '',
+      tipo_entrega: pendiente.tipo_entrega || 'Material Pendiente',
+      valor_factura: pendiente.valor_factura || ''
+    });
+    setClienteSeleccionadoNombre(pendiente.nombre_cliente);
+    
+    // Set modalAction depending on type
+    if (pendiente.tipo_entrega === 'Domicilio') setModalAction('Domicilio');
+    else if (pendiente.tipo_entrega === 'Entrega Inmediata') setModalAction('Inmediata');
+    else setModalAction('Pendiente');
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes/${pendiente.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.productos && data.productos.length > 0) {
+          setItems(data.productos);
+        } else {
+          setItems([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    
+    setModalAbierto(true);
   };
 
   const handleGuardar = async (e) => {
@@ -218,27 +271,67 @@ const PendientesBodega = () => {
       return;
     }
     
-    if (!formMaster.punto_venta_id || items.some(i => !i.bodega_id)) {
-      mostrarInfo("Por favor selecciona el punto de venta y la bodega para cada material.");
-      return;
-    }
+    setIsSaving(true);
+
+    let tipoEntregaDerived = formMaster.tipo_entrega;
+    if (modalAction === 'Inmediata') tipoEntregaDerived = 'Entrega Inmediata';
+    else if (modalAction === 'Domicilio') tipoEntregaDerived = 'Domicilio';
+    else if (modalAction === 'Pendiente') tipoEntregaDerived = 'Entrega Pendiente';
 
     const payload = { 
       ...formMaster, 
+      tipo_entrega: tipoEntregaDerived,
       productos: items,
       usuario_id: user?.id 
     };
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes/nuevo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      cerrarModalRegistro();
-      cargarDatos();
-    } else {
-      const errorData = await res.json();
-      mostrarError(`❌ Error: ${errorData.error || errorData.message || 'No se pudo guardar el registro'}`);
+
+    const url = editId 
+      ? `${import.meta.env.VITE_API_URL}/api/bodega/pendientes/${editId}`
+      : `${import.meta.env.VITE_API_URL}/api/bodega/pendientes/nuevo`;
+    
+    const method = editId ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const dataRes = await res.json();
+        cerrarModalRegistro();
+        mostrarExito(editId ? "Registro actualizado exitosamente" : "Registro guardado exitosamente");
+        
+        const resPend = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/pendientes`);
+        if (resPend.ok) {
+          const updatedPendientes = await resPend.json();
+          setPendientes(updatedPendientes);
+          
+          if (!editId && (modalAction === 'Inmediata' || modalAction === 'Domicilio')) {
+            const targetId = dataRes.newId;
+            const nuevoItem = updatedPendientes.find(p => p.id === targetId);
+            if (nuevoItem) {
+              if (modalAction === 'Inmediata') abrirModalEntrega(nuevoItem);
+              else abrirModalDomicilio(nuevoItem);
+            }
+          }
+        } else {
+          cargarDatos();
+        }
+      } else {
+        try {
+          const errorData = await res.json();
+          mostrarError(`❌ Error: ${errorData.error || errorData.message || 'No se pudo guardar el registro'}`);
+        } catch (err) {
+          mostrarError(`❌ Error de conexión al servidor (Ruta no encontrada). ¿Reiniciaste el backend?`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      mostrarError(`❌ Error de red o servidor no disponible.`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -661,7 +754,21 @@ const PendientesBodega = () => {
     if (fechaInicio && fecha) cumpleFecha = cumpleFecha && fecha >= fechaInicio;
     if (fechaFin && fecha) cumpleFecha = cumpleFecha && fecha <= fechaFin;
     
-    return cumpleFactura && cumpleFecha;
+    const esDomicilio = p.tipo_entrega === 'Domicilio';
+    const esInmediata = p.tipo_entrega === 'Entrega Inmediata';
+    const esPendiente = !esDomicilio && !esInmediata;
+
+    const algunFiltroActivo = filtroTipo.pendiente || filtroTipo.inmediata || filtroTipo.domicilio;
+    let cumpleTipo = true;
+
+    if (algunFiltroActivo) {
+      cumpleTipo = false;
+      if (esDomicilio && filtroTipo.domicilio) cumpleTipo = true;
+      if (esInmediata && filtroTipo.inmediata) cumpleTipo = true;
+      if (esPendiente && filtroTipo.pendiente) cumpleTipo = true;
+    }
+
+    return cumpleFactura && cumpleFecha && cumpleTipo;
   });
 
   const isLectura = !(user?.role === 'admin' || user?.role === 'logistica' || user?.role === 'bodeguero');
@@ -680,8 +787,8 @@ const PendientesBodega = () => {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex-1 w-full">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col xl:flex-row flex-wrap gap-6 items-end">
+        <div className="flex-1 min-w-[200px] w-full xl:w-auto">
           <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Search size={12}/> Buscar Factura</label>
           <input 
             type="text" 
@@ -691,7 +798,7 @@ const PendientesBodega = () => {
             className="w-full border p-2 rounded-lg outline-none focus:ring-2 focus:ring-[#47B3A8]"
           />
         </div>
-        <div className="flex-[2] w-full md:w-auto">
+        <div className="flex-shrink-0 w-full xl:w-auto overflow-x-auto">
           <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Calendar size={12}/> Rango de Fechas</label>
           <DateRangeSelector 
             fechaInicio={fechaInicio} 
@@ -699,6 +806,23 @@ const PendientesBodega = () => {
             fechaFin={fechaFin} 
             setFechaFin={setFechaFin} 
           />
+        </div>
+        <div className="flex-1 min-w-[300px] w-full xl:w-auto">
+          <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1">Filtrar por Entrega</label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer select-none">
+              <input type="checkbox" checked={filtroTipo.pendiente} onChange={(e) => setFiltroTipo({...filtroTipo, pendiente: e.target.checked})} className="w-4 h-4 rounded text-[#47B3A8] focus:ring-[#47B3A8] border-slate-300" />
+              Pendiente
+            </label>
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer select-none">
+              <input type="checkbox" checked={filtroTipo.inmediata} onChange={(e) => setFiltroTipo({...filtroTipo, inmediata: e.target.checked})} className="w-4 h-4 rounded text-green-600 focus:ring-green-600 border-slate-300" />
+              Inmediata
+            </label>
+            <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer select-none">
+              <input type="checkbox" checked={filtroTipo.domicilio} onChange={(e) => setFiltroTipo({...filtroTipo, domicilio: e.target.checked})} className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 border-slate-300" />
+              Domicilio
+            </label>
+          </div>
         </div>
       </div>
 
@@ -709,12 +833,12 @@ const PendientesBodega = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b">
-                <th className="p-4">Factura No.</th><th className="p-4">Origen</th><th className="p-4">Cliente</th><th className="p-4">Creado Por</th><th className="p-4">Total</th><th className="p-4">Fecha Factura</th><th className="p-4">Estado</th><th className="p-4 text-center">Acción</th>
+                <th className="p-4">Factura No.</th><th className="p-4">Origen</th><th className="p-4">Cliente</th><th className="p-4">Creado Por</th><th className="p-4">Total</th><th className="p-4">Fecha Factura</th><th className="p-4">Promesa Entrega</th><th className="p-4">Estado</th><th className="p-4 text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700">
               {pendientesFiltrados.length === 0 ? (
-                <tr><td colSpan="8" className="p-8 text-center text-slate-400">No hay materiales pendientes.</td></tr>
+                <tr><td colSpan="9" className="p-8 text-center text-slate-400">No hay materiales pendientes.</td></tr>
               ) : (
                 pendientesFiltrados.map((p) => (
                   <tr key={p.id} className="border-b hover:bg-slate-50">
@@ -730,42 +854,57 @@ const PendientesBodega = () => {
                     </td>
                     <td className="p-4 font-bold text-slate-700">{p.total_items} Unds</td>
                     <td className="p-4"><span className="flex items-center gap-1 text-slate-600"><Calendar size={14}/> {new Date(p.fecha_factura).toLocaleDateString()}</span></td>
+                    <td className="p-4">
+                        {p.fecha_promesa ? (
+                          <span className="flex items-center gap-1 text-slate-600"><Calendar size={14}/> {new Date(p.fecha_promesa).toLocaleDateString()}</span>
+                        ) : (
+                          <span className="text-slate-400 italic text-[10px]">Sin Fecha</span>
+                        )}
+                    </td>
                     <td className="p-4"><span className={`px-2 py-1 rounded-full text-[10px] font-extrabold uppercase ${p.estado === 'Pendiente' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{p.estado}</span></td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {p.tipo_entrega !== 'Domicilio' && (
+                        {p.tipo_entrega === 'Domicilio' ? (
                           <button 
                             onClick={() => abrirModalDomicilio(p)} 
-                            className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
-                            title="Agendar Domicilio"
+                            className="bg-orange-500 hover:bg-orange-600 text-white min-w-[140px] px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
                           >
                             Domicilio
                           </button>
-                        )}
-                        {!isLectura ? (
+                        ) : !isLectura ? (
                           <button 
-                            onClick={() => p.tipo_entrega !== 'Domicilio' && abrirModalEntrega(p)} 
-                            disabled={p.tipo_entrega === 'Domicilio'}
-                            className={`${p.tipo_entrega === 'Domicilio' ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'} px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1`}
+                            onClick={() => abrirModalEntrega(p)} 
+                            className="bg-green-600 hover:bg-green-700 text-white min-w-[140px] px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
                           >
-                            <CheckCircle size={14}/> {p.tipo_entrega === 'Domicilio' ? 'Agendado' : 'Entregar'}
+                            <CheckCircle size={14}/> {p.tipo_entrega === 'Entrega Inmediata' ? 'Entrega Inmediata' : 'Entrega Pendiente'}
                           </button>
                         ) : (
                           <button 
                             onClick={() => abrirModalEntrega(p)} 
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
+                            className="bg-blue-600 hover:bg-blue-700 text-white min-w-[140px] px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
                           >
                             <Eye size={14}/> Ver Detalle
                           </button>
                         )}
-                        {user?.role === 'admin' && (
-                          <button 
-                            onClick={() => eliminarPendiente(p.id)} 
-                            className="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1.5 rounded text-xs font-bold transition-colors flex items-center justify-center"
-                            title="Eliminar Pendiente"
-                          >
-                            <Trash2 size={14}/>
-                          </button>
+                        
+                        {/* ADMIN / SUPER ADMIN CONTROLS */}
+                        {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'Super Admin') && (
+                          <div className="flex flex-col gap-1">
+                            <button 
+                              onClick={() => abrirModalEdicion(p)} 
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-xs font-bold transition-colors flex items-center justify-center"
+                              title="Editar Pendiente"
+                            >
+                              <Edit2 size={14}/>
+                            </button>
+                            <button 
+                              onClick={() => eliminarPendiente(p.id)} 
+                              className="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-xs font-bold transition-colors flex items-center justify-center"
+                              title="Eliminar Pendiente"
+                            >
+                              <Trash2 size={14}/>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -795,21 +934,25 @@ const PendientesBodega = () => {
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Origen</p><p className="font-bold text-[#47B3A8] text-xs">{p.nombre_punto_venta}</p></div>
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Fecha</p><p className="font-medium text-slate-700 text-xs flex items-center gap-1"><Calendar size={12}/>{new Date(p.fecha_factura).toLocaleDateString()}</p></div>
                   <div className="col-span-2"><p className="text-[10px] text-slate-400 font-bold uppercase">Cliente</p><p className="font-bold text-slate-700 text-xs">{p.nombre_cliente}</p></div>
+                  <div><p className="text-[10px] text-slate-400 font-bold uppercase">Promesa</p><p className="font-medium text-slate-700 text-xs flex items-center gap-1">{p.fecha_promesa ? <><Calendar size={12}/>{new Date(p.fecha_promesa).toLocaleDateString()}</> : <span className="text-slate-400 italic text-[10px]">Sin Fecha</span>}</p></div>
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Total Items</p><p className="font-bold text-slate-700 text-xs">{p.total_items} Unds</p></div>
-                  <div><p className="text-[10px] text-slate-400 font-bold uppercase">Creado Por</p><p className="font-medium text-slate-700 text-xs truncate">{p.nombre_creador || <span className="italic text-slate-400">No registrado</span>}</p></div>
+                  <div className="col-span-2"><p className="text-[10px] text-slate-400 font-bold uppercase">Creado Por</p><p className="font-medium text-slate-700 text-xs truncate">{p.nombre_creador || <span className="italic text-slate-400">No registrado</span>}</p></div>
                 </div>
 
-                <div className="flex gap-2 justify-end mt-1">
-                  {user?.role === 'admin' && (
-                    <button onClick={() => eliminarPendiente(p.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors flex items-center justify-center shrink-0"><Trash2 size={16}/></button>
-                  )}
-                  {p.tipo_entrega !== 'Domicilio' && (
-                    <button onClick={() => abrirModalDomicilio(p)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2">Domicilio</button>
-                  )}
-                  {!isLectura ? (
-                    <button onClick={() => p.tipo_entrega !== 'Domicilio' && abrirModalEntrega(p)} disabled={p.tipo_entrega === 'Domicilio'} className={`flex-1 ${p.tipo_entrega === 'Domicilio' ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white'} py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2`}><CheckCircle size={16}/> {p.tipo_entrega === 'Domicilio' ? 'Agendado' : 'Entregar'}</button>
+                <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-slate-100">
+                  {p.tipo_entrega === 'Domicilio' ? (
+                    <button onClick={() => abrirModalDomicilio(p)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]">Domicilio</button>
+                  ) : !isLectura ? (
+                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]"><CheckCircle size={16}/> {p.tipo_entrega === 'Entrega Inmediata' ? 'Entrega Inmediata' : 'Entrega Pendiente'}</button>
                   ) : (
-                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2"><Eye size={16}/> Ver Detalle</button>
+                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]"><Eye size={16}/> Ver Detalle</button>
+                  )}
+
+                  {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'Super Admin') && (
+                    <div className="flex gap-1">
+                      <button onClick={() => abrirModalEdicion(p)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors flex items-center justify-center shrink-0"><Edit2 size={16}/></button>
+                      <button onClick={() => eliminarPendiente(p.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors flex items-center justify-center shrink-0"><Trash2 size={16}/></button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -822,7 +965,7 @@ const PendientesBodega = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
-              <h3 className="font-bold">Cargar Registro</h3>
+              <h3 className="font-bold">{editId ? 'Editar Registro' : 'Cargar Registro'}</h3>
               <div className="flex items-center gap-4">
                 <label className="cursor-pointer bg-[#47B3A8] hover:bg-[#3d9a90] px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
                   <UploadCloud size={16} />
@@ -864,6 +1007,25 @@ const PendientesBodega = () => {
                       <Search size={16}/> Buscar
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* OPCIÓN DE ACCIÓN */}
+              <div className="mb-4">
+                <h4 className="font-extrabold text-sm mb-2 text-slate-700">Acción a realizar tras guardar:</h4>
+                <div className="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                    <input type="radio" name="modalAction" value="Pendiente" checked={modalAction === 'Pendiente'} onChange={(e) => setModalAction(e.target.value)} className="w-4 h-4 text-[#47B3A8] focus:ring-[#47B3A8]" />
+                    Solo Guardar Pendiente
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                    <input type="radio" name="modalAction" value="Inmediata" checked={modalAction === 'Inmediata'} onChange={(e) => setModalAction(e.target.value)} className="w-4 h-4 text-green-600 focus:ring-green-600" />
+                    Entrega Inmediata
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                    <input type="radio" name="modalAction" value="Domicilio" checked={modalAction === 'Domicilio'} onChange={(e) => setModalAction(e.target.value)} className="w-4 h-4 text-orange-500 focus:ring-orange-500" />
+                    Enviar a Domicilio
+                  </label>
                 </div>
               </div>
 
@@ -934,8 +1096,10 @@ const PendientesBodega = () => {
               </div>
 
               <div className="flex justify-end gap-2 border-t pt-4">
-                <button type="button" onClick={cerrarModalRegistro} className="px-4 py-2 bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="px-5 py-2 bg-[#47B3A8] text-white rounded-lg">Guardar Pendiente</button>
+                <button type="button" onClick={cerrarModalRegistro} className="px-4 py-2 bg-slate-100 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
+                <button type="submit" disabled={isSaving} className={`px-5 py-2 text-white rounded-lg text-sm font-bold shadow-sm transition-colors disabled:opacity-50 ${modalAction === 'Inmediata' ? 'bg-green-600 hover:bg-green-700' : modalAction === 'Domicilio' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#47B3A8] hover:bg-[#3d9a90]'}`}>
+                  {isSaving ? 'Procesando...' : (modalAction === 'Inmediata' ? 'Guardar y Entregar' : modalAction === 'Domicilio' ? 'Guardar y Agendar Domicilio' : 'Guardar Pendiente')}
+                </button>
               </div>
             </form>
           </div>

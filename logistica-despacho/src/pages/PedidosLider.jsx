@@ -88,18 +88,36 @@ const PedidosLider = () => {
 
   useEffect(() => { fetchCatalogos(); }, []);
 
+  const abortControllerRef = React.useRef(null);
+
   const fetchPedidos = async (mostrarCarga = true) => {
     if (!user) return;
+    
+    if (mostrarCarga) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+    }
+    
     if (mostrarCarga) setLoading(true);
     try {
       const timestamp = new Date().getTime(); 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/lider/mis-pedidos?fecha=${fechaFiltro}&usuario_id=${user.id}&_t=${timestamp}`, {
+        signal: mostrarCarga ? abortControllerRef.current.signal : undefined,
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       if (!response.ok) throw new Error("Error en la respuesta");
       const data = await response.json();
       setPedidos(data); 
-    } catch (err) { console.error(err); } finally { if (mostrarCarga) setLoading(false); }
+    } catch (err) { 
+      if (err.name === 'AbortError') return;
+      console.error(err); 
+    } finally { 
+      if (mostrarCarga && (!abortControllerRef.current || !abortControllerRef.current.signal.aborted)) {
+        setLoading(false); 
+      }
+    }
   };
 
   useEffect(() => {
@@ -111,6 +129,12 @@ const PedidosLider = () => {
   }, [user, fechaFiltro]); 
 
   const handleUploadPdf = async (e) => {
+    if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
+      mostrarError("❌ Primero se debe ingresar los datos del cliente antes de subir el archivo PDF.");
+      e.target.value = null;
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 

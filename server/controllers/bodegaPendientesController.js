@@ -51,7 +51,7 @@ const crearPendiente = async (req, res) => {
     const io = req.app.get('socketio');
     if (io) io.emit('actualizacion_bodega');
 
-    res.status(201).json({ message: "Registro exitoso" });
+    res.status(201).json({ message: "Registro exitoso", newId: master.insertId });
   } catch (error) {
     await connection.rollback();
     console.error("Error creando pendiente:", error);
@@ -273,6 +273,51 @@ const actualizarTipoEntrega = async (req, res) => {
   }
 };
 
+const editarPendiente = async (req, res) => {
+  const { id } = req.params;
+  const { factura_num, fecha_factura, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, productos } = req.body;
+  const connection = await pool.getConnection();
+
+  if (!id) return res.status(400).json({ error: "Falta el ID del pendiente" });
+  if (!factura_num || !punto_venta_id || !cliente_id) {
+    return res.status(400).json({ error: "Faltan datos obligatorios (factura, punto_venta, cliente)." });
+  }
+
+  try {
+    await connection.beginTransaction();
+
+    await connection.query(
+      `UPDATE bodega_pendientes 
+       SET factura_num = ?, fecha_factura = ?, punto_venta_id = ?, cliente_id = ?, fecha_promesa = ?, tipo_entrega = ?, valor_factura = ?
+       WHERE id = ?`,
+      [factura_num, fecha_factura || null, punto_venta_id, cliente_id, fecha_promesa || null, tipo_entrega, valor_factura || 0, id]
+    );
+
+    if (productos && Array.isArray(productos)) {
+      await connection.query(`DELETE FROM bodega_pendientes_detalle WHERE pendiente_id = ?`, [id]);
+
+      for (let prod of productos) {
+        await connection.query(
+          `INSERT INTO bodega_pendientes_detalle (pendiente_id, codigo_producto, nombre_producto, cantidad_pendiente, unidad_medida, bodega_id, precio_unitario, valor_total, peso_kg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, prod.codigo || prod.codigo_producto, prod.nombre || prod.nombre_producto, prod.cantidad || prod.cantidad_pendiente, prod.unidad || prod.unidad_medida, prod.bodega_id, prod.precio_unitario || 0, prod.valor_total || prod.precio_total || 0, prod.peso_kg || prod.peso || 0]
+        );
+      }
+    }
+
+    await connection.commit();
+    const io = req.app.get('socketio');
+    if (io) io.emit('actualizacion_bodega');
+
+    res.json({ message: "Registro actualizado exitosamente" });
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error editando pendiente:", error);
+    res.status(500).json({ error: "Error al editar el pendiente" });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = { 
   getPendientesLista, 
   crearPendiente, 
@@ -280,5 +325,6 @@ module.exports = {
   getPendientePorId,
   entregarPendiente,
   eliminarPendiente,
-  actualizarTipoEntrega
+  actualizarTipoEntrega,
+  editarPendiente
 };

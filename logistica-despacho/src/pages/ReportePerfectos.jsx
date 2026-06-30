@@ -16,14 +16,23 @@ const ReportePerfectos = () => {
 
   const [animacionOtif, setAnimacionOtif] = useState(0);
 
+  const abortControllerRef = React.useRef(null);
+
   useEffect(() => {
     const obtenerDatos = async () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setCargando(true);
       setError(null);
       setAnimacionOtif(0);
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        const respuesta = await fetch(`${apiUrl}/api/reportes/perfectos?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
+        const respuesta = await fetch(`${apiUrl}/api/reportes/perfectos?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`, {
+          signal: abortControllerRef.current.signal
+        });
         
         if (!respuesta.ok) throw new Error('Error al cargar el reporte de pedidos perfectos');
         
@@ -37,9 +46,12 @@ const ReportePerfectos = () => {
         }
 
       } catch (err) {
+        if (err.name === 'AbortError') return;
         setError(err.message);
       } finally {
-        setCargando(false);
+        if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+          setCargando(false);
+        }
       }
     };
 

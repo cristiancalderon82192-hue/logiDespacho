@@ -2,14 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
 
 const DateRangeSelector = ({ fechaInicio, setFechaInicio, fechaFin, setFechaFin }) => {
-  const [isRangoFechas, setIsRangoFechas] = useState(false);
+  const [isRangoFechas, setIsRangoFechas] = useState(true);
 
-  // Cuando el usuario desmarca "Rango de fechas", sincronizamos fechaFin con fechaInicio
-  useEffect(() => {
-    if (!isRangoFechas && fechaInicio !== fechaFin) {
-      setFechaFin(fechaInicio);
+  const getHoyStr = () => {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+  };
+
+  const getPrimerDiaMes = () => {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-01`;
+  };
+
+  const handleToggleRango = (checked) => {
+    setIsRangoFechas(checked);
+    const hoyStr = getHoyStr();
+    
+    if (checked) {
+      setFechaInicio(getPrimerDiaMes());
+      setFechaFin(hoyStr);
+    } else {
+      setFechaInicio(hoyStr);
+      setFechaFin(hoyStr);
     }
-  }, [isRangoFechas, fechaInicio, fechaFin, setFechaFin]);
+  };
+
+  // Al montar el componente en cualquier vista del proyecto, forzamos por defecto el rango del mes
+  useEffect(() => {
+    if (isRangoFechas) {
+      setFechaInicio(getPrimerDiaMes());
+      setFechaFin(getHoyStr());
+    }
+    // eslint-disable-next-line
+  }, []);
 
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -17,7 +45,7 @@ const DateRangeSelector = ({ fechaInicio, setFechaInicio, fechaFin, setFechaFin 
         <input 
           type="checkbox" 
           checked={isRangoFechas}
-          onChange={(e) => setIsRangoFechas(e.target.checked)}
+          onChange={(e) => handleToggleRango(e.target.checked)}
           className="w-4 h-4 text-[#47B3A8] rounded border-slate-300 focus:ring-[#47B3A8]"
         />
         Rango de fechas
