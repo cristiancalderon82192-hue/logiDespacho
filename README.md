@@ -35,12 +35,16 @@ Además, cuenta con integración de un **Asistente Inteligente (IA)**, manejo de
 - Control de peso por bodega y valor de factura.
 - Dashboard con KPIs: total pedidos, valor facturado y kilos despachados.
 - Edición y eliminación de pedidos con trazabilidad.
+- **Mejoras de UX: Estados de carga interactivos ("Procesando...") y bloqueos de seguridad en guardado de registros.**
 
 ### Módulo de Bodega (NUEVO)
 - Dashboard exclusivo de indicadores para el área de almacenamiento.
 - Panel de entregados y pendientes de despachar.
+- **Sistema de filtrado inteligente (Inmediata, Pendiente, Domicilio) con lógica aditiva en tiempo real.**
 - Reporte detallado de movimientos de bodega y despachos parciales.
 - Gestión orientada a la preparación previa a la ruta logística.
+- **Prevención de errores humanos (anti doble-clic) en todas las transacciones de guardado.**
+- **Interfaz altamente responsiva adaptada a dispositivos móviles y tablets.**
 
 ### Módulo de Logística
 - Vista diaria de pedidos agendados con filtro por fecha.
@@ -471,8 +475,9 @@ La documentación incluye todos los endpoints, parámetros, cuerpos de solicitud
 ### Pedidos (`/api/pedidos`)
 - CRUD completo, Dashboard KPIs por fecha, desglose de cargas por bodegas.
 
-### Bodega (`/api/bodegas... /api/movimientos...`)
+### Bodega (`/api/bodegas... /api/movimientos... /api/bodega/pendientes...`)
 - Reporte y listas de pedidos pendientes, entregados, devoluciones y movimientos internos en bodega.
+- CRUD avanzado para la gestión de material pendiente (registro, edición, eliminación, actualización de tipos de entrega y procesamiento de despachos).
 
 ### Logística (`/api/logistica`)
 - Vista diaria de rutas, despachos de saldos parciales.

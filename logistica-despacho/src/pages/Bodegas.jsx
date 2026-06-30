@@ -6,6 +6,7 @@ const Bodegas = () => {
   const [bodegas, setBodegas] = useState([]);
   const [formData, setFormData] = useState({ nombre: '' });
   const [editingId, setEditingId] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // CARGAR DATOS
   const fetchBodegas = async () => {
@@ -55,6 +56,7 @@ const Bodegas = () => {
     }
     // 👆 FIN DE LÓGICA DE DUPLICADOS 👆
 
+    setIsSaving(true);
 
     const url = editingId 
       ? `${import.meta.env.VITE_API_URL}/api/bodegas/${editingId}` 
@@ -79,6 +81,9 @@ const Bodegas = () => {
         mostrarError(`Error al guardar: ${errorData.error || 'Desconocido'}`);
       }
     } catch (error) { mostrarError("Error de conexión"); }
+    finally {
+      setIsSaving(false);
+    }
   };
 
   // PREPARAR EDICIÓN
@@ -90,13 +95,17 @@ const Bodegas = () => {
   // ELIMINAR
   const handleDelete = async (id) => {
     if(!(await confirmarAccion("Confirmar", "¿Eliminar esta bodega?"))) return;
+    setIsSaving(true);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodegas/${id}`, { method: 'DELETE' });
       const data = await res.json();
       
       if (res.ok) fetchBodegas();
-      else mostrarError(data.error || "No se pudo eliminar");
+      else mostrarError(data.error || "No se pudo guardar");
     } catch (error) { mostrarError("Error de conexión"); }
+    finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -149,9 +158,9 @@ const Bodegas = () => {
                     </p>
                   </div>
                 </div>
-                <button type="submit" className={`w-full py-3 rounded-xl font-bold text-white flex justify-center items-center gap-2 shadow-md transition-all active:scale-95 ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#47B3A8] hover:bg-[#3A948C]'}`}>
+                <button type="submit" disabled={isSaving} className={`w-full py-3 rounded-xl font-bold text-white flex justify-center items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-[#47B3A8] hover:bg-[#3A948C]'}`}>
                   {editingId ? <RefreshCw size={18}/> : <Save size={18}/>} 
-                  {editingId ? 'Actualizar Bodega' : 'Guardar Bodega'}
+                  {isSaving ? 'Procesando...' : (editingId ? 'Actualizar Bodega' : 'Guardar Bodega')}
                 </button>
               </form>
             </div>

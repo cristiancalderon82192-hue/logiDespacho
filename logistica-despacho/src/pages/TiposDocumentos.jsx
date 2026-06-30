@@ -7,6 +7,7 @@ const TiposDocumento = () => {
   const [nombre, setNombre] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // CARGAR DATOS
   const fetchTipos = async () => {
@@ -32,6 +33,7 @@ const TiposDocumento = () => {
       : `${import.meta.env.VITE_API_URL}/api/tipos-documento`;
     const method = editingId ? 'PUT' : 'POST';
 
+    setIsSaving(true);
     try {
       const res = await fetch(url, {
         method,
@@ -46,9 +48,10 @@ const TiposDocumento = () => {
         setEditingId(null);
         fetchTipos();
       } else {
-        mostrarError(`❌ Error: ${data.error}`);
+        mostrarError(`⛔ Error: ${data.error}`);
       }
     } catch (error) { mostrarError("Error de conexión"); }
+    finally { setIsSaving(false); }
   };
 
   // EDITAR
@@ -102,9 +105,9 @@ const TiposDocumento = () => {
               />
             </div>
             
-            <button type="submit" className={`w-full py-3 rounded-lg font-bold text-white flex justify-center items-center gap-2 shadow-md transition-transform active:scale-95 ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {editingId ? <RefreshCw size={18}/> : <Save size={18}/>} 
-              {editingId ? 'Actualizar' : 'Guardar'}
+            <button type="submit" disabled={isSaving} className={`w-full py-3 rounded-lg font-bold text-white flex justify-center items-center gap-2 shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${editingId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
+              {editingId ? <RefreshCw size={18}/> : <Save size={18}/>}
+              {isSaving ? 'Procesando...' : (editingId ? 'Actualizar Tipo' : 'Guardar Tipo')}
             </button>
             
             {editingId && (
