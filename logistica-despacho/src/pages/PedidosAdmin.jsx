@@ -19,6 +19,7 @@ const PedidosAdmin = () => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null); 
+  const [isSaving, setIsSaving] = useState(false);
 
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientData, setNewClientData] = useState({ nombre: '', documento: '', telefono: '', direccion_exacta: '' });
@@ -267,7 +268,6 @@ const PedidosAdmin = () => {
     e.preventDefault();
     if (isReadOnly) return;
 
-    // 👇 VALIDACIÓN ESTRICTA: ABSOLUTAMENTE TODOS LOS CAMPOS OBLIGATORIOS 👇
     if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
       mostrarError("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
       setShowClientModal(true);
@@ -287,6 +287,8 @@ const PedidosAdmin = () => {
     if (totalPeso <= 0) {
       return mostrarError("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega para poder despachar.");
     }
+    
+    setIsSaving(true);
 
     const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
     const method = editingId ? 'PUT' : 'POST';
@@ -303,7 +305,12 @@ const PedidosAdmin = () => {
       } else {
         const errorData = await response.json(); mostrarError(`❌ Error: ${errorData.error}`);
       }
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+      console.error(error); 
+      mostrarError("❌ Error de red.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCreateClient = async (e) => {
@@ -807,8 +814,13 @@ const PedidosAdmin = () => {
                       {isReadOnly ? 'Cerrar Vista' : 'Cancelar'}
                     </button>
                     {!isReadOnly && (
-                      <button type="submit" className={`w-full sm:w-auto text-white px-8 py-2.5 md:py-2.5 rounded-lg font-extrabold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
-                        {editingId ? <RefreshCw size={18}/> : <Save size={18}/>} {editingId ? 'Actualizar Pedido' : 'Guardar Pedido'}
+                      <button type="submit" disabled={isSaving} className={`w-full sm:w-auto text-white px-8 py-2.5 md:py-2.5 rounded-lg font-extrabold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+                        {isSaving ? 'Procesando...' : (
+                          <>
+                            {editingId ? <RefreshCw size={18}/> : <Save size={18}/>} 
+                            {editingId ? 'Actualizar Pedido' : 'Guardar Pedido'}
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
