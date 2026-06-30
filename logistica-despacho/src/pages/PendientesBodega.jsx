@@ -778,8 +778,8 @@ const PendientesBodega = () => {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col xl:flex-row flex-wrap gap-6 items-end">
-        <div className="flex-1 min-w-[200px] w-full xl:w-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col xl:flex-row flex-wrap gap-6 items-start xl:items-end">
+        <div className="flex-1 w-full xl:w-auto">
           <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1"><Search size={12}/> Buscar Factura</label>
           <input 
             type="text" 
@@ -798,7 +798,7 @@ const PendientesBodega = () => {
             setFechaFin={setFechaFin} 
           />
         </div>
-        <div className="flex-1 min-w-[300px] w-full xl:w-auto">
+        <div className="flex-1 w-full xl:w-auto">
           <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-1">Filtrar por Entrega</label>
           <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
             <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer select-none">
