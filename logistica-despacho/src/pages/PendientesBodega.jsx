@@ -307,15 +307,6 @@ const PendientesBodega = () => {
         if (resPend.ok) {
           const updatedPendientes = await resPend.json();
           setPendientes(updatedPendientes);
-          
-          if (!editId && (modalAction === 'Inmediata' || modalAction === 'Domicilio')) {
-            const targetId = dataRes.newId;
-            const nuevoItem = updatedPendientes.find(p => p.id === targetId);
-            if (nuevoItem) {
-              if (modalAction === 'Inmediata') abrirModalEntrega(nuevoItem);
-              else abrirModalDomicilio(nuevoItem);
-            }
-          }
         } else {
           cargarDatos();
         }
