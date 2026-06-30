@@ -865,7 +865,7 @@ const PendientesBodega = () => {
                         ) : !isLectura ? (
                           <button 
                             onClick={() => abrirModalEntrega(p)} 
-                            className="bg-green-600 hover:bg-green-700 text-white min-w-[140px] px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
+                            className={`${p.tipo_entrega === 'Entrega Pendiente' ? 'bg-[#F5D627] hover:bg-[#e0c015] text-slate-900' : 'bg-green-600 hover:bg-green-700 text-white'} min-w-[140px] px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1`}
                           >
                             <CheckCircle size={14}/> {p.tipo_entrega === 'Entrega Inmediata' ? 'Entrega Inmediata' : 'Entrega Pendiente'}
                           </button>
@@ -934,7 +934,7 @@ const PendientesBodega = () => {
                   {p.tipo_entrega === 'Domicilio' ? (
                     <button onClick={() => abrirModalDomicilio(p)} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]">Domicilio</button>
                   ) : !isLectura ? (
-                    <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]"><CheckCircle size={16}/> {p.tipo_entrega === 'Entrega Inmediata' ? 'Entrega Inmediata' : 'Entrega Pendiente'}</button>
+                    <button onClick={() => abrirModalEntrega(p)} className={`flex-1 ${p.tipo_entrega === 'Entrega Pendiente' ? 'bg-[#F5D627] hover:bg-[#e0c015] text-slate-900' : 'bg-green-600 hover:bg-green-700 text-white'} py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]`}><CheckCircle size={16}/> {p.tipo_entrega === 'Entrega Inmediata' ? 'Entrega Inmediata' : 'Entrega Pendiente'}</button>
                   ) : (
                     <button onClick={() => abrirModalEntrega(p)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 min-w-[140px]"><Eye size={16}/> Ver Detalle</button>
                   )}
