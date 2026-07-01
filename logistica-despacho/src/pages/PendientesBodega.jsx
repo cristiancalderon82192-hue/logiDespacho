@@ -34,7 +34,7 @@ const PendientesBodega = () => {
     domicilio: false
   });
   
-  const [formMaster, setFormMaster] = useState({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '' });
+  const [formMaster, setFormMaster] = useState({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '', notas: '' });
   const [items, setItems] = useState([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
@@ -223,7 +223,7 @@ const PendientesBodega = () => {
     setEditId(null);
     setModalAbierto(false);
     setItems([{ codigo: '', nombre: '', cantidad: '', unidad: 'UND', bodega_id: '', precio_unitario: '', valor_total: '', peso_kg: '' }]);
-    setFormMaster({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '' });
+    setFormMaster({ fecha_factura: '', factura_num: '', punto_venta_id: '', cliente_id: '', fecha_promesa: '', tipo_entrega: 'Retiro Bodega', valor_factura: '', notas: '' });
     setClienteSeleccionadoNombre('');
     setModalAction('Pendiente');
   };
@@ -237,7 +237,8 @@ const PendientesBodega = () => {
       cliente_id: pendiente.cliente_id,
       fecha_promesa: pendiente.fecha_promesa ? new Date(pendiente.fecha_promesa).toISOString().split('T')[0] : '',
       tipo_entrega: pendiente.tipo_entrega || 'Material Pendiente',
-      valor_factura: pendiente.valor_factura || ''
+      valor_factura: pendiente.valor_factura || '',
+      notas: pendiente.notas || ''
     });
     setClienteSeleccionadoNombre(pendiente.nombre_cliente);
     
@@ -824,18 +825,19 @@ const PendientesBodega = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b">
-                <th className="p-4">Factura No.</th><th className="p-4">Origen</th><th className="p-4">Cliente</th><th className="p-4">Creado Por</th><th className="p-4">Total</th><th className="p-4">Fecha Factura</th><th className="p-4">Promesa Entrega</th><th className="p-4">Estado</th><th className="p-4 text-center">Acción</th>
+                <th className="p-4">Factura No.</th><th className="p-4">Origen</th><th className="p-4">Cliente</th><th className="p-4">Notas</th><th className="p-4">Creado Por</th><th className="p-4">Total</th><th className="p-4">Fecha Factura</th><th className="p-4">Promesa Entrega</th><th className="p-4">Estado</th><th className="p-4 text-center">Acción</th>
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700">
               {pendientesFiltrados.length === 0 ? (
-                <tr><td colSpan="9" className="p-8 text-center text-slate-400">No hay materiales pendientes.</td></tr>
+                <tr><td colSpan="10" className="p-8 text-center text-slate-400">No hay materiales pendientes.</td></tr>
               ) : (
                 pendientesFiltrados.map((p) => (
                   <tr key={p.id} className="border-b hover:bg-slate-50">
                     <td className="p-4 font-bold text-slate-900">{p.factura_num}</td>
                     <td className="p-4 text-[#47B3A8] font-bold">{p.nombre_punto_venta}</td>
                     <td className="p-4">{p.nombre_cliente}</td>
+                    <td className="p-4 text-xs text-slate-500 max-w-[150px] truncate" title={p.notas}>{p.notas || '-'}</td>
                     <td className="p-4">
                       {p.nombre_creador ? (
                         <span className="text-slate-700 font-medium">{p.nombre_creador}</span>
@@ -925,6 +927,7 @@ const PendientesBodega = () => {
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Origen</p><p className="font-bold text-[#47B3A8] text-xs">{p.nombre_punto_venta}</p></div>
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Fecha</p><p className="font-medium text-slate-700 text-xs flex items-center gap-1"><Calendar size={12}/>{new Date(p.fecha_factura).toLocaleDateString()}</p></div>
                   <div className="col-span-2"><p className="text-[10px] text-slate-400 font-bold uppercase">Cliente</p><p className="font-bold text-slate-700 text-xs">{p.nombre_cliente}</p></div>
+                  {p.notas && <div className="col-span-2"><p className="text-[10px] text-slate-400 font-bold uppercase">Notas / Observaciones</p><p className="text-slate-600 text-xs italic">{p.notas}</p></div>}
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Promesa</p><p className="font-medium text-slate-700 text-xs flex items-center gap-1">{p.fecha_promesa ? <><Calendar size={12}/>{new Date(p.fecha_promesa).toLocaleDateString()}</> : <span className="text-slate-400 italic text-[10px]">Sin Fecha</span>}</p></div>
                   <div><p className="text-[10px] text-slate-400 font-bold uppercase">Total Items</p><p className="font-bold text-slate-700 text-xs">{p.total_items} Unds</p></div>
                   <div className="col-span-2"><p className="text-[10px] text-slate-400 font-bold uppercase">Creado Por</p><p className="font-medium text-slate-700 text-xs truncate">{p.nombre_creador || <span className="italic text-slate-400">No registrado</span>}</p></div>
@@ -998,6 +1001,15 @@ const PendientesBodega = () => {
                       <Search size={16}/> Buscar
                     </button>
                   </div>
+                </div>
+                <div className="md:col-span-5">
+                  <label className="text-xs font-bold text-slate-500">Notas / Observaciones (Opcional)</label>
+                  <textarea 
+                    className="w-full border p-2 rounded-lg resize-none h-16 text-sm" 
+                    placeholder="Escribe aquí si hay alguna nota, observación o dato adicional importante..." 
+                    value={formMaster.notas || ''} 
+                    onChange={(e) => setFormMaster({...formMaster, notas: e.target.value})}
+                  ></textarea>
                 </div>
               </div>
 

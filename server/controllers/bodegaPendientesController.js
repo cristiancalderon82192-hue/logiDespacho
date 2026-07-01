@@ -37,8 +37,8 @@ const crearPendiente = async (req, res) => {
     await connection.beginTransaction();
 
     const [master] = await connection.query(
-      `INSERT INTO bodega_pendientes (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    , [fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura || 0, usuario_id]);
+      `INSERT INTO bodega_pendientes (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, usuario_id, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    , [fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura || 0, usuario_id, req.body.notas || null]);
 
     for (let prod of productos) {
       await connection.query(
@@ -288,9 +288,9 @@ const editarPendiente = async (req, res) => {
 
     await connection.query(
       `UPDATE bodega_pendientes 
-       SET factura_num = ?, fecha_factura = ?, punto_venta_id = ?, cliente_id = ?, fecha_promesa = ?, tipo_entrega = ?, valor_factura = ?
+       SET factura_num = ?, fecha_factura = ?, punto_venta_id = ?, cliente_id = ?, fecha_promesa = ?, tipo_entrega = ?, valor_factura = ?, notas = ?
        WHERE id = ?`,
-      [factura_num, fecha_factura || null, punto_venta_id, cliente_id, fecha_promesa || null, tipo_entrega, valor_factura || 0, id]
+      [factura_num, fecha_factura || null, punto_venta_id, cliente_id, fecha_promesa || null, tipo_entrega, valor_factura || 0, req.body.notas || null, id]
     );
 
     if (productos && Array.isArray(productos)) {

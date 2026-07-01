@@ -86,6 +86,7 @@ CREATE TABLE `bodega_pendientes` (
   `fecha_promesa` date DEFAULT NULL,
   `tipo_entrega` varchar(50) DEFAULT 'Retiro Bodega',
   `estado` enum('Pendiente','Parcial','Entregado') DEFAULT 'Pendiente',
+  `notas` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `usuario_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),
