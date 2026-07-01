@@ -837,7 +837,7 @@ const PendientesBodega = () => {
                     <td className="p-4 font-bold text-slate-900">{p.factura_num}</td>
                     <td className="p-4 text-[#47B3A8] font-bold">{p.nombre_punto_venta}</td>
                     <td className="p-4">{p.nombre_cliente}</td>
-                    <td className="p-4 text-xs text-slate-500 max-w-[150px] truncate" title={p.notas}>{p.notas || '-'}</td>
+                    <td className="p-4 text-xs text-slate-500 min-w-[180px] max-w-[250px] whitespace-normal break-words" title={p.notas}>{p.notas || '-'}</td>
                     <td className="p-4">
                       {p.nombre_creador ? (
                         <span className="text-slate-700 font-medium">{p.nombre_creador}</span>
