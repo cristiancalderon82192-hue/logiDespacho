@@ -317,16 +317,26 @@ const PedidosLider = () => {
 
     // Auto-generar nota manual para retiros en mostrador
     let finalNotaManual = formData.nota_manual || '';
+    
+    // Limpiar notas anteriores de retiros para no duplicarlas
+    finalNotaManual = finalNotaManual
+        .replace(/\|\s*\[Retir[oó]s? en Mostrador:[^\]]*\]/g, '')
+        .replace(/\[Retir[oó]s? en Mostrador:[^\]]*\]\s*\|?/g, '')
+        .trim();
+        
+    if (finalNotaManual.endsWith('|')) {
+        finalNotaManual = finalNotaManual.slice(0, -1).trim();
+    }
+
     if (formData.productos) {
-      formData.productos.forEach(prod => {
-        const retirada = Number(prod.cantidad_retirada_cliente || 0);
-        if (retirada > 0) {
-          const nota = `[Retiró en Mostrador: ${retirada} ${prod.unidad_medida || 'und'} de ${prod.descripcion}]`;
-          if (!finalNotaManual.includes(nota)) {
-            finalNotaManual += (finalNotaManual ? ' | ' : '') + nota;
-          }
-        }
-      });
+      const productosRetirados = formData.productos
+          .filter(prod => Number(prod.cantidad_retirada_cliente || 0) > 0)
+          .map(prod => `${prod.cantidad_retirada_cliente} ${prod.unidad_medida || 'und'} de ${prod.descripcion}`);
+          
+      if (productosRetirados.length > 0) {
+          const nota = `[Retiro en Mostrador: ${productosRetirados.join(' / ')}]`;
+          finalNotaManual += (finalNotaManual ? ' | ' : '') + nota;
+      }
     }
 
     try {
