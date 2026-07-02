@@ -279,9 +279,11 @@ const actualizarPedido = async (req, res) => {
 
   try {
     // 👇 CANDADO 3: VALIDAR FACTURA DUPLICADA AL EDITAR 👇
-    const [facturaExiste] = await db.query("SELECT id FROM pedidos WHERE id_factura = ? AND id != ?", [data.id_factura, id]);
-    if (facturaExiste.length > 0) {
-      return res.status(400).json({ error: `La factura '${data.id_factura}' ya pertenece a otro pedido.` });
+    if (data.id_factura && data.id_factura.trim() !== '') {
+      const [facturaExiste] = await db.query("SELECT id FROM pedidos WHERE id_factura = ? AND id != ?", [data.id_factura, id]);
+      if (facturaExiste.length > 0) {
+        return res.status(400).json({ error: `La factura '${data.id_factura}' ya pertenece a otro pedido.` });
+      }
     }
 
     let destinoId = data.destino_id;
