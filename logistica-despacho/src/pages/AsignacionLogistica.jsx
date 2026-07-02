@@ -169,12 +169,18 @@ const AsignacionLogistica = () => {
       .filter(p => pedidosSeleccionados.includes(p.id))
       .forEach(p => {
     const productosInit = p.productos ? p.productos.map(prod => {
-      const cantidadReal = Number(prod.cantidad) - Number(prod.cantidad_retirada_cliente || 0);
+      const cantidadOrig = Number(prod.cantidad || 1);
+      const cantidadReal = cantidadOrig - Number(prod.cantidad_retirada_cliente || 0);
+      const pesoOriginal = Number(prod.peso_kg || prod.peso || 0);
+      const nuevoPeso = cantidadOrig > 0 ? (pesoOriginal / cantidadOrig) * cantidadReal : 0;
+      
       return {
         ...prod,
         cantidad: cantidadReal,
-        cantidad_original: Number(prod.cantidad), // Guardamos la original por si acaso
-        cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : cantidadReal
+        cantidad_original: cantidadOrig,
+        peso: nuevoPeso,
+        peso_original: pesoOriginal,
+        cantidad_despachada: prod.cantidad_despachada !== undefined && prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : cantidadReal
       };
     }) : [];
         valoresIniciales[p.id] = {
@@ -352,8 +358,11 @@ const AsignacionLogistica = () => {
     }
   };
 
-  const obtenerPesoFormateado = (p) => Number(p.total_peso || p.peso || 0).toLocaleString();
-  const obtenerPesoNumerico = (p) => Number(p.total_peso || p.peso || 0);
+  const obtenerPesoNumerico = (p) => {
+    if (p.total_peso !== undefined && p.total_peso !== null) return Number(p.total_peso);
+    return Number(p.peso || 0);
+  };
+  const obtenerPesoFormateado = (p) => obtenerPesoNumerico(p).toLocaleString();
 
   const destinosUnicos = [...new Set(pedidos.map(p => p.destino))].sort();
   
@@ -775,7 +784,7 @@ const AsignacionLogistica = () => {
                                               {prod.bodega_nombre || (prod.bodega_id ? `B${prod.bodega_id}` : 'N/A')}
                                             </span>
                                           </td>
-                                          <td className="p-2 text-right font-medium text-blue-600">{Number(prod.peso_kg || prod.peso || 0).toLocaleString()}</td>
+                                          <td className="p-2 text-right font-medium text-blue-600">{Number(prod.peso || 0).toLocaleString()}</td>
                                           <td className="p-2">
                                             <input 
                                               type="number" 
