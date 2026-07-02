@@ -1064,24 +1064,20 @@ const AsignacionLogistica = () => {
                           <table className="w-full text-left text-[9px] border-collapse">
                             <thead className="bg-gray-50">
                               <tr>
-                                <th className="border-b border-r border-black p-1">CÓDIGO</th>
+                                <th className="border-b border-r border-black p-1 w-16">CÓDIGO</th>
                                 <th className="border-b border-r border-black p-1">DESCRIPCIÓN</th>
-                                <th className="border-b border-r border-black p-1 text-center">CANT</th>
-                                <th className="border-b border-r border-black p-1 text-center">UND</th>
-                                <th className="border-b border-r border-black p-1 text-right">VR. UNIT</th>
-                                <th className="border-b border-r border-black p-1 text-right">VR. TOTAL</th>
-                                <th className="border-b border-black p-1 text-right">PESO</th>
+                                <th className="border-b border-r border-black p-1 text-center w-10">CANT</th>
+                                <th className="border-b border-r border-black p-1 text-center w-10">UND</th>
+                                <th className="border-b border-black p-1 text-right w-14">PESO</th>
                               </tr>
                             </thead>
                             <tbody>
                               {fac.items.map((item, iIdx) => (
                                 <tr key={iIdx} className="border-b border-dashed border-gray-300 last:border-0">
                                   <td className="border-r border-gray-300 p-1 font-bold text-gray-700">{item.codigo}</td>
-                                  <td className="border-r border-gray-300 p-1 font-semibold truncate max-w-[120px]" title={item.descripcion}>{item.descripcion}</td>
+                                  <td className="border-r border-gray-300 p-1 font-semibold">{item.descripcion}</td>
                                   <td className="border-r border-gray-300 p-1 text-center font-bold text-[10px]">{item.cantidad}</td>
                                   <td className="border-r border-gray-300 p-1 text-center text-gray-500">{item.unidad_medida}</td>
-                                  <td className="border-r border-gray-300 p-1 text-right">${Number(item.vr_unitario).toLocaleString('es-CO')}</td>
-                                  <td className="border-r border-gray-300 p-1 text-right font-bold text-green-700">${Number(item.vr_total).toLocaleString('es-CO')}</td>
                                   <td className="p-1 text-right font-bold text-blue-600">{Number(item.peso).toLocaleString('es-CO')} Kg</td>
                                 </tr>
                               ))}
