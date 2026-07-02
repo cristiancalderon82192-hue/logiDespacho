@@ -44,10 +44,50 @@ const ejecutarPruebaDesempeno = async (req, res) => {
 
   } catch (error) {
     console.error("Error en prueba de desempeño:", error);
-    res.status(500).json({ success: false, error: "Error ejecutando la prueba de desempeño." });
+    res.status(500).json({ error: "Error en la prueba de desempeño" });
+  }
+};
+
+const migrateRetiro = async (req, res) => {
+  try {
+    const results = [];
+    
+    // Add column if not exists
+    try {
+      await db.query(`ALTER TABLE pedidos_productos_detalle ADD COLUMN cantidad_retirada_cliente DECIMAL(10,2) DEFAULT 0;`);
+      results.push("Columna cantidad_retirada_cliente añadida.");
+    } catch (e) {
+      if (e.code === 'ER_DUP_FIELDNAME') {
+        results.push("La columna cantidad_retirada_cliente ya existe.");
+      } else {
+        throw e;
+      }
+    }
+
+    // Create novedades table if not exists
+    try {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS novedades_pedidos (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          pedido_id INT NOT NULL,
+          tipo VARCHAR(100) NOT NULL,
+          descripcion TEXT,
+          fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      results.push("Tabla novedades_pedidos creada o ya existía.");
+    } catch (e) {
+      throw e;
+    }
+
+    res.json({ success: true, message: "Migración completada", details: results });
+  } catch (error) {
+    console.error("Error en migración:", error);
+    res.status(500).json({ error: error.message });
   }
 };
 
 module.exports = {
-  ejecutarPruebaDesempeno
+  ejecutarPruebaDesempeno,
+  migrateRetiro
 };
