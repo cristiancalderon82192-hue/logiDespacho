@@ -1056,7 +1056,7 @@ const AsignacionLogistica = () => {
                     <h3 className="text-[11px] font-bold uppercase border-b-2 border-black mb-3 pb-1">Lista de Empaque (Detalle por Factura)</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {bodegaGrp.facturas.map((fac, fIdx) => (
-                        <div key={fIdx} className="border border-black p-0 bg-white">
+                        <div key={fIdx} className="border border-black p-0 bg-white break-inside-avoid">
                           <div className="flex justify-between items-center bg-gray-200 border-b border-black p-1.5">
                             <span className="font-extrabold text-[11px] text-blue-800">DOC: {fac.factura}</span>
                             <span className="font-bold text-[10px] truncate ml-2 text-right">{fac.cliente}</span>
@@ -1090,7 +1090,7 @@ const AsignacionLogistica = () => {
                 )}
                 
                 {/* ZONA DE NOTAS MANUALES PARA NOVEDADES */}
-                <div className="mt-6 border border-black p-2 min-h-[100px]">
+                <div className="mt-6 border border-black p-2 min-h-[100px] break-inside-avoid">
                   <p className="text-[10px] font-bold uppercase mb-1">Notas / Novedades (Uso exclusivo de bodega):</p>
                   <div className="w-full h-[1px] border-b border-dashed border-gray-400 mt-6"></div>
                   <div className="w-full h-[1px] border-b border-dashed border-gray-400 mt-6"></div>
