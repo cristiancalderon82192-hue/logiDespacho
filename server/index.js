@@ -38,6 +38,7 @@ app.use('/api', pedidosRoutes);
 app.use('/api', zonasRoutes);   
 app.use('/api', destinosRoutes); 
 app.use('/api', clientesRoutes);
+app.use('/api', require('./routes/testRoutes'));
 app.use('/api', usuariosRoutes);
 app.use('/api', bodegasRoutes);
 app.use('/api', vehiculosRoutes);
