@@ -1023,11 +1023,12 @@ const AsignacionLogistica = () => {
                 </div>
               </div>
 
-              <div className="mb-8" style={{ pageBreakInside: 'avoid' }}>
-                <h2 className="text-md font-bold uppercase mb-2 bg-gray-200 p-2 border border-black inline-block">
-                  Bodega: {bodegaGrp.bodega}
-                </h2>
-                <table className="w-full text-left text-[10px] border-collapse border border-black">
+              <div className="mb-8">
+                <div style={{ pageBreakInside: 'avoid' }}>
+                  <h2 className="text-md font-bold uppercase mb-2 bg-gray-200 p-2 border border-black inline-block">
+                    Bodega: {bodegaGrp.bodega}
+                  </h2>
+                  <table className="w-full text-left text-[10px] border-collapse border border-black">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="border border-black p-1 text-center w-24">CÓDIGO</th>
@@ -1049,6 +1050,7 @@ const AsignacionLogistica = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
                 
                 {/* DESGLOSE DETALLADO POR FACTURA */}
                 {bodegaGrp.facturas && bodegaGrp.facturas.length > 0 && (
