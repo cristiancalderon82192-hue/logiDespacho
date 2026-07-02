@@ -95,7 +95,16 @@ const asignarRuta = async (req, res) => {
     const [pedido] = await db.query('SELECT valor_factura, fecha_agendada FROM pedidos WHERE id = ?', [id]);
     if (pedido.length === 0) return res.status(404).json({ error: "Pedido no encontrado" });
 
-    const valorFactura = parseFloat(pedido[0].valor_factura) || 0;
+    const [retirado] = await db.query(`
+      SELECT COALESCE(SUM(cantidad_retirada_cliente * precio_unitario), 0) as valor_retirado 
+      FROM pedidos_productos_detalle 
+      WHERE pedido_id = ?
+    `, [id]);
+    
+    const valorFacturaOriginal = parseFloat(pedido[0].valor_factura) || 0;
+    const valorRetirado = parseFloat(retirado[0].valor_retirado) || 0;
+    const valorFactura = Math.max(0, valorFacturaOriginal - valorRetirado);
+
     const despachado = parseFloat(total_despachado) || 0;
     const valorFacturaPendiente = valorFactura - despachado;
 
@@ -158,7 +167,16 @@ const asignarLote = async (req, res) => {
 
       const [pedido] = await db.query('SELECT valor_factura FROM pedidos WHERE id = ?', [id]);
       if (pedido.length > 0) {
-        const valorFactura = parseFloat(pedido[0].valor_factura) || 0;
+        const [retirado] = await db.query(`
+          SELECT COALESCE(SUM(cantidad_retirada_cliente * precio_unitario), 0) as valor_retirado 
+          FROM pedidos_productos_detalle 
+          WHERE pedido_id = ?
+        `, [id]);
+
+        const valorFacturaOriginal = parseFloat(pedido[0].valor_factura) || 0;
+        const valorRetirado = parseFloat(retirado[0].valor_retirado) || 0;
+        const valorFactura = Math.max(0, valorFacturaOriginal - valorRetirado);
+
         const despachado = parseFloat(total_despachado) || 0;
         const valorFacturaPendiente = valorFactura - despachado;
 
