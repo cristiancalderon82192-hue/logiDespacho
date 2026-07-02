@@ -101,10 +101,11 @@ const crearPedido = async (req, res) => {
     // F. INSERTAR DETALLE DE PRODUCTOS (SI EXISTE)
     if (data.productos && Array.isArray(data.productos) && data.productos.length > 0) {
       for (const prod of data.productos) {
+        const retirada = prod.cantidad_retirada_cliente || 0;
         await db.query(`
           INSERT INTO pedidos_productos_detalle 
-          (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total, cantidad_retirada_cliente) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           pedido_id,
           prod.codigo_producto || null,
@@ -114,8 +115,16 @@ const crearPedido = async (req, res) => {
           prod.cantidad || 0,
           prod.unidad_medida || 'und',
           prod.precio_unitario || 0,
-          prod.precio_total || 0
+          prod.precio_total || 0,
+          retirada
         ]);
+        
+        if (retirada > 0) {
+          await db.query(`
+            INSERT INTO novedades_pedidos (pedido_id, tipo, descripcion)
+            VALUES (?, 'Retiro Mostrador', ?)
+          `, [pedido_id, `El cliente retiró en mostrador ${retirada} ${prod.unidad_medida || 'und'} de ${prod.descripcion}`]);
+        }
       }
     }
 
@@ -330,10 +339,11 @@ const actualizarPedido = async (req, res) => {
     if (data.productos && Array.isArray(data.productos)) {
       await db.query("DELETE FROM pedidos_productos_detalle WHERE pedido_id = ?", [id]);
       for (const prod of data.productos) {
+        const retirada = prod.cantidad_retirada_cliente || 0;
         await db.query(`
           INSERT INTO pedidos_productos_detalle 
-          (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (pedido_id, codigo_producto, descripcion, peso, bodega_id, cantidad, unidad_medida, precio_unitario, precio_total, cantidad_retirada_cliente) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           id,
           prod.codigo_producto || null,
@@ -343,8 +353,17 @@ const actualizarPedido = async (req, res) => {
           prod.cantidad || 0,
           prod.unidad_medida || 'und',
           prod.precio_unitario || 0,
-          prod.precio_total || 0
+          prod.precio_total || 0,
+          retirada
         ]);
+        
+        // Si hay una cantidad retirada, registramos automáticamente la novedad
+        if (retirada > 0) {
+          await db.query(`
+            INSERT INTO novedades_pedidos (pedido_id, tipo, descripcion)
+            VALUES (?, 'Retiro Mostrador', ?)
+          `, [id, `El cliente retiró en mostrador ${retirada} ${prod.unidad_medida || 'und'} de ${prod.descripcion}`]);
+        }
       }
     }
 

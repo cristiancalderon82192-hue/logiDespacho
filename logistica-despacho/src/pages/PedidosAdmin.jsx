@@ -3,7 +3,7 @@ import {
   Save, Truck, FileText, Calendar, User, Weight, MapPin, Search, 
   ChevronDown, ChevronUp, PlusCircle, DollarSign, Phone, X, CheckCircle, 
   Edit, Trash2, RefreshCw, AlertTriangle, Lock, Eye, XCircle, UserPlus, CreditCard,
-  Printer, Plus, UploadCloud
+  Printer, Plus, UploadCloud, Store
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -57,8 +57,9 @@ const PedidosAdmin = () => {
   const [pedidos, setPedidos] = useState([]);
   const [fechaInicio, setFechaInicio] = useState(hoy);
   const [fechaFin, setFechaFin] = useState(hoy);
+  const [habilitarRetiro, setHabilitarRetiro] = useState(false);
 
-  const isReadOnly = ['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(formData.estado_entrega);
+  const isReadOnly = !!editingId;
 
   useEffect(() => {
     const fetchCatalogos = async () => {
@@ -266,7 +267,6 @@ const PedidosAdmin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isReadOnly) return;
 
     if (!formData.nombre_cliente || formData.nombre_cliente.trim() === '') {
       mostrarError("❌ Debes seleccionar un cliente utilizando el buscador antes de guardar el pedido.");
@@ -292,11 +292,26 @@ const PedidosAdmin = () => {
 
     const url = editingId ? `${import.meta.env.VITE_API_URL}/api/pedidos/${editingId}` : `${import.meta.env.VITE_API_URL}/api/pedidos`;
     const method = editingId ? 'PUT' : 'POST';
+
+    // Auto-generar nota manual para retiros en mostrador
+    let finalNotaManual = formData.nota_manual || '';
+    if (formData.productos) {
+      formData.productos.forEach(prod => {
+        const retirada = Number(prod.cantidad_retirada_cliente || 0);
+        if (retirada > 0) {
+          const nota = `[Retiró en Mostrador: ${retirada} ${prod.unidad_medida || 'und'} de ${prod.descripcion}]`;
+          if (!finalNotaManual.includes(nota)) {
+            finalNotaManual += (finalNotaManual ? ' | ' : '') + nota;
+          }
+        }
+      });
+    }
+
     try {
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, usuario_id: user.id })
+        body: JSON.stringify({ ...formData, nota_manual: finalNotaManual, usuario_id: user.id })
       });
       if (response.ok) {
         mostrarExito(editingId ? "✅ Pedido Actualizado" : "✅ Pedido Guardado");
@@ -347,6 +362,7 @@ const PedidosAdmin = () => {
         fecha_agendada: formatearFecha(data.fecha_agendada),
         telefono: data.telefono || '', destino_id: data.destino_id || '' 
       });
+      setHabilitarRetiro(data.productos && data.productos.some(p => Number(p.cantidad_retirada_cliente || 0) > 0));
       setEditingId(pedidoId); 
       setShowFormModal(true); 
     } catch (error) { mostrarError("Error al cargar datos"); }
@@ -636,11 +652,11 @@ const PedidosAdmin = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] relative">
             
             {/* Encabezado del Modal del Formulario */}
-            <div className={`px-4 md:px-6 py-4 flex items-center justify-between gap-3 border-b shrink-0 ${isReadOnly ? 'bg-slate-800 text-white' : editingId ? 'bg-orange-600 text-white' : 'bg-slate-900 text-white'}`}>
+            <div className={`px-4 md:px-6 py-4 flex items-center justify-between gap-3 border-b shrink-0 ${editingId ? 'bg-orange-600 text-white' : 'bg-slate-900 text-white'}`}>
               <div className="flex items-center gap-3">
-                {isReadOnly ? <Eye size={24} /> : editingId ? <Edit size={24} /> : <Truck size={24} />}
+                {editingId ? <Edit size={24} /> : <Truck size={24} />}
                 <div>
-                  <h2 className="text-lg md:text-xl font-bold">{isReadOnly ? `Viendo Pedido #${editingId}` : editingId ? `Editando Pedido #${editingId}` : 'Registrar Nuevo Despacho'}</h2>
+                  <h2 className="text-lg md:text-xl font-bold">{editingId ? `Editando Pedido #${editingId}` : 'Registrar Nuevo Despacho'}</h2>
                   <p className="text-[10px] md:text-xs opacity-80">Administración general</p>
                 </div>
               </div>
@@ -655,8 +671,8 @@ const PedidosAdmin = () => {
                   <div className="col-span-1 lg:col-span-2 bg-slate-100 border border-slate-300 p-3 md:p-4 rounded-xl flex items-center gap-3">
                     <Lock className="text-slate-500 shrink-0" size={20} />
                     <div>
-                      <p className="font-bold text-slate-700 text-sm md:text-base">Formulario Bloqueado</p>
-                      <p className="text-[10px] md:text-sm text-slate-600">Este pedido está en estado <b>{formData.estado_entrega}</b>. Las modificaciones no están permitidas.</p>
+                      <p className="font-bold text-slate-700 text-sm md:text-base">Formulario Protegido por Seguridad</p>
+                      <p className="text-[10px] md:text-sm text-slate-600">Por seguridad, la información del pedido está bloqueada. Solo puedes utilizar esta vista para ingresar un <b>Retiro en Mostrador</b> si aplica.</p>
                     </div>
                   </div>
                 )}
@@ -741,16 +757,21 @@ const PedidosAdmin = () => {
                       <FileText size={16} className={isReadOnly ? "text-slate-400" : "text-blue-600"} /> 
                       Detalle de Productos
                     </h3>
-                    {!isReadOnly && (
-                      <div className="flex gap-2">
-                        <button type="button" onClick={agregarProducto} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
-                          <PlusCircle size={14} /> Añadir Producto
-                        </button>
-                        <button type="button" onClick={recalcularPesos} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
-                          <RefreshCw size={14} /> Recalcular Pesos
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setHabilitarRetiro(!habilitarRetiro)} className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors ${habilitarRetiro ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}>
+                        <Store size={14} /> {habilitarRetiro ? 'Ocultar Retiro' : 'Habilitar Retiro'}
+                      </button>
+                      {!isReadOnly && (
+                        <>
+                          <button type="button" onClick={agregarProducto} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
+                            <PlusCircle size={14} /> Añadir Producto
+                          </button>
+                          <button type="button" onClick={recalcularPesos} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
+                            <RefreshCw size={14} /> Recalcular Pesos
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="overflow-x-auto">
@@ -765,6 +786,7 @@ const PedidosAdmin = () => {
                           <th className="p-2 border text-right">Vr. Total</th>
                           <th className="p-2 border text-center">Bodega</th>
                           <th className="p-2 border text-center">Peso(Kg)</th>
+                          {habilitarRetiro && <th className="p-2 border text-center text-orange-600">Retiro Mostrador</th>}
                           {!isReadOnly && <th className="p-2 border text-center">Acción</th>}
                         </tr>
                       </thead>
@@ -784,6 +806,9 @@ const PedidosAdmin = () => {
                                 </select>
                               </td>
                               <td className="p-1 border"><input type="number" step="0.01" value={prod.peso} onChange={(e) => handleProductoChange(index, 'peso', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-center outline-none font-bold text-blue-600 disabled:text-slate-500" /></td>
+                              {habilitarRetiro && (
+                                <td className="p-1 border"><input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400 disabled:bg-transparent disabled:border-transparent" placeholder="0" title="Cantidad retirada por el cliente en mostrador" /></td>
+                              )}
                               {!isReadOnly && (
                                 <td className="p-1 border text-center">
                                   <button type="button" onClick={() => eliminarProducto(index)} className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"><Trash2 size={14}/></button>
@@ -813,12 +838,12 @@ const PedidosAdmin = () => {
                     <button type="button" onClick={() => setShowFormModal(false)} className="w-full sm:w-auto text-slate-600 hover:bg-slate-200 bg-slate-200/50 px-6 py-2.5 md:py-2.5 rounded-lg font-bold text-sm text-center transition-colors">
                       {isReadOnly ? 'Cerrar Vista' : 'Cancelar'}
                     </button>
-                    {!isReadOnly && (
+                    {( !isReadOnly || editingId ) && (
                       <button type="submit" disabled={isSaving} className={`w-full sm:w-auto text-white px-8 py-2.5 md:py-2.5 rounded-lg font-extrabold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>
                         {isSaving ? 'Procesando...' : (
                           <>
                             {editingId ? <RefreshCw size={18}/> : <Save size={18}/>} 
-                            {editingId ? 'Actualizar Pedido' : 'Guardar Pedido'}
+                            {editingId ? (isReadOnly ? 'Guardar Retiros' : 'Actualizar Pedido') : 'Guardar Pedido'}
                           </>
                         )}
                       </button>

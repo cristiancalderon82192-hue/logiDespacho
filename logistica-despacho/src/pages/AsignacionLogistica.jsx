@@ -47,7 +47,30 @@ const AsignacionLogistica = () => {
         fetch(`${import.meta.env.VITE_API_URL}/api/logistica/vehiculos`)
       ]);
       
-      if(resP.ok) setPedidos(await resP.json());
+      if(resP.ok) {
+        const data = await resP.json();
+        const procesados = data.map(p => {
+          let peso_retirado = 0;
+          let valor_retirado = 0;
+          if (p.productos && p.productos.length > 0) {
+            p.productos.forEach(prod => {
+              const retirada = Number(prod.cantidad_retirada_cliente || 0);
+              if (retirada > 0) {
+                valor_retirado += (retirada * Number(prod.precio_unitario || 0));
+                const orig_qty = Number(prod.cantidad || 1);
+                const row_weight = Number(prod.peso || 0);
+                peso_retirado += orig_qty > 0 ? (retirada * (row_weight / orig_qty)) : 0;
+              }
+            });
+          }
+          return {
+            ...p,
+            valor_factura: Math.max(0, Number(p.valor_factura || 0) - valor_retirado),
+            total_peso: Math.max(0, Number(p.total_peso || 0) - peso_retirado)
+          };
+        });
+        setPedidos(procesados);
+      }
       if(resC.ok) setConductores(await resC.json());
       if(resV.ok) setVehiculos(await resV.json());
       
@@ -145,10 +168,15 @@ const AsignacionLogistica = () => {
     pedidosFiltrados
       .filter(p => pedidosSeleccionados.includes(p.id))
       .forEach(p => {
-        const productosInit = p.productos ? p.productos.map(prod => ({
-          ...prod,
-          cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad)
-        })) : [];
+    const productosInit = p.productos ? p.productos.map(prod => {
+      const cantidadReal = Number(prod.cantidad) - Number(prod.cantidad_retirada_cliente || 0);
+      return {
+        ...prod,
+        cantidad: cantidadReal,
+        cantidad_original: Number(prod.cantidad), // Guardamos la original por si acaso
+        cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : cantidadReal
+      };
+    }) : [];
         valoresIniciales[p.id] = {
           valor_despachar: p.valor_factura || 0,
           observacion: '',
@@ -238,10 +266,15 @@ const AsignacionLogistica = () => {
     if (['En Ruta', 'Entregado', 'Entregado Incompleto', 'Devolución'].includes(pedido.estado_entrega)) return;
 
     setPedidoIndividual(pedido);
-    const productosInit = pedido.productos ? pedido.productos.map(prod => ({
-      ...prod,
-      cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : Number(prod.cantidad)
-    })) : [];
+    const productosInit = pedido.productos ? pedido.productos.map(prod => {
+      const cantidadReal = Number(prod.cantidad) - Number(prod.cantidad_retirada_cliente || 0);
+      return {
+        ...prod,
+        cantidad: cantidadReal,
+        cantidad_original: Number(prod.cantidad),
+        cantidad_despachada: prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : cantidadReal
+      };
+    }) : [];
 
     setAsignacionIndividual({ 
       conductor_id: pedido.conductor_id || '', 
@@ -362,12 +395,12 @@ const AsignacionLogistica = () => {
         const bodegaFinal = prod.bodega_nombre || (prod.bodega_id ? `Bodega ${prod.bodega_id}` : 'Bodega Principal');
         
         if (!bodegasConsolidadasMap[bodegaFinal]) {
-          bodegasConsolidadasMap[bodegaFinal] = {};
+          bodegasConsolidadasMap[bodegaFinal] = { productos: {}, facturas: {} };
         }
         
         const codigo = prod.codigo_producto || 'S/C';
-        if (!bodegasConsolidadasMap[bodegaFinal][codigo]) {
-          bodegasConsolidadasMap[bodegaFinal][codigo] = {
+        if (!bodegasConsolidadasMap[bodegaFinal].productos[codigo]) {
+          bodegasConsolidadasMap[bodegaFinal].productos[codigo] = {
             codigo: codigo,
             descripcion: prod.descripcion || prod.nombre_producto || 'Sin descripción',
             cantidad: 0,
@@ -375,7 +408,30 @@ const AsignacionLogistica = () => {
           };
         }
         
-        bodegasConsolidadasMap[bodegaFinal][codigo].cantidad += parseFloat(prod.cantidad_despachada || prod.cantidad_pendiente || 0);
+        const baseCant = prod.cantidad_despachada !== undefined && prod.cantidad_despachada !== null ? parseFloat(prod.cantidad_despachada) : (parseFloat(prod.cantidad_pendiente || prod.cantidad || 0));
+        const cant = Math.max(0, baseCant - parseFloat(prod.cantidad_retirada_cliente || 0));
+        bodegasConsolidadasMap[bodegaFinal].productos[codigo].cantidad += cant;
+        
+        // --- DESGLOSE DETALLADO POR FACTURA ---
+        if (cant > 0) {
+          const facId = pedido.id_factura;
+          if (!bodegasConsolidadasMap[bodegaFinal].facturas[facId]) {
+            bodegasConsolidadasMap[bodegaFinal].facturas[facId] = {
+              factura: facId,
+              cliente: pedido.nombre_cliente,
+              items: []
+            };
+          }
+          bodegasConsolidadasMap[bodegaFinal].facturas[facId].items.push({
+            codigo: codigo,
+            descripcion: prod.descripcion || prod.nombre_producto,
+            cantidad: cant,
+            unidad_medida: prod.unidad_medida || 'UND',
+            vr_unitario: prod.vr_unitario || 0,
+            vr_total: prod.vr_total || 0,
+            peso: prod.peso_kg || prod.peso || 0
+          });
+        }
       });
     }
   });
@@ -383,7 +439,8 @@ const AsignacionLogistica = () => {
   const bodegasConsolidadasArr = Object.keys(bodegasConsolidadasMap).map(bodegaName => {
     return {
       bodega: bodegaName,
-      productos: Object.values(bodegasConsolidadasMap[bodegaName])
+      productos: Object.values(bodegasConsolidadasMap[bodegaName].productos),
+      facturas: Object.values(bodegasConsolidadasMap[bodegaName].facturas)
     };
   });
 
@@ -578,7 +635,7 @@ const AsignacionLogistica = () => {
         {/* ================= MODAL LOTE CON DESGLOSE POR FACTURA ================= */}
         {showModalLote && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[95vh]">
               
               <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -685,22 +742,49 @@ const AsignacionLogistica = () => {
                                 <span>{det.expandido ? '▲' : '▼'}</span>
                               </button>
                               {det.expandido && (
-                                <div className="mt-1 border border-slate-200 rounded">
-                                  <table className="w-full text-left bg-white">
-                                    <thead className="bg-slate-100 border-b border-slate-200 text-slate-500">
+                                <div className="mt-1 border border-slate-200 rounded overflow-x-auto">
+                                  <table className="w-full text-left bg-white text-[10px]">
+                                    <thead className="bg-slate-100 border-b border-slate-200 text-slate-500 whitespace-nowrap">
                                       <tr>
-                                        <th className="p-2 font-bold w-1/2">Producto</th>
-                                        <th className="p-2 font-bold text-center">Orig.</th>
-                                        <th className="p-2 font-bold text-center w-24">Despacho</th>
+                                        <th className="p-2 font-bold">Código</th>
+                                        <th className="p-2 font-bold">Descripción</th>
+                                        <th className="p-2 font-bold text-center text-slate-400">Orig.</th>
+                                        <th className="p-2 font-bold text-center text-orange-600">Retirado</th>
+                                        <th className="p-2 font-bold text-center text-blue-600">A Enviar</th>
+                                        <th className="p-2 font-bold text-center">Und</th>
+                                        <th className="p-2 font-bold text-right">Vr. Unit</th>
+                                        <th className="p-2 font-bold text-right">Vr. Total</th>
+                                        <th className="p-2 font-bold text-center">Bodega</th>
+                                        <th className="p-2 font-bold text-right">Peso</th>
+                                        <th className="p-2 font-bold text-center w-20">Despacho</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {det.productos.map(prod => (
-                                        <tr key={prod.id} className="border-b border-slate-100 last:border-0">
-                                          <td className="p-2 truncate max-w-[120px] sm:max-w-[200px]" title={prod.descripcion}>{prod.descripcion}</td>
-                                          <td className="p-2 text-center text-slate-500">{prod.cantidad}</td>
+                                        <tr key={prod.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                          <td className="p-2 whitespace-nowrap">{prod.codigo_producto}</td>
+                                          <td className="p-2 min-w-[150px]">{prod.descripcion || prod.nombre_producto}</td>
+                                          <td className="p-2 text-center text-slate-400">{prod.cantidad_original || prod.cantidad}</td>
+                                          <td className="p-2 text-center text-orange-600 font-bold">{prod.cantidad_retirada_cliente || 0}</td>
+                                          <td className="p-2 text-center text-blue-600 font-bold">{prod.cantidad}</td>
+                                          <td className="p-2 text-center text-slate-500">{prod.unidad_medida}</td>
+                                          <td className="p-2 text-right">${Number(prod.precio_unitario || 0).toLocaleString()}</td>
+                                          <td className="p-2 text-right font-medium">${Number(prod.precio_total || 0).toLocaleString()}</td>
+                                          <td className="p-2 text-center whitespace-nowrap">
+                                            <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                              {prod.bodega_nombre || (prod.bodega_id ? `B${prod.bodega_id}` : 'N/A')}
+                                            </span>
+                                          </td>
+                                          <td className="p-2 text-right font-medium text-blue-600">{Number(prod.peso_kg || prod.peso || 0).toLocaleString()}</td>
                                           <td className="p-2">
-                                            <input type="number" min="0" max={prod.cantidad} value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} onChange={(e) => handleProductoLoteChange(p.id, prod.id, e.target.value)} className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" />
+                                            <input 
+                                              type="number" 
+                                              min="0" 
+                                              max={prod.cantidad} 
+                                              value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} 
+                                              onChange={(e) => handleProductoLoteChange(p.id, prod.id, e.target.value)} 
+                                              className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" 
+                                            />
                                           </td>
                                         </tr>
                                       ))}
@@ -728,7 +812,7 @@ const AsignacionLogistica = () => {
         {/* ================= MODAL DE EDICIÓN INDIVIDUAL ================= */}
         {showModalIndividual && pedidoIndividual && (
           <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-3 sm:p-4 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] max-h-[95vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
               
               <div className="bg-[#172033] p-4 flex justify-between items-center text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -811,22 +895,49 @@ const AsignacionLogistica = () => {
                       </button>
                       
                       {asignacionIndividual.expandido && (
-                        <div className="border border-slate-200 rounded overflow-hidden">
-                          <table className="w-full text-left bg-white">
-                            <thead className="bg-slate-100 border-b border-slate-200 text-slate-500">
+                        <div className="border border-slate-200 rounded overflow-x-auto">
+                          <table className="w-full text-left bg-white text-[10px]">
+                            <thead className="bg-slate-100 border-b border-slate-200 text-slate-500 whitespace-nowrap">
                               <tr>
-                                <th className="p-2 font-bold w-1/2">Producto</th>
-                                <th className="p-2 font-bold text-center">Orig.</th>
-                                <th className="p-2 font-bold text-center w-24">Despacho</th>
+                                <th className="p-2 font-bold">Código</th>
+                                <th className="p-2 font-bold">Descripción</th>
+                                <th className="p-2 font-bold text-center text-slate-400">Orig.</th>
+                                <th className="p-2 font-bold text-center text-orange-600">Retirado</th>
+                                <th className="p-2 font-bold text-center text-blue-600">A Enviar</th>
+                                <th className="p-2 font-bold text-center">Und</th>
+                                <th className="p-2 font-bold text-right">Vr. Unit</th>
+                                <th className="p-2 font-bold text-right">Vr. Total</th>
+                                <th className="p-2 font-bold text-center">Bodega</th>
+                                <th className="p-2 font-bold text-right">Peso</th>
+                                <th className="p-2 font-bold text-center w-20">Despacho</th>
                               </tr>
                             </thead>
                             <tbody>
                               {asignacionIndividual.productos_despachados.map(prod => (
-                                <tr key={prod.id} className="border-b border-slate-100 last:border-0">
-                                  <td className="p-2 truncate max-w-[120px] sm:max-w-[180px]" title={prod.descripcion}>{prod.descripcion}</td>
-                                  <td className="p-2 text-center text-slate-500">{prod.cantidad}</td>
+                                <tr key={prod.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                  <td className="p-2 whitespace-nowrap">{prod.codigo_producto}</td>
+                                  <td className="p-2 min-w-[150px]">{prod.descripcion || prod.nombre_producto}</td>
+                                  <td className="p-2 text-center text-slate-400">{prod.cantidad_original || prod.cantidad}</td>
+                                  <td className="p-2 text-center text-orange-600 font-bold">{prod.cantidad_retirada_cliente || 0}</td>
+                                  <td className="p-2 text-center text-blue-600 font-bold">{prod.cantidad}</td>
+                                  <td className="p-2 text-center text-slate-500">{prod.unidad_medida}</td>
+                                  <td className="p-2 text-right">${Number(prod.vr_unitario || 0).toLocaleString()}</td>
+                                  <td className="p-2 text-right font-medium">${Number(prod.vr_total || 0).toLocaleString()}</td>
+                                  <td className="p-2 text-center whitespace-nowrap">
+                                    <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                      {prod.bodega_nombre || (prod.bodega_id ? `B${prod.bodega_id}` : 'N/A')}
+                                    </span>
+                                  </td>
+                                  <td className="p-2 text-right font-medium text-blue-600">{Number(prod.peso_kg || prod.peso || 0).toLocaleString()}</td>
                                   <td className="p-2">
-                                    <input type="number" min="0" max={prod.cantidad} value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} onChange={(e) => handleProductoIndividualChange(prod.id, e.target.value)} className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" />
+                                    <input 
+                                      type="number" 
+                                      min="0" 
+                                      max={prod.cantidad} 
+                                      value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} 
+                                      onChange={(e) => handleProductoIndividualChange(prod.id, e.target.value)} 
+                                      className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" 
+                                    />
                                   </td>
                                 </tr>
                               ))}
@@ -889,21 +1000,21 @@ const AsignacionLogistica = () => {
             </tbody>
           </table>
 
-          {/* NUEVA PÁGINA PARA CONSOLIDADOS */}
-          <div style={{ pageBreakBefore: 'always' }} className="pt-4">
-            <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-end">
-              <div>
-                <h1 className="text-2xl font-extrabold tracking-tight uppercase">Consolidado de Cargue</h1>
-                <p className="text-xs font-bold mt-1 text-gray-600">Conductor: {conductorSeleccionadoInfo?.nombre || 'Múltiples'}</p>
+          {/* CONSOLIDADOS POR BODEGA (CADA UNA EN NUEVA PÁGINA) */}
+          {bodegasConsolidadasArr.map((bodegaGrp, bIdx) => (
+            <div key={bIdx} style={{ pageBreakBefore: 'always' }} className="pt-4">
+              <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-end">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight uppercase">Consolidado de Cargue</h1>
+                  <p className="text-xs font-bold mt-1 text-gray-600">Conductor: {conductorSeleccionadoInfo?.nombre || 'Múltiples'}</p>
+                </div>
+                <div className="text-right text-xs">
+                  <p><strong>Fecha:</strong> {fechaFiltro}</p>
+                  <p><strong>Generado:</strong> {new Date().toLocaleTimeString()}</p>
+                </div>
               </div>
-              <div className="text-right text-xs">
-                <p><strong>Fecha:</strong> {fechaFiltro}</p>
-                <p><strong>Generado:</strong> {new Date().toLocaleTimeString()}</p>
-              </div>
-            </div>
 
-            {bodegasConsolidadasArr.map((bodegaGrp, bIdx) => (
-              <div key={bIdx} className="mb-8" style={{ pageBreakInside: 'avoid' }}>
+              <div className="mb-8" style={{ pageBreakInside: 'avoid' }}>
                 <h2 className="text-md font-bold uppercase mb-2 bg-gray-200 p-2 border border-black inline-block">
                   Bodega: {bodegaGrp.bodega}
                 </h2>
@@ -929,12 +1040,76 @@ const AsignacionLogistica = () => {
                     ))}
                   </tbody>
                 </table>
+                
+                {/* DESGLOSE DETALLADO POR FACTURA */}
+                {bodegaGrp.facturas && bodegaGrp.facturas.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="text-[11px] font-bold uppercase border-b-2 border-black mb-3 pb-1">Lista de Empaque (Detalle por Factura)</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {bodegaGrp.facturas.map((fac, fIdx) => (
+                        <div key={fIdx} className="border border-black p-0 bg-white">
+                          <div className="flex justify-between items-center bg-gray-200 border-b border-black p-1.5">
+                            <span className="font-extrabold text-[11px] text-blue-800">DOC: {fac.factura}</span>
+                            <span className="font-bold text-[10px] truncate ml-2 text-right">{fac.cliente}</span>
+                          </div>
+                          <table className="w-full text-left text-[9px] border-collapse">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="border-b border-r border-black p-1">CÓDIGO</th>
+                                <th className="border-b border-r border-black p-1">DESCRIPCIÓN</th>
+                                <th className="border-b border-r border-black p-1 text-center">CANT</th>
+                                <th className="border-b border-r border-black p-1 text-center">UND</th>
+                                <th className="border-b border-r border-black p-1 text-right">VR. UNIT</th>
+                                <th className="border-b border-r border-black p-1 text-right">VR. TOTAL</th>
+                                <th className="border-b border-black p-1 text-right">PESO</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {fac.items.map((item, iIdx) => (
+                                <tr key={iIdx} className="border-b border-dashed border-gray-300 last:border-0">
+                                  <td className="border-r border-gray-300 p-1 font-bold text-gray-700">{item.codigo}</td>
+                                  <td className="border-r border-gray-300 p-1 font-semibold truncate max-w-[120px]" title={item.descripcion}>{item.descripcion}</td>
+                                  <td className="border-r border-gray-300 p-1 text-center font-bold text-[10px]">{item.cantidad}</td>
+                                  <td className="border-r border-gray-300 p-1 text-center text-gray-500">{item.unidad_medida}</td>
+                                  <td className="border-r border-gray-300 p-1 text-right">${Number(item.vr_unitario).toLocaleString('es-CO')}</td>
+                                  <td className="border-r border-gray-300 p-1 text-right font-bold text-green-700">${Number(item.vr_total).toLocaleString('es-CO')}</td>
+                                  <td className="p-1 text-right font-bold text-blue-600">{Number(item.peso).toLocaleString('es-CO')} Kg</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* ZONA DE NOTAS MANUALES PARA NOVEDADES */}
+                <div className="mt-6 border border-black p-2 min-h-[100px]">
+                  <p className="text-[10px] font-bold uppercase mb-1">Notas / Novedades (Uso exclusivo de bodega):</p>
+                  <div className="w-full h-[1px] border-b border-dashed border-gray-400 mt-6"></div>
+                  <div className="w-full h-[1px] border-b border-dashed border-gray-400 mt-6"></div>
+                  <div className="w-full h-[1px] border-b border-dashed border-gray-400 mt-6"></div>
+                </div>
               </div>
-            ))}
-            {bodegasConsolidadasArr.length === 0 && (
+            </div>
+          ))}
+
+          {bodegasConsolidadasArr.length === 0 && (
+            <div style={{ pageBreakBefore: 'always' }} className="pt-4">
+              <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-end">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight uppercase">Consolidado de Cargue</h1>
+                  <p className="text-xs font-bold mt-1 text-gray-600">Conductor: {conductorSeleccionadoInfo?.nombre || 'Múltiples'}</p>
+                </div>
+                <div className="text-right text-xs">
+                  <p><strong>Fecha:</strong> {fechaFiltro}</p>
+                  <p><strong>Generado:</strong> {new Date().toLocaleTimeString()}</p>
+                </div>
+              </div>
               <p className="text-center text-gray-500 italic mt-4">No hay detalles de productos para consolidar en este viaje.</p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </>
