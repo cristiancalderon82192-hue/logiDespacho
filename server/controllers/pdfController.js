@@ -67,10 +67,10 @@ En el documento original, las tablas de productos tienen EXACTAMENTE estas 10 co
 10. Valor Total
 
 Ten un cuidado extremo para no confundir estas columnas. Por ejemplo: 
-- El número `19` suele ser el `% Iva`, ¡NO LO PONGAS COMO CANTIDAD!
-- El número `2.00` o `5.00` suele ser el `% Dcto`, ¡NO LO PONGAS COMO PESO!
-- El primer número de la fila es el `Peso`, ¡NO LO PONGAS COMO VALOR UNITARIO!
-- Asegúrate de mapear el `Valor Und` a `precio_unitario`, la `Cantidad` a `cantidad`, y el `Peso` a `peso` respetando estrictamente esta estructura de 10 columnas.
+- El número '19' suele ser el '% Iva', ¡NO LO PONGAS COMO CANTIDAD!
+- El número '2.00' o '5.00' suele ser el '% Dcto', ¡NO LO PONGAS COMO PESO!
+- El primer número de la fila es el 'Peso', ¡NO LO PONGAS COMO VALOR UNITARIO!
+- Asegúrate de mapear el 'Valor Und' a 'precio_unitario', la 'Cantidad' a 'cantidad', y el 'Peso' a 'peso' respetando estrictamente esta estructura de 10 columnas.
 
 Asegúrate de limpiar todos los números de forma muy precisa. Si falta algún dato, usa null o 0 según corresponda.
 
