@@ -30,29 +30,30 @@ const extraerFactura = async (req, res) => {
     const prompt = `Analiza el siguiente texto extraído de una factura comercial y extrae los datos correspondientes en formato JSON ESTRICTO.
 Solo debes devolver un objeto JSON válido, sin ningún texto adicional, sin formato de markdown (no uses \`\`\`json).
 
+IMPORTANTE: Los números en el texto usan formato de moneda colombiano (punto '.' para miles y coma ',' para decimales. Ejemplo: 5.000,00 representa cinco mil. 714,00 representa setecientos catorce). Debes convertir TODOS los valores numéricos a formato decimal estándar de programación (sin separador de miles, y usando punto '.' para decimales. Ejemplo: 5000.0 y 714.0).
+
 Estructura JSON requerida:
 {
-  "id_factura": "Número de factura o documento principal",
+  "id_factura": "Busca estrictamente el valor del campo 'Id Doc:' (ej: 1837048). Si no encuentras un Id Doc explícito, usa entonces el 'Número' de factura principal (ej: FAE 84950).",
   "cliente": "Nombre del cliente COMPRADOR. Suele estar al lado de 'Señores:', 'Cliente:' o 'Facturar a:'. NUNCA uses el nombre del encabezado (Ej: DEPÓSITO Y CERÁMICAS EL RODEO), ya que ese es el vendedor.",
   "nit_cliente": "NIT del cliente COMPRADOR. Suele estar cerca de 'Señores' o 'Nit:'. Devuelve el número exacto, ej: 900787714-2. Si no hay NIT del comprador, devuelve null.",
   "telefono_cliente": "Teléfono del cliente (si aparece cerca del bloque de Señores/Cliente)",
-  "valor_factura": 150000.0, // número, valor total
+  "valor_factura": 150000.0, // NÚMERO DECIMAL. Valor total a pagar. Recuerda remover puntos de miles.
   "productos": [
     {
       "codigo_producto": "código (si lo hay)",
-      "descripcion": "nombre del producto",
-      "peso": 0, // número, en Kg. Si no lo dice, usa 0
-      "bodega_id": 1, // número (1 al 8). Ejemplo: Bodega 2 -> 2. Si no especifica, usa 1
-      "cantidad": 1.0, // número
-      "unidad_medida": "und", // string
-      "precio_unitario": 0.0, // número
-      "precio_total": 0.0 // número
+      "descripcion": "nombre exacto del producto",
+      "peso": 0.0, // NÚMERO DECIMAL, en Kg. Revisa bien la columna Peso en la factura. Extrae el número y conviértelo al formato estándar (ej: 5.000,00 -> 5000.0). Si no dice nada, pon 0.
+      "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
+      "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. Si dice 100, devuelve 100.0.
+      "unidad_medida": "und", // string, usualmente en la columna Und
+      "precio_unitario": 0.0, // NÚMERO DECIMAL
+      "precio_total": 0.0 // NÚMERO DECIMAL
     }
   ]
 }
 
-Asegúrate de limpiar los números (sin signos de dólar, usa punto como separador decimal si es necesario, o trata la coma como miles según contexto común en Colombia). 
-Si falta algún dato, usa null o 0 según el tipo.
+Asegúrate de limpiar todos los números de forma muy precisa. Si falta algún dato, usa null o 0 según corresponda.
 
 Texto de la factura:
 ----------------
