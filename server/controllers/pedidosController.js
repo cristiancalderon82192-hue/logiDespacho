@@ -210,8 +210,11 @@ const obtenerDashboard = async (req, res) => {
 
   try {
     const [kpisHeader] = await db.query(`
-      SELECT COUNT(*) as total_pedidos, COALESCE(SUM(valor_factura), 0) as total_valor
-      FROM pedidos WHERE fecha_agendada BETWEEN ? AND ?
+      SELECT COUNT(*) as total_pedidos, 
+             COALESCE(SUM(
+               p.valor_factura - COALESCE((SELECT SUM(ppd.cantidad_retirada_cliente * ppd.precio_unitario) FROM pedidos_productos_detalle ppd WHERE ppd.pedido_id = p.id), 0)
+             ), 0) as total_valor
+      FROM pedidos p WHERE fecha_agendada BETWEEN ? AND ?
     `, fechas);
 
     const [kpisDetalle] = await db.query(`

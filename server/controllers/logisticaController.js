@@ -6,7 +6,8 @@ const getPedidosPorFecha = async (req, res) => {
 
   try {
     const sql = `
-      SELECT p.*, 
+      SELECT p.id, p.id_factura, p.prioridad, p.estado_entrega, p.fecha_agendada, p.nota_manual, p.observaciones_entrega, p.total_despachado, p.valor_factura_pendiente, p.numero_viaje, p.tipo_entrega, p.fecha_entrega_conductor, p.firma_cliente, p.fecha_facturacion, p.hora_registro, p.cliente_id, p.conductor_id, p.vehiculo_id, p.destino_id, p.tipo_documento_id, p.usuario_id,
+             GREATEST(0, p.valor_factura - COALESCE((SELECT SUM(ppd2.cantidad_retirada_cliente * ppd2.precio_unitario) FROM pedidos_productos_detalle ppd2 WHERE ppd2.pedido_id = p.id), 0)) AS valor_factura,
              COALESCE(SUM(
                CASE 
                  WHEN ppd.cantidad > 0 THEN ppd.peso - (ppd.cantidad_retirada_cliente * (ppd.peso / ppd.cantidad))

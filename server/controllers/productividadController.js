@@ -12,7 +12,9 @@ const getReporteProductividad = async (req, res) => {
         COUNT(p.id) AS total_viajes_asignados,
         SUM(CASE WHEN p.estado_entrega = 'Entregado' THEN 1 ELSE 0 END) AS entregas_completas,
         SUM(CASE WHEN p.estado_entrega = 'Entregado Incompleto' THEN 1 ELSE 0 END) AS entregas_incompletas,
-        SUM(CASE WHEN p.estado_entrega IN ('Entregado', 'Entregado Incompleto') THEN p.valor_factura ELSE 0 END) AS valor_total_entregado,
+        SUM(CASE WHEN p.estado_entrega IN ('Entregado', 'Entregado Incompleto') THEN 
+          (p.valor_factura - COALESCE((SELECT SUM(ppd.cantidad_retirada_cliente * ppd.precio_unitario) FROM pedidos_productos_detalle ppd WHERE ppd.pedido_id = p.id), 0)) 
+        ELSE 0 END) AS valor_total_entregado,
         SUM(CASE WHEN p.estado_entrega = 'Devolución' THEN 1 ELSE 0 END) AS devoluciones,
         COALESCE(SUM(peso_pedido.total_peso), 0) AS total_kilos_transportados
       FROM usuarios u

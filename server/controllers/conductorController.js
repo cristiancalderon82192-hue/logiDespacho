@@ -23,19 +23,25 @@ const getMisRutas = async (req, res) => {
     const sql = `
       SELECT p.id, p.id_factura, p.prioridad, p.estado_entrega,
              p.nota_manual, p.observaciones_entrega, p.total_despachado,
-             p.valor_factura, p.valor_recaudado,
+             GREATEST(0, p.valor_factura - COALESCE((SELECT SUM(ppd2.cantidad_retirada_cliente * ppd2.precio_unitario) FROM pedidos_productos_detalle ppd2 WHERE ppd2.pedido_id = p.id), 0)) AS valor_factura,
+             p.valor_recaudado,
              c.nombre as nombre_cliente, c.telefono, 
              d.nombre as destino, z.nombre as zona_envio,
              td.nombre as tipo_documento,
              v.placa as vehiculo_placa,
-             COALESCE(SUM(pd.peso), 0) AS total_peso
+             COALESCE(SUM(
+               CASE 
+                 WHEN ppd.cantidad > 0 THEN ppd.peso - (ppd.cantidad_retirada_cliente * (ppd.peso / ppd.cantidad))
+                 ELSE ppd.peso 
+               END
+             ), 0) AS total_peso
       FROM pedidos p
       JOIN clientes c ON p.cliente_id = c.id
       JOIN destinos d ON p.destino_id = d.id
       LEFT JOIN zonas z ON d.zona_id = z.id
       LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
       LEFT JOIN vehiculos v ON p.vehiculo_id = v.id
-      LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
+      LEFT JOIN pedidos_productos_detalle ppd ON p.id = ppd.pedido_id
       
       WHERE p.conductor_id = ? AND DATE(p.fecha_agendada) = ?
       
