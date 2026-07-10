@@ -31,6 +31,7 @@ const DashboardLider = () => {
   const [pedidos, setPedidos] = useState([]);
   const [datosGrafica, setDatosGrafica] = useState([]); 
   const [datosBodegas, setDatosBodegas] = useState([]);
+  const [destinosTop, setDestinosTop] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const fetchDatos = async () => {
@@ -52,6 +53,7 @@ const DashboardLider = () => {
       
       setPedidos(dataLider.lista || []);     
       setDatosGrafica(dataLider.grafica || []); 
+      setDestinosTop(dataLider.destinos || []); 
       
       if (dataGlobal.bodegas) {
         setDatosBodegas(Object.keys(dataGlobal.bodegas).map(key => ({
@@ -212,6 +214,46 @@ const DashboardLider = () => {
                   </BarChart>
                 </ResponsiveContainer>
               )}
+            </div>
+          </div>
+
+          {/* TABLA DE DESTINOS */}
+          <div className="lg:col-span-3 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 md:mb-6 flex items-center gap-2">
+              <MapPin className="text-orange-500" size={20} /> Destinos de la Jornada
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 text-[10px] md:text-xs uppercase text-slate-500 border-b border-slate-200 tracking-wider">
+                  <tr>
+                    <th className="p-3 md:p-4 font-extrabold rounded-tl-lg">Ciudad / Destino</th>
+                    <th className="p-3 md:p-4 font-extrabold text-center">Despachos</th>
+                    <th className="p-3 md:p-4 font-extrabold text-right rounded-tr-lg">Peso (Kg)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm">
+                  {destinosTop.length === 0 ? (
+                    <tr><td colSpan="3" className="p-8 text-center text-slate-400 font-medium">No hay rutas agendadas hoy.</td></tr>
+                  ) : (
+                    destinosTop.map((d, index) => (
+                      <tr key={index} className="hover:bg-slate-50 transition-colors group">
+                        <td className="p-3 md:p-4 font-bold text-slate-700 flex items-center gap-2">
+                          <div className="p-1.5 bg-orange-50 text-orange-500 rounded-lg group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                            <MapPin size={14} />
+                          </div>
+                          {d.destino}
+                        </td>
+                        <td className="p-3 md:p-4 text-center">
+                          <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold text-xs">{d.entregas}</span>
+                        </td>
+                        <td className="p-3 md:p-4 text-right font-black text-slate-800">
+                          {Number(d.peso).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

@@ -50,7 +50,24 @@ const getDashboard = async (req, res) => {
     `;
     const [grafica] = await db.query(sqlGrafica, [usuario_id, inicio, fin]);
 
-    res.json({ lista, grafica });
+    // 3. DATOS DE DESTINOS (Top 5 por peso para el líder)
+    const sqlDestinos = `
+      SELECT 
+        d.nombre as destino, 
+        COUNT(DISTINCT p.id) as entregas, 
+        COALESCE(SUM(pd.peso), 0) as peso
+      FROM pedidos p 
+      JOIN destinos d ON p.destino_id = d.id 
+      LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
+      WHERE p.usuario_id = ? 
+      AND p.fecha_agendada BETWEEN ? AND ? 
+      GROUP BY d.id 
+      ORDER BY peso DESC 
+      LIMIT 5
+    `;
+    const [destinos] = await db.query(sqlDestinos, [usuario_id, inicio, fin]);
+
+    res.json({ lista, grafica, destinos });
 
   } catch (error) {
     console.error("Error Dashboard Líder:", error);
