@@ -1014,8 +1014,8 @@ const PendientesBodega = () => {
                         <th className="p-2 border-r border-slate-200 text-center w-20 font-bold">Unidad</th>
                         <th className="p-2 border-r border-slate-200 text-center w-24 font-bold">Vr. Unitario</th>
                         <th className="p-2 border-r border-slate-200 text-center w-24 font-bold">Vr. Total</th>
-                        <th className="p-2 border-r border-slate-200 text-center w-20 font-bold">Peso(KG)</th>
                         <th className="p-2 border-r border-slate-200 text-center w-28 font-bold">Bodega</th>
+                        <th className="p-2 border-r border-slate-200 text-center w-20 font-bold">Peso(KG)</th>
                         <th className="p-2 text-center w-12"></th>
                       </tr>
                     </thead>
@@ -1043,13 +1043,13 @@ const PendientesBodega = () => {
                             <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.valor_total} onChange={(e) => handleItemChange(index, 'valor_total', e.target.value)} />
                           </td>
                           <td className="p-1 border-r border-slate-200">
-                            <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.peso_kg} onChange={(e) => handleItemChange(index, 'peso_kg', e.target.value)} />
-                          </td>
-                          <td className="p-1 border-r border-slate-200">
                             <select className="w-full p-1.5 bg-transparent outline-none text-center font-bold text-slate-700" required value={item.bodega_id} onChange={(e) => handleItemChange(index, 'bodega_id', e.target.value)}>
                               <option value="">Bodega...</option>
                               {bodegasExistentes.map(b => <option key={b.id} value={b.id}>B{b.id}</option>)}
                             </select>
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.peso_kg} onChange={(e) => handleItemChange(index, 'peso_kg', e.target.value)} />
                           </td>
                           <td className="p-1 text-center">
                             {items.length > 1 && (
