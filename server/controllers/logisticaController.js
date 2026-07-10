@@ -7,7 +7,12 @@ const getPedidosPorFecha = async (req, res) => {
   try {
     const sql = `
       SELECT p.*, 
-             COALESCE(SUM(pd.peso), 0) AS total_peso,
+             COALESCE(SUM(
+               CASE 
+                 WHEN ppd.cantidad > 0 THEN ppd.peso - (ppd.cantidad_retirada_cliente * (ppd.peso / ppd.cantidad))
+                 ELSE ppd.peso 
+               END
+             ), 0) AS total_peso,
              td.nombre as tipo_documento,
              c.nombre as nombre_cliente, c.telefono, 
              d.nombre as destino, z.nombre as zona_envio,
@@ -22,7 +27,7 @@ const getPedidosPorFecha = async (req, res) => {
       LEFT JOIN usuarios u ON p.conductor_id = u.id
       LEFT JOIN vehiculos v ON p.vehiculo_id = v.id
       LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
-      LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
+      LEFT JOIN pedidos_productos_detalle ppd ON p.id = ppd.pedido_id
       LEFT JOIN usuarios uc ON p.usuario_id = uc.id 
       LEFT JOIN bodegas b ON uc.bodega_id = b.id 
       WHERE p.fecha_agendada = ?

@@ -49,24 +49,21 @@ const AsignacionLogistica = () => {
       
       if(resP.ok) {
         const data = await resP.json();
+        // El backend ahora devuelve total_peso y valor_factura descontando retiros.
         const procesados = data.map(p => {
-          let peso_retirado = 0;
           let valor_retirado = 0;
           if (p.productos && p.productos.length > 0) {
             p.productos.forEach(prod => {
               const retirada = Number(prod.cantidad_retirada_cliente || 0);
               if (retirada > 0) {
                 valor_retirado += (retirada * Number(prod.precio_unitario || 0));
-                const orig_qty = Number(prod.cantidad || 1);
-                const row_weight = Number(prod.peso || 0);
-                peso_retirado += orig_qty > 0 ? (retirada * (row_weight / orig_qty)) : 0;
               }
             });
           }
           return {
             ...p,
-            valor_factura: Math.max(0, Number(p.valor_factura || 0) - valor_retirado),
-            total_peso: Math.max(0, Number(p.total_peso || 0) - peso_retirado)
+            valor_factura: Math.max(0, Number(p.valor_factura || 0) - valor_retirado)
+            // total_peso ya viene descontado correctamente desde el backend (SQL)
           };
         });
         setPedidos(procesados);

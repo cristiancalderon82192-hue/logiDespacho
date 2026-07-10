@@ -218,17 +218,35 @@ const PedidosLider = () => {
 
   const recalcularPesos = () => {
     const nuevosPesos = { peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0 };
+    let valorNuevo = 0;
+    
     if (formData.productos && formData.productos.length > 0) {
       formData.productos.forEach(p => {
         const bId = Number(p.bodega_id) || 1;
-        const peso = Number(p.peso) || 0;
+        const pesoFila = Number(p.peso) || 0;
+        const cantidadTotal = Number(p.cantidad) || 1;
+        const retirada = Number(p.cantidad_retirada_cliente) || 0;
+        
+        // Descontar peso proporcional al retiro
+        const pesoRestante = cantidadTotal > 0 ? pesoFila - (retirada * (pesoFila / cantidadTotal)) : pesoFila;
+        
         if (bId >= 1 && bId <= 8) {
-          nuevosPesos[`peso_b${bId}`] += peso;
+          nuevosPesos[`peso_b${bId}`] += pesoRestante;
         }
+
+        // Calcular nuevo valor de la factura basado en productos restantes
+        const cantidadRestante = Math.max(0, cantidadTotal - retirada);
+        const pUnitario = Number(p.precio_unitario) || 0;
+        valorNuevo += (cantidadRestante * pUnitario);
       });
     }
-    setFormData(prev => ({ ...prev, ...nuevosPesos }));
-    mostrarInfo("Pesos de bodegas recalculados.");
+
+    setFormData(prev => ({ 
+      ...prev, 
+      ...nuevosPesos,
+      valor_factura: valorNuevo > 0 ? valorNuevo : prev.valor_factura 
+    }));
+    mostrarInfo("Pesos y Valor Total recalculados considerando retiros.");
   };
 
   const handleChange = async (e) => {
@@ -293,7 +311,36 @@ const PedidosLider = () => {
     if (!formData.destino_id) return mostrarError("❌ Debes seleccionar un 'Destino'.");
     if (!formData.nota_manual || formData.nota_manual.trim() === '') return mostrarError("❌ El campo 'Nota Manual' es obligatorio. Escribe una descripción o 'Ninguna'.");
 
-    const totalPeso = [1, 2, 3, 4, 5, 6, 7, 8].reduce((acc, num) => acc + Number(formData[`peso_b${num}`] || 0), 0);
+    // Auto-recalcular pesos y valor de la factura antes de guardar
+    const nuevosPesos = { peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0 };
+    let valorNuevo = 0;
+    
+    if (formData.productos && formData.productos.length > 0) {
+      formData.productos.forEach(p => {
+        const bId = Number(p.bodega_id) || 1;
+        const pesoFila = Number(p.peso) || 0;
+        const cantidadTotal = Number(p.cantidad) || 1;
+        const retirada = Number(p.cantidad_retirada_cliente) || 0;
+        
+        const pesoRestante = cantidadTotal > 0 ? pesoFila - (retirada * (pesoFila / cantidadTotal)) : pesoFila;
+        
+        if (bId >= 1 && bId <= 8) {
+          nuevosPesos[`peso_b${bId}`] += pesoRestante;
+        }
+
+        const cantidadRestante = Math.max(0, cantidadTotal - retirada);
+        const pUnitario = Number(p.precio_unitario) || 0;
+        valorNuevo += (cantidadRestante * pUnitario);
+      });
+    }
+
+    const payload = {
+      ...formData,
+      ...nuevosPesos,
+      valor_factura: valorNuevo > 0 ? valorNuevo : formData.valor_factura
+    };
+
+    const totalPeso = [1, 2, 3, 4, 5, 6, 7, 8].reduce((acc, num) => acc + Number(payload[`peso_b${num}`] || 0), 0);
     if (totalPeso <= 0) {
       return mostrarError("❌ El peso total no puede ser 0 kg. Debes ingresar carga en al menos una bodega.");
     }
@@ -303,7 +350,7 @@ const PedidosLider = () => {
     const method = editingId ? 'PUT' : 'POST';
 
     // Auto-generar nota manual para retiros en mostrador
-    let finalNotaManual = formData.nota_manual || '';
+    let finalNotaManual = payload.nota_manual || '';
     
     // Limpiar notas anteriores de retiros para no duplicarlas
     finalNotaManual = finalNotaManual
@@ -315,8 +362,8 @@ const PedidosLider = () => {
         finalNotaManual = finalNotaManual.slice(0, -1).trim();
     }
 
-    if (formData.productos) {
-      const productosRetirados = formData.productos
+    if (payload.productos) {
+      const productosRetirados = payload.productos
           .filter(prod => Number(prod.cantidad_retirada_cliente || 0) > 0)
           .map(prod => `${prod.cantidad_retirada_cliente} ${prod.unidad_medida || 'und'} de ${prod.descripcion}`);
           
@@ -330,7 +377,7 @@ const PedidosLider = () => {
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, nota_manual: finalNotaManual, usuario_id: user.id })
+        body: JSON.stringify({ ...payload, nota_manual: finalNotaManual, usuario_id: user.id })
       });
 
       if (response.ok) {
@@ -774,7 +821,7 @@ const PedidosLider = () => {
                             <PlusCircle size={14} /> Añadir Producto
                           </button>
                           <button type="button" onClick={recalcularPesos} className="bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
-                            <RefreshCw size={14} /> Recalcular Pesos
+                            <RefreshCw size={14} /> Recalcular Totales
                           </button>
                         </>
                       )}

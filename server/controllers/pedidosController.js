@@ -168,14 +168,19 @@ const listarPedidosRango = async (req, res) => {
         c.nombre as nombre_cliente, 
         d.nombre as destino,  
         z.nombre as zona_envio, 
-        COALESCE(SUM(pd.peso), 0) as total_peso
+        COALESCE(SUM(
+          CASE 
+            WHEN ppd.cantidad > 0 THEN ppd.peso - (ppd.cantidad_retirada_cliente * (ppd.peso / ppd.cantidad))
+            ELSE ppd.peso 
+          END
+        ), 0) as total_peso
       FROM pedidos p
       JOIN clientes c ON p.cliente_id = c.id
       JOIN destinos d ON p.destino_id = d.id  
       LEFT JOIN zonas z ON d.zona_id = z.id 
       LEFT JOIN usuarios u ON p.conductor_id = u.id /* 👇 AGREGADO PARA LEAD TIME 👇 */
       LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
-      LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
+      LEFT JOIN pedidos_productos_detalle ppd ON p.id = ppd.pedido_id
       WHERE p.fecha_agendada BETWEEN ? AND ? 
       GROUP BY p.id 
       ORDER BY 
