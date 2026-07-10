@@ -60,7 +60,10 @@ const getMisRutas = async (req, res) => {
       const pedidosIds = rutas.map(p => p.id);
       const [productos] = await db.query('SELECT * FROM pedidos_productos_detalle WHERE pedido_id IN (?)', [pedidosIds]);
       rutas.forEach(ruta => {
-        ruta.productos = productos.filter(prod => prod.pedido_id === ruta.id);
+        ruta.productos = productos.filter(prod => prod.pedido_id === ruta.id).map(p => ({
+          ...p,
+          cantidad: Math.max(0, Number(p.cantidad) - Number(p.cantidad_retirada_cliente || 0))
+        }));
       });
     }
 

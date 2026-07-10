@@ -665,7 +665,7 @@ const DashboardConductor = () => {
             {pasoDevolucion === 1 ? (
               <form onSubmit={validarDatosDevolucion} className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                 
-                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm max-h-64 overflow-y-auto custom-scrollbar">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm max-h-64 min-h-[200px] overflow-y-auto custom-scrollbar shrink-0">
                   <label className="text-[11px] font-bold text-orange-800 uppercase mb-3 block">Productos de la Factura</label>
                   <div className="space-y-3">
                     {productosNovedad.length === 0 ? (
