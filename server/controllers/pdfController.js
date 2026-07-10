@@ -45,7 +45,7 @@ Estructura JSON requerida:
       "descripcion": "nombre exacto del producto",
       "peso": 0.0, // NÚMERO DECIMAL, en Kg. ¡IMPORTANTE! Revisa con extremo cuidado la columna 'Peso' (suele ser la primera columna a la izquierda de cada fila de producto). Asocia correctamente el peso a cada ítem en el orden exacto en que aparecen. Si la fila dice '20,00', extrae 20.0. No asumas 0 a menos que explícitamente diga 0,00 o esté vacía.
       "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
-      "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. Suele estar JUSTO ANTES de la unidad de medida (ej: si dice '33,48 mts2', la cantidad es 33.48).
+      "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. A menudo las cantidades aparecen todas agrupadas en un bloque de números pequeños (ej: 34, 52, 20, 5) que debes emparejar en orden secuencial con cada producto, igual que haces con los pesos y las descripciones.
       "unidad_medida": "und", // string (ej: mts2, Bul, Und, kg).
       "precio_unitario": 0.0, // NÚMERO DECIMAL (Montos monetarios altos).
       "precio_total": 0.0 // NÚMERO DECIMAL (Montos monetarios muy altos).
@@ -54,10 +54,10 @@ Estructura JSON requerida:
 }
 
 ¡CRÍTICO - CÓMO LEER EL TEXTO!
-El extractor de PDF a veces NO lee fila por fila, sino VERTICALMENTE por bloques (todos los pesos, luego todos los códigos, luego todas las descripciones, luego todas las cantidades, etc.). 
-Por favor, usa la LÓGICA y el SENTIDO COMÚN para emparejar los datos, sin importar el desorden:
-1. CANTIDAD Y UNIDAD: Las cantidades siempre están ligadas a su unidad de medida (ej: '33,48 mts2', '20 Bul', '2 Und'). ¡Busca estas unidades! El número que las acompaña es la 'cantidad'.
-2. PESO: Suele ser un bloque de números sueltos (ej: 522,00 o 1.036,00) que NO tienen una unidad de medida pegada como mts2 o Bul. ¡NUNCA pongas el peso en el campo cantidad!
+El extractor de PDF a veces NO lee fila por fila, sino VERTICALMENTE por bloques (todos los pesos juntos, luego todos los códigos, luego todas las descripciones, luego todas las CANTIDADES juntas, luego todas las unidades, etc.). 
+Por favor, usa la LÓGICA y el SENTIDO COMÚN para emparejar los datos secuencialmente por posición, sin importar el desorden:
+1. CANTIDADES: Suele ser un bloque de números pequeños (ej: 34, 52, 20, 5, 14, 2, 2). Empareja el primer número con el primer producto, el segundo con el segundo, etc. NO asumas que la cantidad está pegada a la unidad en el texto extraído.
+2. PESO: Suele ser un bloque de números sueltos (ej: 522,00 o 1.036,00) que NO tienen una unidad de medida pegada. ¡NUNCA confundas el peso con la cantidad, fíjate en el tamaño de los números y su posición!
 3. VALORES UNITARIOS Y TOTALES: Son los montos de dinero más grandes (ej: 36.240,40 o 1.213.328,59). ¡No los pongas como cantidades!
 4. PORCENTAJES: Los números como '19' o '5.00' suelen ser % de IVA o Descuento. Ignóralos si no te los pido.
 
