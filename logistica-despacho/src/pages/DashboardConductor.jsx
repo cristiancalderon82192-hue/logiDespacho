@@ -43,6 +43,8 @@ const DashboardConductor = () => {
 
   const [showModalFirma, setShowModalFirma] = useState(false);
   const [pedidoFirma, setPedidoFirma] = useState(null);
+  const [nombreRecibe, setNombreRecibe] = useState('');
+  const [cedulaRecibe, setCedulaRecibe] = useState('');
   const sigCanvas = useRef({});
 
   const [showModalDevolucion, setShowModalDevolucion] = useState(false);
@@ -51,6 +53,8 @@ const DashboardConductor = () => {
   const [valorDevolucion, setValorDevolucion] = useState('');
   const [productosNovedad, setProductosNovedad] = useState([]);
   const [pasoDevolucion, setPasoDevolucion] = useState(1); 
+  const [nombreRecibeDev, setNombreRecibeDev] = useState('');
+  const [cedulaRecibeDev, setCedulaRecibeDev] = useState('');
   const sigCanvasDev = useRef({}); 
 
   // VARIABLE PARA VERIFICAR SI HAY SINCRONIZACIONES PENDIENTES
@@ -304,16 +308,18 @@ const DashboardConductor = () => {
     await procesarPeticion(url, 'PUT', body, pedidoId, nuevoEstado);
   };
 
-  const iniciarEntrega = (pedido) => { setPedidoFirma(pedido); setShowModalFirma(true); };
+  const iniciarEntrega = (pedido) => { setPedidoFirma(pedido); setNombreRecibe(''); setCedulaRecibe(''); setShowModalFirma(true); };
   const limpiarFirma = () => sigCanvas.current.clear();
 
   const confirmarEntregaConFirma = async () => {
     if (sigCanvas.current.isEmpty()) return mostrarInfo("El cliente debe firmar en el recuadro.");
+    if (!nombreRecibe.trim()) return mostrarInfo("Debes ingresar el nombre de la persona que recibe.");
+    if (!cedulaRecibe.trim()) return mostrarInfo("Debes ingresar la cédula de la persona que recibe.");
     const firmaBase64 = sigCanvas.current.getCanvas().toDataURL('image/png');
     let valorACobrar = parseFloat(pedidoFirma.total_despachado);
     if (isNaN(valorACobrar) || valorACobrar <= 0) valorACobrar = parseFloat(pedidoFirma.valor_factura || 0);
 
-    const body = { estado: 'Entregado', firma_cliente: firmaBase64, valor_recaudado: valorACobrar };
+    const body = { estado: 'Entregado', firma_cliente: firmaBase64, valor_recaudado: valorACobrar, nombre_recibe: nombreRecibe, cedula_recibe: cedulaRecibe };
     const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoFirma.id}/estado`;
 
     setShowModalFirma(false);
@@ -324,6 +330,8 @@ const DashboardConductor = () => {
   const abrirModalDevolucion = (pedido) => {
     setPedidoDevolucion(pedido);
     setMotivoDevolucion('');
+    setNombreRecibeDev('');
+    setCedulaRecibeDev('');
     
     if (pedido.productos) {
       const prodIniciales = pedido.productos.map(p => ({ ...p, faltante: 0 }));
@@ -353,6 +361,8 @@ const DashboardConductor = () => {
 
   const confirmarDevolucionConFirma = async () => {
     if (sigCanvasDev.current.isEmpty()) return mostrarInfo("El cliente debe firmar la novedad.");
+    if (!nombreRecibeDev.trim()) return mostrarInfo("Debes ingresar el nombre de la persona que firma.");
+    if (!cedulaRecibeDev.trim()) return mostrarInfo("Debes ingresar la cédula de la persona que firma.");
     const firmaBase64 = sigCanvasDev.current.getCanvas().toDataURL('image/png');
     let carga = parseFloat(pedidoDevolucion.total_despachado);
     if (isNaN(carga) || carga <= 0) carga = parseFloat(pedidoDevolucion.valor_factura || 0);
@@ -383,7 +393,9 @@ const DashboardConductor = () => {
       valor_devolucion: valorD, 
       valor_recaudado: valorRecaudado, 
       firma_cliente: firmaBase64,
-      productos_novedad: productosNovedad
+      productos_novedad: productosNovedad,
+      nombre_recibe: nombreRecibeDev,
+      cedula_recibe: cedulaRecibeDev
     };
     const url = `${import.meta.env.VITE_API_URL}/api/conductor/pedidos/${pedidoDevolucion.id}/estado`;
 
@@ -623,6 +635,17 @@ const DashboardConductor = () => {
                 Pide al cliente <b>{pedidoFirma.nombre_cliente}</b> que firme en el recuadro para confirmar la entrega del pedido <b>{pedidoFirma.id_factura}</b>.
               </p>
               
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Nombre de quien recibe:</label>
+                  <input type="text" value={nombreRecibe} onChange={(e) => setNombreRecibe(e.target.value)} required className="w-full border-2 border-slate-200 p-2.5 rounded-xl focus:border-green-500 outline-none text-slate-700 bg-white font-bold" placeholder="Nombre..." />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Cédula:</label>
+                  <input type="number" value={cedulaRecibe} onChange={(e) => setCedulaRecibe(e.target.value)} required className="w-full border-2 border-slate-200 p-2.5 rounded-xl focus:border-green-500 outline-none text-slate-700 bg-white font-bold" placeholder="123456789..." />
+                </div>
+              </div>
+
               <div className="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 mb-4 relative overflow-hidden touch-none" style={{ height: '250px' }}>
                 <SignatureCanvas 
                   ref={sigCanvas} 
@@ -742,6 +765,17 @@ const DashboardConductor = () => {
                   Pide al cliente <b>{pedidoDevolucion.nombre_cliente}</b> que firme en el recuadro para confirmar que entrega/recibe con esta novedad.
                 </p>
                 
+                <div className="mb-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Nombre de quien firma:</label>
+                    <input type="text" value={nombreRecibeDev} onChange={(e) => setNombreRecibeDev(e.target.value)} required className="w-full border-2 border-slate-200 p-2.5 rounded-xl focus:border-orange-500 outline-none text-slate-700 bg-white font-bold" placeholder="Nombre..." />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Cédula:</label>
+                    <input type="number" value={cedulaRecibeDev} onChange={(e) => setCedulaRecibeDev(e.target.value)} required className="w-full border-2 border-slate-200 p-2.5 rounded-xl focus:border-orange-500 outline-none text-slate-700 bg-white font-bold" placeholder="123456789..." />
+                  </div>
+                </div>
+
                 <div className="border-2 border-dashed border-orange-300 rounded-xl bg-orange-50 mb-4 relative overflow-hidden touch-none" style={{ height: '250px' }}>
                   <SignatureCanvas 
                     ref={sigCanvasDev} 

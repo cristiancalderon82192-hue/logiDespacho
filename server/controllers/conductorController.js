@@ -79,7 +79,7 @@ const getMisRutas = async (req, res) => {
 const actualizarEstado = async (req, res) => {
   require('fs').appendFileSync('debug_wa.log', `Entro a actualizarEstado con id ${req.params.id}\n`);
   const { id } = req.params;
-  const { estado, observacion_devolucion, valor_devolucion, firma_cliente, valor_recaudado, productos_novedad } = req.body;
+  const { estado, observacion_devolucion, valor_devolucion, firma_cliente, valor_recaudado, productos_novedad, nombre_recibe, cedula_recibe } = req.body;
 
   if (!estado) return res.status(400).json({ error: "El estado es requerido" });
 
@@ -100,8 +100,12 @@ const actualizarEstado = async (req, res) => {
     const cliente = clienteRows.length > 0 ? clienteRows[0] : null;
 
     if (estado === 'Entregado') {
-      sql = 'UPDATE pedidos SET estado_entrega = ?, fecha_entrega_conductor = ?, firma_cliente = ?, valor_recaudado = ? WHERE id = ?';
-      params = [estado, horaColombia, firma_cliente || null, recaudoReal, id];
+      const notaRecibe = nombre_recibe && nombre_recibe.trim() ? `[Recibe: ${nombre_recibe.trim()}${cedula_recibe && cedula_recibe.trim() ? ` - CC: ${cedula_recibe.trim()}` : ''}]` : '';
+      const notaPrevia = pedido.observaciones_entrega ? ` | Previo: ${pedido.observaciones_entrega}` : '';
+      const nuevaNota = notaRecibe || notaPrevia ? `${notaRecibe}${notaPrevia}`.trim() : null;
+
+      sql = 'UPDATE pedidos SET estado_entrega = ?, fecha_entrega_conductor = ?, firma_cliente = ?, valor_recaudado = ?, observaciones_entrega = COALESCE(?, observaciones_entrega) WHERE id = ?';
+      params = [estado, horaColombia, firma_cliente || null, recaudoReal, nuevaNota, id];
     } 
     else if (estado === 'Devolución' || estado === 'Entregado Incompleto') {
       let valorDevolver = parseFloat(valor_devolucion) || 0;
@@ -134,8 +138,9 @@ const actualizarEstado = async (req, res) => {
       const nuevaDeudaPendiente = deudaActual + valorDevolver;
       const nuevoTotalDespachado = despachadoActual - valorDevolver;
       
+      const notaRecibe = nombre_recibe && nombre_recibe.trim() ? `[Recibe: ${nombre_recibe.trim()}${cedula_recibe && cedula_recibe.trim() ? ` - CC: ${cedula_recibe.trim()}` : ''}] ` : '';
       const notaPrevia = pedido.observaciones_entrega ? ` | Previo: ${pedido.observaciones_entrega}` : '';
-      const nuevaNota = `[RECAUDÓ $${recaudoReal.toLocaleString('es-CO')} - DEVUELVE $${valorDevolver.toLocaleString('es-CO')}: ${observacion_devolucion}]${notaPrevia}`;
+      const nuevaNota = `${notaRecibe}[RECAUDÓ $${recaudoReal.toLocaleString('es-CO')} - DEVUELVE $${valorDevolver.toLocaleString('es-CO')}: ${observacion_devolucion}]${notaPrevia}`;
 
       // 👇 AQUÍ AGREGAMOS firma_cliente AL UPDATE 👇
       sql = `
