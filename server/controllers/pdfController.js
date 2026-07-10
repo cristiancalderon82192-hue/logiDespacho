@@ -45,34 +45,23 @@ Estructura JSON requerida:
       "descripcion": "nombre exacto del producto",
       "peso": 0.0, // NÚMERO DECIMAL, en Kg. ¡IMPORTANTE! Revisa con extremo cuidado la columna 'Peso' (suele ser la primera columna a la izquierda de cada fila de producto). Asocia correctamente el peso a cada ítem en el orden exacto en que aparecen. Si la fila dice '20,00', extrae 20.0. No asumas 0 a menos que explícitamente diga 0,00 o esté vacía.
       "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
-      "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. Si dice 100, devuelve 100.0.
-      "unidad_medida": "und", // string, usualmente en la columna Und
-      "precio_unitario": 0.0, // NÚMERO DECIMAL. Extrae de la columna Valor Und.
-      "precio_total": 0.0 // NÚMERO DECIMAL. Extrae de la columna Valor Total.
+      "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. Suele estar JUSTO ANTES de la unidad de medida (ej: si dice '33,48 mts2', la cantidad es 33.48).
+      "unidad_medida": "und", // string (ej: mts2, Bul, Und, kg).
+      "precio_unitario": 0.0, // NÚMERO DECIMAL (Montos monetarios altos).
+      "precio_total": 0.0 // NÚMERO DECIMAL (Montos monetarios muy altos).
     }
   ]
 }
 
-¡CRÍTICO PARA LAS TABLAS DE PRODUCTOS! 
-En el documento original, las tablas de productos tienen EXACTAMENTE estas 10 columnas en este orden de izquierda a derecha:
-1. Peso
-2. Código
-3. Bod (Bodega)
-4. Descripción
-5. Cantidad
-6. Und (Unidad de Medida)
-7. Valor Und (Precio Unitario)
-8. % Dcto (Porcentaje de Descuento)
-9. % Iva (Porcentaje de IVA)
-10. Valor Total
+¡CRÍTICO - CÓMO LEER EL TEXTO!
+El extractor de PDF a veces NO lee fila por fila, sino VERTICALMENTE por bloques (todos los pesos, luego todos los códigos, luego todas las descripciones, luego todas las cantidades, etc.). 
+Por favor, usa la LÓGICA y el SENTIDO COMÚN para emparejar los datos, sin importar el desorden:
+1. CANTIDAD Y UNIDAD: Las cantidades siempre están ligadas a su unidad de medida (ej: '33,48 mts2', '20 Bul', '2 Und'). ¡Busca estas unidades! El número que las acompaña es la 'cantidad'.
+2. PESO: Suele ser un bloque de números sueltos (ej: 522,00 o 1.036,00) que NO tienen una unidad de medida pegada como mts2 o Bul. ¡NUNCA pongas el peso en el campo cantidad!
+3. VALORES UNITARIOS Y TOTALES: Son los montos de dinero más grandes (ej: 36.240,40 o 1.213.328,59). ¡No los pongas como cantidades!
+4. PORCENTAJES: Los números como '19' o '5.00' suelen ser % de IVA o Descuento. Ignóralos si no te los pido.
 
-Ten un cuidado extremo para no confundir estas columnas. Por ejemplo: 
-- El número '19' suele ser el '% Iva', ¡NO LO PONGAS COMO CANTIDAD!
-- El número '2.00' o '5.00' suele ser el '% Dcto', ¡NO LO PONGAS COMO PESO!
-- El primer número de la fila es el 'Peso', ¡NO LO PONGAS COMO VALOR UNITARIO!
-- Asegúrate de mapear el 'Valor Und' a 'precio_unitario', la 'Cantidad' a 'cantidad', y el 'Peso' a 'peso' respetando estrictamente esta estructura de 10 columnas.
-
-Asegúrate de limpiar todos los números de forma muy precisa. Si falta algún dato, usa null o 0 según corresponda.
+Haz un mapeo lógico y semántico (deduciendo qué es cada número por su tamaño y contexto) para construir los productos correctamente. Mapea el Peso a 'peso' y la Cantidad a 'cantidad'.
 
 Texto de la factura:
 ----------------
