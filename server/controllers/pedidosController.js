@@ -77,8 +77,8 @@ const crearPedido = async (req, res) => {
       INSERT INTO pedidos (
         usuario_id, cliente_id, destino_id, id_factura, tipo_documento_id, 
         prioridad, valor_factura, fecha_facturacion, fecha_promesa, fecha_agendada, hora_registro, 
-        nota_manual, estado_entrega
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+        nota_manual, estado_entrega, deja_en_bodega, bodega_acopio_id, punto_venta_origen_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente', ?, ?, ?)
     `;
 
     const values = [
@@ -93,7 +93,10 @@ const crearPedido = async (req, res) => {
       data.fecha_promesa,
       data.fecha_agendada || null,
       data.hora_registro,
-      data.nota_manual
+      data.nota_manual,
+      data.deja_en_bodega ? 1 : 0,
+      data.deja_en_bodega ? (data.bodega_acopio_id || 1) : null,
+      data.deja_en_bodega ? 1 : null // Defaulting punto_venta_origen_id to 1 (Main branch) for now
     ];
 
     const [result] = await db.query(sql, values);

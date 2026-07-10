@@ -51,6 +51,8 @@ const PedidosLider = () => {
     estado_entrega: 'Pendiente', 
     peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0,
     productos: [],
+    deja_en_bodega: false,
+    bodega_acopio_id: 1,
   };
   const [formData, setFormData] = useState(initialFormState);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
@@ -796,6 +798,20 @@ const PedidosLider = () => {
                         </select>
                         <MapPin size={14} className="absolute left-2.5 top-3 md:top-2.5 text-slate-400"/>
                       </div>
+                    </div>
+                    <div className="sm:col-span-2 border border-blue-200 bg-blue-50/50 p-3 rounded-lg flex flex-col gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="deja_en_bodega" checked={formData.deja_en_bodega} onChange={(e) => setFormData(prev => ({...prev, deja_en_bodega: e.target.checked}))} disabled={isReadOnly} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+                        <span className="text-sm font-bold text-slate-700">Se deja en bodega y el cliente recoge en mostrador</span>
+                      </label>
+                      {formData.deja_en_bodega && (
+                        <div>
+                          <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase mb-1 block">Bodega de Acopio (Responsable de entregar)</label>
+                          <select name="bodega_acopio_id" value={formData.bodega_acopio_id} onChange={(e) => setFormData(prev => ({...prev, bodega_acopio_id: Number(e.target.value)}))} disabled={isReadOnly} required className="w-full sm:w-1/2 border py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100 font-bold">
+                            {[1,2,3,4,5,6,7,8].map(b => <option key={b} value={b}>Bodega {b}</option>)}
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <div className="sm:col-span-2">
                       <label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Nota Manual</label>

@@ -84,7 +84,7 @@ const actualizarEstado = async (req, res) => {
   if (!estado) return res.status(400).json({ error: "El estado es requerido" });
 
   try {
-    const [rows] = await db.query('SELECT id_factura, valor_factura, total_despachado, valor_factura_pendiente, observaciones_entrega FROM pedidos WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT id_factura, valor_factura, total_despachado, valor_factura_pendiente, observaciones_entrega, deja_en_bodega, bodega_acopio_id, punto_venta_origen_id, cliente_id, fecha_facturacion, fecha_promesa, usuario_id FROM pedidos WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ error: "Pedido no encontrado" });
     const pedido = rows[0];
 
@@ -158,6 +158,34 @@ const actualizarEstado = async (req, res) => {
     }
 
     await db.query(sql, params);
+
+    // 👇 INTEGRACIÓN BODEGA PENDIENTES (DEJA EN BODEGA) 👇
+    if ((estado === 'Entregado' || estado === 'Entregado Incompleto') && pedido.deja_en_bodega) {
+      try {
+        const notasBodega = `Traslado logístico. Dejado en bodega de acopio por logística.${estado === 'Entregado Incompleto' ? ' Entregado Incompleto.' : ''}`;
+        const [master] = await db.query(
+          `INSERT INTO bodega_pendientes (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, usuario_id, notas, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')`
+        , [pedido.fecha_facturacion, pedido.id_factura, pedido.punto_venta_origen_id || 1, pedido.cliente_id, pedido.fecha_promesa, 'Entrega Inmediata', pedido.valor_factura, pedido.usuario_id, notasBodega]);
+
+        const masterId = master.insertId;
+
+        const [productos] = await db.query('SELECT * FROM pedidos_productos_detalle WHERE pedido_id = ?', [id]);
+        for (const prod of productos) {
+           const cant = prod.cantidad_despachada !== null && prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad;
+           if (cant > 0) {
+             await db.query(
+               `INSERT INTO bodega_pendientes_detalle (pendiente_id, codigo_producto, nombre_producto, cantidad_pendiente, unidad_medida, bodega_id, precio_unitario, valor_total, peso_kg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             , [masterId, prod.codigo_producto || '', prod.descripcion, cant, prod.unidad_medida || 'und', pedido.bodega_acopio_id || 1, prod.precio_unitario || 0, prod.precio_total || 0, prod.peso || 0]);
+           }
+        }
+        
+        const io = req.app.get('socketio');
+        if (io) io.emit('actualizacion_bodega');
+        require('fs').appendFileSync('debug_wa.log', `Material Pendiente creado para ${pedido.id_factura}\n`);
+      } catch (err) {
+        console.error("Error insertando en bodega_pendientes:", err);
+      }
+    }
 
     require('fs').appendFileSync('debug_wa.log', `Evaluando: estado=${estado}, cliente=${JSON.stringify(cliente)}\n`);
 
