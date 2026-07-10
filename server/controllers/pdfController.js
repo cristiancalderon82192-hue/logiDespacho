@@ -47,13 +47,30 @@ Estructura JSON requerida:
       "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
       "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. Si dice 100, devuelve 100.0.
       "unidad_medida": "und", // string, usualmente en la columna Und
-      "precio_unitario": 0.0, // NÚMERO DECIMAL
-      "precio_total": 0.0 // NÚMERO DECIMAL
+      "precio_unitario": 0.0, // NÚMERO DECIMAL. Extrae de la columna Valor Und.
+      "precio_total": 0.0 // NÚMERO DECIMAL. Extrae de la columna Valor Total.
     }
   ]
 }
 
-Ten en cuenta que el extractor de texto del PDF a veces puede desordenar un poco las columnas. Por lo general, los datos de cada producto (Peso, Código, Bodega, Descripción, Cantidad, etc.) aparecen secuencialmente. Haz un análisis profundo para emparejar el Peso correcto con la Descripción correcta, sin omitir ni saltar ningún valor.
+¡CRÍTICO PARA LAS TABLAS DE PRODUCTOS! 
+En el documento original, las tablas de productos tienen EXACTAMENTE estas 10 columnas en este orden de izquierda a derecha:
+1. Peso
+2. Código
+3. Bod (Bodega)
+4. Descripción
+5. Cantidad
+6. Und (Unidad de Medida)
+7. Valor Und (Precio Unitario)
+8. % Dcto (Porcentaje de Descuento)
+9. % Iva (Porcentaje de IVA)
+10. Valor Total
+
+Ten un cuidado extremo para no confundir estas columnas. Por ejemplo: 
+- El número `19` suele ser el `% Iva`, ¡NO LO PONGAS COMO CANTIDAD!
+- El número `2.00` o `5.00` suele ser el `% Dcto`, ¡NO LO PONGAS COMO PESO!
+- El primer número de la fila es el `Peso`, ¡NO LO PONGAS COMO VALOR UNITARIO!
+- Asegúrate de mapear el `Valor Und` a `precio_unitario`, la `Cantidad` a `cantidad`, y el `Peso` a `peso` respetando estrictamente esta estructura de 10 columnas.
 
 Asegúrate de limpiar todos los números de forma muy precisa. Si falta algún dato, usa null o 0 según corresponda.
 

@@ -165,32 +165,6 @@ const PedidosLider = () => {
 
       const data = await response.json();
       
-      let matchCliente = '';
-      let matchTelefono = '';
-      if (data.cliente) {
-        const cli = listaClientes.find(c => c.nombre.toLowerCase().includes(data.cliente.toLowerCase()) || data.cliente.toLowerCase().includes(c.nombre.toLowerCase()));
-        if (cli) {
-          matchCliente = cli.nombre;
-          matchTelefono = cli.telefono;
-        } else {
-          matchCliente = data.cliente;
-          // Si no existe, pre-llenar y abrir modal para crearlo
-          setNewClientData(prev => ({ 
-            ...prev, 
-            nombre: data.cliente,
-            documento: data.nit_cliente || '',
-            telefono: data.telefono_cliente || ''
-          }));
-          setIsCreatingClient(true);
-          setShowClientModal(true);
-          mostrarInfo("El cliente extraído no existe. Por favor completa sus datos para crearlo.");
-        }
-      } else {
-        setIsCreatingClient(false);
-        setShowClientModal(true);
-        mostrarInfo("No se detectó un cliente en el PDF. Por favor selecciónalo o créalo.");
-      }
-
       const nuevosPesos = { peso_b1: 0, peso_b2: 0, peso_b3: 0, peso_b4: 0, peso_b5: 0, peso_b6: 0, peso_b7: 0, peso_b8: 0 };
       if (data.productos && data.productos.length > 0) {
         data.productos.forEach(p => {
@@ -206,8 +180,6 @@ const PedidosLider = () => {
         ...prev,
         id_factura: data.id_factura || prev.id_factura,
         valor_factura: data.valor_factura || prev.valor_factura,
-        nombre_cliente: matchCliente || prev.nombre_cliente,
-        telefono: matchTelefono || prev.telefono,
         productos: data.productos || [],
         ...nuevosPesos
       }));

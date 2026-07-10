@@ -153,31 +153,6 @@ const PendientesBodega = () => {
 
       const data = await response.json();
       
-      let matchCliente = '';
-      let matchClienteId = '';
-      if (data.cliente) {
-        const cli = clientesExistentes.find(c => c.nombre.toLowerCase().includes(data.cliente.toLowerCase()) || data.cliente.toLowerCase().includes(c.nombre.toLowerCase()));
-        if (cli) {
-          matchCliente = cli.nombre;
-          matchClienteId = cli.id;
-        } else {
-          matchCliente = data.cliente;
-          setNewClientData(prev => ({ 
-            ...prev, 
-            nombre: data.cliente,
-            documento: data.nit_cliente || '',
-            telefono: data.telefono_cliente || ''
-          }));
-          setIsCreatingClient(true);
-          setShowClientModal(true);
-          mostrarInfo("El cliente extraído no existe. Por favor completa sus datos para crearlo.");
-        }
-      } else {
-        setIsCreatingClient(false);
-        setShowClientModal(true);
-        mostrarInfo("No se detectó un cliente en el PDF. Por favor selecciónalo o créalo.");
-      }
-
       let nuevosItems = [];
       if (data.productos && data.productos.length > 0) {
         nuevosItems = data.productos.map(p => ({
@@ -199,14 +174,9 @@ const PendientesBodega = () => {
         factura_num: data.id_factura || prev.factura_num,
         fecha_factura: data.fecha_facturacion ? data.fecha_facturacion.split('T')[0] : prev.fecha_factura,
         fecha_promesa: data.fecha_promesa ? data.fecha_promesa.split('T')[0] : prev.fecha_promesa,
-        cliente_id: matchClienteId || prev.cliente_id,
         valor_factura: data.valor_factura || prev.valor_factura
       }));
       
-      if(matchCliente) {
-         setClienteSeleccionadoNombre(matchCliente);
-      }
-
       setItems(nuevosItems);
       mostrarExito("PDF Procesado correctamente. Verifica los datos extraídos.");
 
