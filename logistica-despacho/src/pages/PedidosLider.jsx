@@ -231,10 +231,25 @@ const PedidosLider = () => {
     mostrarInfo("Pesos de bodegas recalculados.");
   };
 
-  const handleChange = (e) => {
+  const handleChange = async (e) => {
     if (isReadOnly) return; 
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'tipo_documento' && value === 'Nota Manual') {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/siguiente-nota-manual`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFormData(prev => ({ ...prev, id_factura: data.nextId }));
+        }
+      } catch (err) {
+        console.error("Error obteniendo consecutivo", err);
+      }
+    }
   };
 
   const handleSelectCliente = (cliente) => {
@@ -682,7 +697,7 @@ const PedidosLider = () => {
                     )}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.tipo_documento === 'Nota Manual' ? 'Auto-generado' : formData.id_factura} onChange={handleChange} disabled={isReadOnly || formData.tipo_documento === 'Nota Manual'} required={formData.tipo_documento !== 'Nota Manual'} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" /></div>
+                    <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Id_Factura</label><input type="text" name="id_factura" value={formData.id_factura} onChange={handleChange} disabled={isReadOnly || formData.tipo_documento === 'Nota Manual'} required={formData.tipo_documento !== 'Nota Manual'} className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 bg-white" /></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Tipo Doc</label><select name="tipo_documento" value={formData.tipo_documento} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100">{listaTiposDoc.map(t => (<option key={t.id} value={t.nombre}>{t.nombre}</option>))}</select></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Prioridad</label><select name="prioridad" value={formData.prioridad} onChange={handleChange} disabled={isReadOnly} required className="w-full border py-2.5 md:py-2 px-3 text-sm rounded bg-white disabled:bg-slate-100"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
                     <div><label className="text-[10px] md:text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={10}/> Valor *</label><input type="number" name="valor_factura" value={formData.valor_factura} onChange={handleChange} disabled={isReadOnly} required min="0" step="any" className="w-full border py-2.5 md:py-2 px-3 text-sm rounded focus:ring-2 focus:ring-green-500 outline-none font-semibold text-slate-700 disabled:bg-slate-100 bg-white placeholder:text-slate-300" placeholder="Ej: 150000"/></div>

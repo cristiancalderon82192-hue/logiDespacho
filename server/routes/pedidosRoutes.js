@@ -25,4 +25,7 @@ router.delete('/pedidos/:id', pedidosController.eliminarPedido);  // Eliminar
 // --- RUTA PÚBLICA PARA COMPROBANTE ---
 router.get('/pedidos/public/:id_factura', pedidosController.obtenerPedidoPublicoPorFactura);
 
+// --- RUTA PARA OBTENER CONSECUTIVO DE NOTA MANUAL ---
+router.get('/siguiente-nota-manual', pedidosController.obtenerSiguienteNotaManual);
+
 module.exports = router;

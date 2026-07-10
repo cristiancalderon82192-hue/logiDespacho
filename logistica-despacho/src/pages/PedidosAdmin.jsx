@@ -117,10 +117,25 @@ const PedidosAdmin = () => {
 
   useEffect(() => { fetchPedidos(); }, [fechaInicio, fechaFin]);
 
-  const handleChange = (e) => {
+  const handleChange = async (e) => {
     if (isReadOnly) return; 
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    if (name === 'tipo_documento' && value === 'Nota Manual') {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/siguiente-nota-manual`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFormData(prev => ({ ...prev, id_factura: data.nextId }));
+        }
+      } catch (err) {
+        console.error("Error obteniendo consecutivo", err);
+      }
+    }
   };
 
   const handleUploadPdf = async (e) => {

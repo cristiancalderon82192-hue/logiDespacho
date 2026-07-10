@@ -479,6 +479,24 @@ const obtenerPedidoPublicoPorFactura = async (req, res) => {
 };
 
 // --- EXPORTAR TODO ---
+const obtenerSiguienteNotaManual = async (req, res) => {
+  try {
+    const [lastNm] = await db.query("SELECT id_factura FROM pedidos WHERE id_factura LIKE 'NM-%' ORDER BY id_factura DESC LIMIT 1");
+    let nextNum = 1;
+    if (lastNm.length > 0) {
+      const lastId = lastNm[0].id_factura;
+      const numPart = lastId.replace('NM-', '');
+      if (!isNaN(numPart)) {
+        nextNum = parseInt(numPart, 10) + 1;
+      }
+    }
+    const nextId = `NM-${nextNum.toString().padStart(4, '0')}`;
+    res.json({ nextId });
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener consecutivo de nota manual" });
+  }
+};
+
 module.exports = { 
-  crearPedido, listarPedidosRango, obtenerDashboard, obtenerPedidoPorId, actualizarPedido, eliminarPedido, obtenerPedidoPublicoPorFactura 
+  crearPedido, listarPedidosRango, obtenerDashboard, obtenerPedidoPorId, actualizarPedido, eliminarPedido, obtenerPedidoPublicoPorFactura, obtenerSiguienteNotaManual
 };
