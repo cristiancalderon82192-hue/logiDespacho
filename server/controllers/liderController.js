@@ -50,7 +50,7 @@ const getDashboard = async (req, res) => {
     `;
     const [grafica] = await db.query(sqlGrafica, [usuario_id, inicio, fin]);
 
-    // 3. DATOS DE DESTINOS (Todos los agendados por el líder)
+    // 3. DATOS DE DESTINOS (Globales de la empresa para la jornada)
     const sqlDestinos = `
       SELECT 
         d.nombre as destino, 
@@ -59,12 +59,11 @@ const getDashboard = async (req, res) => {
       FROM pedidos p 
       JOIN destinos d ON p.destino_id = d.id 
       LEFT JOIN pedidos_detalle pd ON p.id = pd.pedido_id
-      WHERE p.usuario_id = ? 
-      AND p.fecha_agendada BETWEEN ? AND ? 
+      WHERE p.fecha_agendada BETWEEN ? AND ? 
       GROUP BY d.id 
       ORDER BY peso DESC
     `;
-    const [destinos] = await db.query(sqlDestinos, [usuario_id, inicio, fin]);
+    const [destinos] = await db.query(sqlDestinos, [inicio, fin]);
 
     res.json({ lista, grafica, destinos });
 
