@@ -53,7 +53,7 @@ const DashboardLider = () => {
       
       setPedidos(dataLider.lista || []);     
       setDatosGrafica(dataLider.grafica || []); 
-      setDestinosTop(dataLider.destinos || []); 
+      setDestinosTop(dataGlobal.destinos || []); 
       
       if (dataGlobal.bodegas) {
         setDatosBodegas(Object.keys(dataGlobal.bodegas).map(key => ({
