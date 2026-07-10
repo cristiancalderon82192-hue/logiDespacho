@@ -20,6 +20,7 @@ const AsignacionLogistica = () => {
   const [fechaFiltro, setFechaFiltro] = useState(hoyLocal);
   const [destinoFiltro, setDestinoFiltro] = useState(''); 
   const [conductorFiltro, setConductorFiltro] = useState(''); 
+  const [viajeFiltro, setViajeFiltro] = useState(''); 
   
   const [pedidos, setPedidos] = useState([]);
   const [conductores, setConductores] = useState([]);
@@ -362,12 +363,14 @@ const AsignacionLogistica = () => {
   const obtenerPesoFormateado = (p) => obtenerPesoNumerico(p).toLocaleString();
 
   const destinosUnicos = [...new Set(pedidos.map(p => p.destino))].sort();
+  const viajesUnicos = [...new Set(pedidos.map(p => Number(p.numero_viaje || 0)))].filter(v => v > 0).sort((a, b) => a - b);
   
   const pedidosFiltrados = pedidos
     .filter(p => {
       const matchDestino = destinoFiltro ? p.destino === destinoFiltro : true;
       const matchConductor = conductorFiltro ? String(p.conductor_id) === conductorFiltro : true;
-      return matchDestino && matchConductor;
+      const matchViaje = viajeFiltro ? String(p.numero_viaje || '') === viajeFiltro : true;
+      return matchDestino && matchConductor && matchViaje;
     })
     .sort((a, b) => {
       const prioridadA = a.estado_entrega === 'Pendiente' ? 0 : 1;
@@ -484,25 +487,32 @@ const AsignacionLogistica = () => {
             <p className="text-slate-500 text-xs md:text-sm mt-1">Selecciona pedidos para asignar lotes o modifícalos individualmente.</p>
           </div>
           
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full xl:w-auto">
-            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
-              <User className="text-slate-500 ml-1 shrink-0" size={16} />
-              <select value={conductorFiltro} onChange={(e) => setConductorFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full sm:min-w-[130px] cursor-pointer">
-                <option value="">Todos los Conductores</option>
-                {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
-              <Filter className="text-slate-500 ml-1 shrink-0" size={16} />
-              <select value={destinoFiltro} onChange={(e) => setDestinoFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full sm:min-w-[130px] cursor-pointer">
-                <option value="">Todos los Destinos</option>
-                {destinosUnicos.map(d => (<option key={d} value={d}>{d}</option>))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
-              <Calendar className="text-slate-500 ml-1 shrink-0" size={18} />
-              <input type="date" value={fechaFiltro} onChange={(e) => setFechaFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full cursor-pointer"/>
-            </div>
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 md:gap-3 w-full xl:w-auto">
+              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
+                <User className="text-slate-500 ml-1 shrink-0" size={16} />
+                <select value={conductorFiltro} onChange={(e) => setConductorFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full sm:min-w-[130px] cursor-pointer">
+                  <option value="">Todos los Conductores</option>
+                  {conductores.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
+                <Truck className="text-slate-500 ml-1 shrink-0" size={16} />
+                <select value={viajeFiltro} onChange={(e) => setViajeFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full sm:min-w-[110px] cursor-pointer">
+                  <option value="">Todos los Viajes</option>
+                  {viajesUnicos.map(v => (<option key={v} value={String(v)}>Viaje #{v}</option>))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
+                <Filter className="text-slate-500 ml-1 shrink-0" size={16} />
+                <select value={destinoFiltro} onChange={(e) => setDestinoFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full sm:min-w-[130px] cursor-pointer">
+                  <option value="">Todos los Destinos</option>
+                  {destinosUnicos.map(d => (<option key={d} value={d}>{d}</option>))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-lg md:rounded-xl border border-slate-200 w-full sm:w-auto">
+                <Calendar className="text-slate-500 ml-1 shrink-0" size={18} />
+                <input type="date" value={fechaFiltro} onChange={(e) => setFechaFiltro(e.target.value)} className="bg-transparent text-slate-700 text-xs md:text-sm outline-none font-bold w-full cursor-pointer"/>
+              </div>
             {conductorFiltro && pedidosFiltrados.length > 0 && (
               <button onClick={handleImprimir} className="w-full sm:w-auto bg-slate-900 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-xl text-sm font-bold shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95">
                 <Printer size={16} /> Planilla
