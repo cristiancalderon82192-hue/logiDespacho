@@ -1032,9 +1032,7 @@ const PendientesBodega = () => {
                             <input type="number" step="any" placeholder="0" className="w-full p-1.5 bg-transparent outline-none text-center" required value={item.cantidad} onChange={(e) => handleItemChange(index, 'cantidad', e.target.value)} />
                           </td>
                           <td className="p-1 border-r border-slate-200">
-                            <select className="w-full p-1.5 bg-transparent outline-none text-center" value={item.unidad} onChange={(e) => handleItemChange(index, 'unidad', e.target.value)}>
-                              <option>UND</option><option>MTS2</option><option>KG</option>
-                            </select>
+                            <input type="text" placeholder="UND" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.unidad || ''} onChange={(e) => handleItemChange(index, 'unidad', e.target.value)} />
                           </td>
                           <td className="p-1 border-r border-slate-200">
                             <input type="number" step="any" placeholder="0.00" className="w-full p-1.5 bg-transparent outline-none text-center" value={item.precio_unitario} onChange={(e) => handleItemChange(index, 'precio_unitario', e.target.value)} />
