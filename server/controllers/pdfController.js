@@ -43,7 +43,7 @@ Estructura JSON requerida:
     {
       "codigo_producto": "código (si lo hay)",
       "descripcion": "nombre exacto del producto",
-      "peso": 0.0, // NÚMERO DECIMAL, en Kg. Revisa bien la columna Peso en la factura. Extrae el número y conviértelo al formato estándar (ej: 5.000,00 -> 5000.0). Si no dice nada, pon 0.
+      "peso": 0.0, // NÚMERO DECIMAL, en Kg. ¡IMPORTANTE! Revisa con extremo cuidado la columna 'Peso' (suele ser la primera columna a la izquierda de cada fila de producto). Asocia correctamente el peso a cada ítem en el orden exacto en que aparecen. Si la fila dice '20,00', extrae 20.0. No asumas 0 a menos que explícitamente diga 0,00 o esté vacía.
       "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
       "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. Si dice 100, devuelve 100.0.
       "unidad_medida": "und", // string, usualmente en la columna Und
@@ -52,6 +52,8 @@ Estructura JSON requerida:
     }
   ]
 }
+
+Ten en cuenta que el extractor de texto del PDF a veces puede desordenar un poco las columnas. Por lo general, los datos de cada producto (Peso, Código, Bodega, Descripción, Cantidad, etc.) aparecen secuencialmente. Haz un análisis profundo para emparejar el Peso correcto con la Descripción correcta, sin omitir ni saltar ningún valor.
 
 Asegúrate de limpiar todos los números de forma muy precisa. Si falta algún dato, usa null o 0 según corresponda.
 
