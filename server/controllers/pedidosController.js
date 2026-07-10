@@ -8,6 +8,20 @@ const crearPedido = async (req, res) => {
   const data = req.body;
   
   try {
+    // 👇 AUTO-GENERAR ID PARA NOTA MANUAL 👇
+    if (data.tipo_documento === 'Nota Manual') {
+      const [lastNm] = await db.query("SELECT id_factura FROM pedidos WHERE id_factura LIKE 'NM-%' ORDER BY id_factura DESC LIMIT 1");
+      let nextNum = 1;
+      if (lastNm.length > 0) {
+        const lastId = lastNm[0].id_factura; // e.g. "NM-0005"
+        const numPart = lastId.replace('NM-', '');
+        if (!isNaN(numPart)) {
+          nextNum = parseInt(numPart, 10) + 1;
+        }
+      }
+      data.id_factura = `NM-${nextNum.toString().padStart(4, '0')}`;
+    }
+
     // 👇 CANDADO 3: VALIDAR FACTURA DUPLICADA 👇
     const [facturaExiste] = await db.query("SELECT id FROM pedidos WHERE id_factura = ?", [data.id_factura]);
     if (facturaExiste.length > 0) {
