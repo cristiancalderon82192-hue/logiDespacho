@@ -38,7 +38,7 @@ Estructura JSON requerida:
   "cliente": "Nombre del cliente COMPRADOR. Suele estar al lado de 'Señores:', 'Cliente:' o 'Facturar a:'. NUNCA uses el nombre del encabezado (Ej: DEPÓSITO Y CERÁMICAS EL RODEO), ya que ese es el vendedor.",
   "nit_cliente": "NIT del cliente COMPRADOR. Suele estar cerca de 'Señores' o 'Nit:'. Devuelve el número exacto, ej: 900787714-2. Si no hay NIT del comprador, devuelve null.",
   "telefono_cliente": "Teléfono del cliente (si aparece cerca del bloque de Señores/Cliente)",
-  "valor_factura": 150000.0, // NÚMERO DECIMAL. Valor total a pagar. Recuerda remover puntos de miles.
+  "valor_factura": 150000.0, // NÚMERO DECIMAL. Valor total a pagar. EXCEPCIÓN IMPORTANTE: El campo 'Total a Pagar' suele estar en formato americano (con comas para miles y punto para decimales, ej: $6,396,365.00). Extrae este número correctamente eliminando las comas de miles. (En el ejemplo sería 6396365.0).
   "productos": [
     {
       "codigo_producto": "código (si lo hay)",
