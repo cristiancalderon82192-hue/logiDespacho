@@ -27,6 +27,7 @@ const extraerFactura = async (req, res) => {
     // 2. Definir el prompt pidiendo JSON estricto
     const prompt = `Analiza el siguiente texto extraído de una factura comercial y extrae los datos correspondientes en formato JSON ESTRICTO.
 Solo debes devolver un objeto JSON válido, sin ningún texto adicional, sin formato de markdown (no uses \`\`\`json).
+Asegúrate de que todas las comillas dobles (") dentro de los valores de texto estén correctamente escapadas con barra invertida (\") para evitar romper el JSON.
 
 IMPORTANTE: Los números en el texto usan formato de moneda colombiano (punto '.' para miles y coma ',' para decimales. Ejemplo: 5.000,00 representa cinco mil. 714,00 representa setecientos catorce). Debes convertir TODOS los valores numéricos a formato decimal estándar de programación (sin separador de miles, y usando punto '.' para decimales. Ejemplo: 5000.0 y 714.0).
 
@@ -80,9 +81,31 @@ ${pdfText}
       throw new Error("La IA no devolvió contenido.");
     }
 
-    const parsedData = JSON.parse(responseContent);
+    let cleanResponse = responseContent.trim();
+    // Remover markdown si la IA lo incluyó
+    if (cleanResponse.startsWith('```json')) {
+      cleanResponse = cleanResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    } else if (cleanResponse.startsWith('```')) {
+      cleanResponse = cleanResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    }
 
-    // Formatear/Limpiar datos antes de enviar al cliente
+    let parsedData;
+    try {
+      parsedData = JSON.parse(cleanResponse);
+    } catch (parseError) {
+      console.error("Error original parsing JSON:", parseError);
+      console.error("Respuesta recibida:", cleanResponse);
+      // Intento desesperado de limpieza si hay comillas dobles sin escapar dentro de strings
+      cleanResponse = cleanResponse.replace(/\\n/g, "\\n")
+                                   .replace(/\\'/g, "\\'")
+                                   .replace(/\\"/g, '\\"')
+                                   .replace(/\\&/g, "\\&")
+                                   .replace(/\\r/g, "\\r")
+                                   .replace(/\\t/g, "\\t")
+                                   .replace(/\\b/g, "\\b")
+                                   .replace(/\\f/g, "\\f");
+      parsedData = JSON.parse(cleanResponse);
+    }
     if (!parsedData.productos || !Array.isArray(parsedData.productos)) {
       parsedData.productos = [];
     }
