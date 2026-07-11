@@ -19,6 +19,10 @@ const extraerFactura = async (req, res) => {
     // OCULTAR EL NIT DE LA EMPRESA EMISORA (Puntualito / Agropecuaria)
     // Esto evita que la IA asuma que es el NIT del cliente
     pdfText = pdfText.replace(/901\.?248\.?396([-\s]\d)?/g, "[NIT_EMISOR_IGNORAR]");
+    
+    // PREVENCIÓN DE ERROR JSON: Reemplazar comillas dobles en el texto (ej: 1/2") por 'pulg'
+    // para evitar que el modelo genere un JSON corrupto con comillas sin escapar.
+    pdfText = pdfText.replace(/"/g, ' pulg ');
 
     if (!pdfText || pdfText.trim() === '') {
       return res.status(400).json({ error: 'El PDF parece estar vacío o es una imagen sin texto.' });
@@ -94,17 +98,14 @@ ${pdfText}
       parsedData = JSON.parse(cleanResponse);
     } catch (parseError) {
       console.error("Error original parsing JSON:", parseError);
-      console.error("Respuesta recibida:", cleanResponse);
-      // Intento desesperado de limpieza si hay comillas dobles sin escapar dentro de strings
-      cleanResponse = cleanResponse.replace(/\\n/g, "\\n")
-                                   .replace(/\\'/g, "\\'")
-                                   .replace(/\\"/g, '\\"')
-                                   .replace(/\\&/g, "\\&")
-                                   .replace(/\\r/g, "\\r")
-                                   .replace(/\\t/g, "\\t")
-                                   .replace(/\\b/g, "\\b")
-                                   .replace(/\\f/g, "\\f");
-      parsedData = JSON.parse(cleanResponse);
+      try {
+        const { jsonrepair } = require('jsonrepair');
+        const repaired = jsonrepair(cleanResponse);
+        parsedData = JSON.parse(repaired);
+      } catch (repairError) {
+        console.error("Fallo también jsonrepair:", repairError);
+        throw new Error("El modelo generó un JSON inválido y no se pudo reparar automáticamente.");
+      }
     }
     if (!parsedData.productos || !Array.isArray(parsedData.productos)) {
       parsedData.productos = [];
