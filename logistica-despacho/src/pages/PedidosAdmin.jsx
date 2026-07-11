@@ -487,6 +487,22 @@ const PedidosAdmin = () => {
           headStyles: { fillColor: [50, 50, 50] }
       });
 
+      if (data.productos && data.productos.length > 0) {
+        const prodData = data.productos.map(p => [
+          p.codigo_producto || 'S/N',
+          p.descripcion || 'Sin descripción',
+          `${p.cantidad_despachada !== null && p.cantidad_despachada !== undefined ? p.cantidad_despachada : p.cantidad} ${p.unidad_medida || 'und'}`
+        ]);
+
+        autoTable(doc, {
+            startY: doc.lastAutoTable.finalY + 10,
+            head: [['Código', 'Producto Entregado', 'Cantidad']],
+            body: prodData,
+            theme: 'grid',
+            headStyles: { fillColor: [50, 50, 50] }
+        });
+      }
+
       const finalY = doc.lastAutoTable.finalY + 20;
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
