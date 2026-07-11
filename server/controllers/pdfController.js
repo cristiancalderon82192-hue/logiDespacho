@@ -61,10 +61,10 @@ Estructura JSON requerida:
 ¡CRÍTICO - CÓMO LEER EL TEXTO!
 El extractor de PDF a veces NO lee fila por fila, sino VERTICALMENTE por bloques (todos los pesos juntos, luego todos los códigos, luego todas las descripciones, luego todas las CANTIDADES juntas, luego todas las unidades, etc.). 
 Por favor, usa la LÓGICA y el SENTIDO COMÚN para emparejar los datos secuencialmente por posición, sin importar el desorden:
-1. CANTIDADES: Suele ser un bloque de números pequeños (ej: 34, 52, 20, 5, 14, 2, 2). Empareja el primer número con el primer producto, el segundo con el segundo, etc. NO asumas que la cantidad está pegada a la unidad en el texto extraído.
+1. CANTIDADES: ¡CUIDADO EXTREMO! NO CONFUNDAS LA CANTIDAD CON LOS DESCUENTOS. Las verdaderas cantidades suelen estar directamente relacionadas con la unidad de medida (Und, mts2, Bul). Si ves una columna de números repetitivos pequeños con decimales (ej: 2.00, 2.00, 5.00), eso suele ser la columna "% Dcto" (Descuento). ¡JAMÁS uses el porcentaje de descuento o el porcentaje de IVA (19) como cantidad! Extrae la cantidad real despachada.
 2. PESO: Suele ser un bloque de números sueltos (ej: 522,00 o 1.036,00) que NO tienen una unidad de medida pegada. ¡NUNCA confundas el peso con la cantidad, fíjate en el tamaño de los números y su posición!
 3. VALORES UNITARIOS Y TOTALES: Son los montos de dinero más grandes (ej: 36.240,40 o 1.213.328,59). ¡No los pongas como cantidades!
-4. PORCENTAJES: Los números como '19' o '5.00' suelen ser % de IVA o Descuento. Ignóralos si no te los pido.
+4. PORCENTAJES Y DESCUENTOS: Las facturas tienen columnas "% Dcto" o "% Iva" con números pequeños (2.00, 5.00, 19). Estos NO SON CANTIDADES. Ignóralos por completo.
 
 Haz un mapeo lógico y semántico (deduciendo qué es cada número por su tamaño y contexto) para construir los productos correctamente. Mapea el Peso a 'peso' y la Cantidad a 'cantidad'.
 
