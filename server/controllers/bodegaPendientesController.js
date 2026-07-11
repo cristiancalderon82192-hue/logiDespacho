@@ -103,7 +103,7 @@ const entregarPendiente = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const { id } = req.params;
-    const { firma_cliente, firma_bodeguero = '', usuario_id, productos_entregados } = req.body;
+    const { firma_cliente, firma_bodeguero = '', usuario_id, productos_entregados, nombre_recibe, cedula_recibe } = req.body;
     
     await connection.beginTransaction();
 
@@ -137,8 +137,8 @@ const entregarPendiente = async (req, res) => {
 
     // Guardamos el soporte digital del historial (PDF/Firmas)
     await connection.query(
-      `INSERT INTO bodega_entregas_historial (pendiente_id, factura_num, productos_entregados, firma_cliente, firma_bodeguero, usuario_id) VALUES (?, ?, ?, ?, ?, ?)`
-    , [id, factura_num, JSON.stringify(itemsADespachar), firma_cliente, firma_bodeguero, usuario_id]);
+      `INSERT INTO bodega_entregas_historial (pendiente_id, factura_num, productos_entregados, firma_cliente, firma_bodeguero, usuario_id, nombre_recibe, cedula_recibe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    , [id, factura_num, JSON.stringify(itemsADespachar), firma_cliente, firma_bodeguero, usuario_id, nombre_recibe || null, cedula_recibe || null]);
 
     // 2. Traemos TODO el detalle actual para calcular saldos y clonar
     const [todosDetalles] = await connection.query(`SELECT * FROM bodega_pendientes_detalle WHERE pendiente_id = ?`, [id]);

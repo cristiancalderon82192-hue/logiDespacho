@@ -51,6 +51,8 @@ const PendientesBodega = () => {
   const [imagenSoporte, setImagenSoporte] = useState(null);
   const [firmaSoporte, setFirmaSoporte] = useState(null);
   const [procesandoEntrega, setProcesandoEntrega] = useState(false);
+  const [nombreRecibePendiente, setNombreRecibePendiente] = useState('');
+  const [cedulaRecibePendiente, setCedulaRecibePendiente] = useState('');
   
   // ESTADO ACCIÓN POST-GUARDADO EN CARGAR REGISTRO
   const [modalAction, setModalAction] = useState('Pendiente');
@@ -553,9 +555,12 @@ const PendientesBodega = () => {
     setPendienteSeleccionado(null);
     setImagenSoporte(null);
     setFirmaSoporte(null);
+    setNombreRecibePendiente('');
+    setCedulaRecibePendiente('');
   };
 
   const confirmarEntrega = async () => {
+    if (!nombreRecibePendiente.trim() || !cedulaRecibePendiente.trim()) return mostrarError("Debes ingresar el nombre y cédula de quien recibe.");
     if (!firmaSoporte) return mostrarError("Debes adjuntar la firma digital del cliente (Obligatoria).");
     
     const totalAEntregar = pendienteSeleccionado.productos?.reduce((acc, p) => acc + (parseFloat(p.cantidad_a_entregar_ahora) || 0), 0) || 0;
@@ -570,7 +575,9 @@ const PendientesBodega = () => {
           firma_cliente: firmaSoporte,
           firma_bodeguero: imagenSoporte || '',
           usuario_id: user?.id || 1,
-          productos_entregados: pendienteSeleccionado.productos
+          productos_entregados: pendienteSeleccionado.productos,
+          nombre_recibe: nombreRecibePendiente,
+          cedula_recibe: cedulaRecibePendiente
         })
       });
       if (res.ok) {
@@ -1320,10 +1327,25 @@ const PendientesBodega = () => {
               {/* Opción de Soporte */}
               {!isLectura && (
                 <div className="flex flex-col gap-4 mt-4">
+
+                  {/* Bloque Quien Recibe */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><User size={14}/> Datos de quien recibe (Obligatorio)</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Nombre:</label>
+                        <input type="text" value={nombreRecibePendiente} onChange={(e) => setNombreRecibePendiente(e.target.value)} required className="w-full border border-slate-200 p-2.5 rounded-lg focus:border-blue-500 outline-none text-slate-700 bg-slate-50 font-medium" placeholder="Nombre completo..." />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Cédula:</label>
+                        <input type="number" value={cedulaRecibePendiente} onChange={(e) => setCedulaRecibePendiente(e.target.value)} required className="w-full border border-slate-200 p-2.5 rounded-lg focus:border-blue-500 outline-none text-slate-700 bg-slate-50 font-medium" placeholder="123456789..." />
+                      </div>
+                    </div>
+                  </div>
                   
                   {/* Bloque Firma */}
                   <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><PenTool size={14}/> Firma del Cliente (Obligatoria)</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2"><PenTool size={14}/> Firma de quien recibe (Obligatoria)</p>
                     
                     {!firmaSoporte ? (
                       <div className="flex flex-col items-center">

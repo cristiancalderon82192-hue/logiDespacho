@@ -97,6 +97,13 @@ const EntregadosBodega = () => {
           doc.setDrawColor(200, 200, 200);
           doc.rect(14, finalY + 5, 80, 40);
       } 
+
+      if (entrega.nombre_recibe || entrega.cedula_recibe) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(50, 50, 50);
+          doc.text(`Recibe: ${entrega.nombre_recibe || 'N/A'} - CC: ${entrega.cedula_recibe || 'N/A'}`, 14, finalY + 50);
+      }
       
       doc.save(`Soporte_Bodega_${entrega.factura_num}.pdf`);
     } catch (error) {
