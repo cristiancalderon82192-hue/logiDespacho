@@ -1,5 +1,7 @@
 const pdfParse = require('pdf-parse');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const extraerFactura = async (req, res) => {
   try {
@@ -7,8 +9,8 @@ const extraerFactura = async (req, res) => {
       return res.status(400).json({ error: 'No se ha subido ningún archivo PDF.' });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'Falta la GEMINI_API_KEY en el servidor.' });
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ error: 'Falta la GROQ_API_KEY en el servidor.' });
     }
 
     // 1. Extraer texto del PDF
@@ -72,15 +74,18 @@ ${pdfText}
 ----------------
 `;
 
-    // 3. Llamar a la IA (Gemini)
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-flash-latest",
-      generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+    // 3. Llamar a la IA (Groq)
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant that parses invoices and ALWAYS outputs valid JSON. Never output conversational text.' },
+        { role: 'user', content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
     });
 
-    const result = await model.generateContent(prompt);
-    const responseContent = result.response.text();
+    const responseContent = response.choices[0]?.message?.content;
     if (!responseContent) {
       throw new Error("La IA no devolvió contenido.");
     }
