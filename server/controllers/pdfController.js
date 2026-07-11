@@ -52,8 +52,8 @@ Estructura JSON requerida:
       "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
       "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. A menudo las cantidades aparecen todas agrupadas en un bloque de números pequeños (ej: 34, 52, 20, 5) que debes emparejar en orden secuencial con cada producto, igual que haces con los pesos y las descripciones.
       "unidad_medida": "und", // string (ej: mts2, Bul, Und, kg).
-      "precio_unitario": 0.0, // NÚMERO DECIMAL (Montos monetarios altos).
-      "precio_total": 0.0 // NÚMERO DECIMAL (Montos monetarios muy altos).
+      "precio_unitario": 0.0, // NÚMERO DECIMAL. Extrae ESTRICTAMENTE el valor literal de la columna 'Valor Und' (ej: 36.240,40 se convierte a 36240.40). No hagas cálculos.
+      "precio_total": 0.0 // NÚMERO DECIMAL. Extrae ESTRICTAMENTE el valor literal de la columna 'Valor Total' ubicada a la derecha del todo (ej: 1.213.328,59 se convierte a 1213328.59). No hagas cálculos.
     }
   ]
 }
@@ -62,7 +62,7 @@ Estructura JSON requerida:
 El extractor de PDF a veces NO lee fila por fila, sino VERTICALMENTE por bloques (todos los pesos juntos, luego todos los códigos, luego todas las descripciones, luego todas las CANTIDADES juntas, luego todas las unidades, etc.). 
 Por favor, usa la LÓGICA y el SENTIDO COMÚN para emparejar los datos secuencialmente por posición, sin importar el desorden: 1. CANTIDADES: ¡CUIDADO EXTREMO! La verdadera cantidad está en una columna separada llamada 'Cantidad', ubicada a la derecha de la descripción, junto a la columna 'Und' (ej: 33,48 mts2, 20 Bul, 45 Bul). REGLA DE ORO: ¡JAMÁS extraigas números que estén dentro del nombre del producto! (Si la descripción dice 'CJ 1.86 M2', 'X 25 KLS' o '2KG', esos números NO SON LA CANTIDAD, son el tamaño del empaque). Tampoco uses la columna '% Dcto' (2.00, 5.00). Busca exclusivamente el número de la columna Cantidad real.
 2. PESO: Suele ser un bloque de números sueltos (ej: 522,00 o 1.036,00) que NO tienen una unidad de medida pegada. ¡NUNCA confundas el peso con la cantidad, fíjate en el tamaño de los números y su posición!
-3. VALORES UNITARIOS Y TOTALES: Son los montos de dinero más grandes (ej: 36.240,40 o 1.213.328,59). ¡No los pongas como cantidades!
+3. VALORES UNITARIOS Y TOTALES: La columna 'Valor Und' corresponde al 'precio_unitario', y la columna final 'Valor Total' corresponde al 'precio_total'. Extrae ambos valores tal cual aparecen en el texto (sin comas de miles y con punto para decimales). ¡JAMÁS intentes calcular matemáticamente el precio unitario dividiendo o multiplicando, solo CÓPIALO literalmente de su respectiva columna!
 4. PORCENTAJES Y DESCUENTOS: Las facturas tienen columnas "% Dcto" o "% Iva" con números pequeños (2.00, 5.00, 19). Estos NO SON CANTIDADES. Ignóralos por completo.
 
 Haz un mapeo lógico y semántico (deduciendo qué es cada número por su tamaño y contexto) para construir los productos correctamente. Mapea el Peso a 'peso' y la Cantidad a 'cantidad'.
