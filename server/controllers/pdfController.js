@@ -70,7 +70,7 @@ ${pdfText}
     // 3. Llamar a la IA (Gemini)
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
     });
 
