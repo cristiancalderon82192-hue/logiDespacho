@@ -65,6 +65,7 @@ app.use('/api/assistant', require('./routes/assistantRoutes'));
 app.use('/api/test', require('./routes/testRoutes'));
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/pdf', pdfRoutes);
+app.use('/api', require('./routes/plantillasRoutes'));
 // ==============================================================
 // 4. CONFIGURACIÓN DE WEBSOCKETS (GPS EN TIEMPO REAL Y SESIONES)
 // ==============================================================

@@ -1,7 +1,5 @@
 const pdfParse = require('pdf-parse');
-const Groq = require('groq-sdk');
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const db = require('../db');
 
 const extraerFactura = async (req, res) => {
   try {
@@ -9,124 +7,126 @@ const extraerFactura = async (req, res) => {
       return res.status(400).json({ error: 'No se ha subido ningún archivo PDF.' });
     }
 
-    if (!process.env.GROQ_API_KEY) {
-      return res.status(500).json({ error: 'Falta la GROQ_API_KEY en el servidor.' });
-    }
-
     // 1. Extraer texto del PDF
     const dataBuffer = req.file.buffer;
     const pdfData = await pdfParse(dataBuffer);
-    let pdfText = pdfData.text;
-
-    // OCULTAR EL NIT DE LA EMPRESA EMISORA (Puntualito / Agropecuaria)
-    // Esto evita que la IA asuma que es el NIT del cliente
-    pdfText = pdfText.replace(/901\.?248\.?396([-\s]\d)?/g, "[NIT_EMISOR_IGNORAR]");
-    
-    // PREVENCIÓN DE ERROR JSON: Reemplazar comillas dobles en el texto (ej: 1/2") por 'pulg'
-    // para evitar que el modelo genere un JSON corrupto con comillas sin escapar.
-    pdfText = pdfText.replace(/"/g, ' pulg ');
+    const pdfText = pdfData.text;
 
     if (!pdfText || pdfText.trim() === '') {
       return res.status(400).json({ error: 'El PDF parece estar vacío o es una imagen sin texto.' });
     }
 
-    // 2. Definir el prompt pidiendo JSON estricto
-    const prompt = `Analiza el siguiente texto extraído de una factura comercial y extrae los datos correspondientes en formato JSON ESTRICTO.
-Solo debes devolver un objeto JSON válido, sin ningún texto adicional, sin formato de markdown (no uses \`\`\`json).
-Asegúrate de que todas las comillas dobles (") dentro de los valores de texto estén correctamente escapadas con barra invertida (\") para evitar romper el JSON.
+    // 2. Buscar plantilla aplicable en la BD
+    const [plantillas] = await db.query('SELECT * FROM plantillas_pdf');
+    const plantilla = plantillas.find(p => pdfText.includes(p.keyword_identificador));
 
-IMPORTANTE: Los números en el texto usan formato de moneda colombiano (punto '.' para miles y coma ',' para decimales. Ejemplo: 5.000,00 representa cinco mil. 714,00 representa setecientos catorce). Debes convertir TODOS los valores numéricos a formato decimal estándar de programación (sin separador de miles, y usando punto '.' para decimales. Ejemplo: 5000.0 y 714.0).
-
-Estructura JSON requerida:
-{
-  "id_factura": "Busca estrictamente el valor del campo 'Id Doc:' (ej: 1837048). Si no encuentras un Id Doc explícito, usa entonces el 'Número' de factura principal (ej: FAE 84950).",
-  "cliente": "Nombre del cliente COMPRADOR. Suele estar al lado de 'Señores:', 'Cliente:' o 'Facturar a:'. NUNCA uses el nombre del encabezado (Ej: DEPÓSITO Y CERÁMICAS EL RODEO), ya que ese es el vendedor.",
-  "nit_cliente": "NIT del cliente COMPRADOR. Suele estar cerca de 'Señores' o 'Nit:'. Devuelve el número exacto, ej: 900787714-2. Si no hay NIT del comprador, devuelve null.",
-  "telefono_cliente": "Teléfono del cliente (si aparece cerca del bloque de Señores/Cliente)",
-  "valor_factura": 150000.0, // NÚMERO DECIMAL. Valor total a pagar. EXCEPCIÓN IMPORTANTE: El campo 'Total a Pagar' suele estar en formato americano (con comas para miles y punto para decimales, ej: $6,396,365.00). Extrae este número correctamente eliminando las comas de miles. (En el ejemplo sería 6396365.0).
-  "productos": [
-    {
-      "codigo_producto": "código (si lo hay)",
-      "descripcion": "nombre exacto del producto",
-      "peso": 0.0, // NÚMERO DECIMAL, en Kg. ¡IMPORTANTE! Revisa con extremo cuidado la columna 'Peso' (suele ser la primera columna a la izquierda de cada fila de producto). Asocia correctamente el peso a cada ítem en el orden exacto en que aparecen. Si la fila dice '20,00', extrae 20.0. No asumas 0 a menos que explícitamente diga 0,00 o esté vacía.
-      "bodega_id": 1, // NÚMERO (1 al 8). Extrae el número de la columna Bod. Ejemplo: Bodega B1 -> 1. Si no especifica, usa 1.
-      "cantidad": 1.0, // NÚMERO DECIMAL. Extrae la cantidad exacta. A menudo las cantidades aparecen todas agrupadas en un bloque de números pequeños (ej: 34, 52, 20, 5) que debes emparejar en orden secuencial con cada producto, igual que haces con los pesos y las descripciones.
-      "unidad_medida": "und", // string (ej: mts2, Bul, Und, kg).
-      "precio_unitario": 0.0, // NÚMERO DECIMAL. Extrae ESTRICTAMENTE el valor literal de la columna 'Valor Und' (ej: 36.240,40 se convierte a 36240.40). No hagas cálculos.
-      "precio_total": 0.0 // NÚMERO DECIMAL. Extrae ESTRICTAMENTE el valor literal de la columna 'Valor Total' ubicada a la derecha del todo (ej: 1.213.328,59 se convierte a 1213328.59). No hagas cálculos.
-    }
-  ]
-}
-
-¡CRÍTICO - CÓMO LEER EL TEXTO!
-El extractor de PDF a veces NO lee fila por fila, sino VERTICALMENTE por bloques (todos los pesos juntos, luego todos los códigos, luego todas las descripciones, luego todas las CANTIDADES juntas, luego todas las unidades, etc.). 
-Por favor, usa la LÓGICA y el SENTIDO COMÚN para emparejar los datos secuencialmente por posición, sin importar el desorden: 1. CANTIDADES: ¡CUIDADO EXTREMO! La verdadera cantidad está en una columna separada llamada 'Cantidad', ubicada a la derecha de la descripción, junto a la columna 'Und' (ej: 33,48 mts2, 20 Bul, 45 Bul). REGLA DE ORO: ¡JAMÁS extraigas números que estén dentro del nombre del producto! (Si la descripción dice 'CJ 1.86 M2', 'X 25 KLS' o '2KG', esos números NO SON LA CANTIDAD, son el tamaño del empaque). Tampoco uses la columna '% Dcto' (2.00, 5.00). Busca exclusivamente el número de la columna Cantidad real.
-2. PESO: Suele ser un bloque de números sueltos (ej: 522,00 o 1.036,00) que NO tienen una unidad de medida pegada. ¡NUNCA confundas el peso con la cantidad, fíjate en el tamaño de los números y su posición!
-3. VALORES UNITARIOS Y TOTALES: La columna 'Valor Und' corresponde al 'precio_unitario', y la columna final 'Valor Total' corresponde al 'precio_total'. Extrae ambos valores tal cual aparecen en el texto (sin comas de miles y con punto para decimales). ¡JAMÁS intentes calcular matemáticamente el precio unitario dividiendo o multiplicando, solo CÓPIALO literalmente de su respectiva columna!
-4. PORCENTAJES Y DESCUENTOS: Las facturas tienen columnas "% Dcto" o "% Iva" con números pequeños (2.00, 5.00, 19). Estos NO SON CANTIDADES. Ignóralos por completo.
-
-Haz un mapeo lógico y semántico (deduciendo qué es cada número por su tamaño y contexto) para construir los productos correctamente. Mapea el Peso a 'peso' y la Cantidad a 'cantidad'.
-
-Texto de la factura:
-----------------
-${pdfText}
-----------------
-`;
-
-    // 3. Llamar a la IA (Groq)
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant that parses invoices and ALWAYS outputs valid JSON. Never output conversational text.' },
-        { role: 'user', content: prompt }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1,
-    });
-
-    const responseContent = response.choices[0]?.message?.content;
-    if (!responseContent) {
-      throw new Error("La IA no devolvió contenido.");
+    if (!plantilla) {
+      return res.status(404).json({ error: 'Formato desconocido: No existe una plantilla de extracción configurada para este formato de PDF.' });
     }
 
-    let cleanResponse = responseContent.trim();
-    // Remover markdown si la IA lo incluyó
-    if (cleanResponse.startsWith('```json')) {
-      cleanResponse = cleanResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-    } else if (cleanResponse.startsWith('```')) {
-      cleanResponse = cleanResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
-    }
-
-    let parsedData;
-    try {
-      parsedData = JSON.parse(cleanResponse);
-    } catch (parseError) {
-      console.error("Error original parsing JSON:", parseError);
+    // 3. Función auxiliar para extraer campo simple
+    const extractField = (regexStr, text) => {
+      if (!regexStr || regexStr.trim() === '') return null;
       try {
-        const { jsonrepair } = require('jsonrepair');
-        const repaired = jsonrepair(cleanResponse);
-        parsedData = JSON.parse(repaired);
-      } catch (repairError) {
-        console.error("Fallo también jsonrepair:", repairError);
-        throw new Error("El modelo generó un JSON inválido y no se pudo reparar automáticamente.");
+        const regex = new RegExp(regexStr, 'im'); // 'm' for multiline just in case
+        const match = text.match(regex);
+        return match ? (match[1] !== undefined ? match[1] : match[0]).trim() : null;
+      } catch (e) {
+        console.error('Error evaluando regex simple:', regexStr, e);
+        return null;
       }
-    }
-    if (!parsedData.productos || !Array.isArray(parsedData.productos)) {
-      parsedData.productos = [];
+    };
+
+    // Función auxiliar para extraer lista (vertical)
+    const extractList = (regexStr, text) => {
+      if (!regexStr || regexStr.trim() === '') return [];
+      try {
+        const regex = new RegExp(regexStr, 'gim');
+        const matches = [...text.matchAll(regex)];
+        // Retornar el grupo de captura 1 si existe, si no, todo el match
+        return matches.map(m => (m[1] !== undefined ? m[1] : m[0]).trim());
+      } catch (e) {
+        console.error('Error evaluando regex de lista:', regexStr, e);
+        return [];
+      }
+    };
+
+    // 4. Extraer campos principales
+    const id_factura = extractField(plantilla.regex_id_factura, pdfText) || null;
+    const cliente = extractField(plantilla.regex_cliente, pdfText) || null;
+    const nit_cliente = extractField(plantilla.regex_nit_cliente, pdfText) || null;
+    const telefono_cliente = extractField(plantilla.regex_telefono_cliente, pdfText) || null;
+    const valor_factura_str = extractField(plantilla.regex_valor_factura, pdfText) || null;
+    
+    // Limpieza de formato número
+    // Reemplaza posibles comas de miles y puntos decimales
+    let valor_factura = 0;
+    if (valor_factura_str) {
+      // Si tiene punto de miles y coma de decimales (1.000,50)
+      let cleanVal = valor_factura_str.replace(/\./g, '').replace(/,/g, '.');
+      // Si tiene coma de miles y punto decimal (1,000.50), arriba quedaría '1000.50' (pues quitó coma). 
+      // Por seguridad matemática básica en Colombia asumimos 1.000,50:
+      valor_factura = parseFloat(cleanVal) || 0;
     }
 
-    parsedData.productos = parsedData.productos.map(p => ({
-      ...p,
-      peso: Number(p.peso) || 0,
-      bodega_id: Number(p.bodega_id) || 1, // Default a 1 si la IA falla
-      unidad_medida: p.unidad_medida || 'und'
-    }));
+    // 5. Extraer arreglos de productos
+    const codigos = extractList(plantilla.regex_lista_codigos, pdfText);
+    const descripciones = extractList(plantilla.regex_lista_descripciones, pdfText);
+    const pesos = extractList(plantilla.regex_lista_pesos, pdfText);
+    const cantidades = extractList(plantilla.regex_lista_cantidades, pdfText);
+    const unidades = extractList(plantilla.regex_lista_unidades, pdfText);
+    const precios_unitarios = extractList(plantilla.regex_lista_precios_unitarios, pdfText);
+    const bodegas = extractList(plantilla.regex_lista_bodegas, pdfText);
+    const precios_totales = extractList(plantilla.regex_lista_precios_totales, pdfText);
+
+    // 6. Armar el objeto JSON de productos (usando descripciones como eje, o el maximo)
+    const productos = [];
+    const maxLen = Math.max(
+      descripciones.length, codigos.length, cantidades.length
+    );
+
+    for (let i = 0; i < maxLen; i++) {
+      let cantStr = cantidades[i] || '0';
+      let cantidad = parseFloat(cantStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+
+      let pesoStr = pesos[i] || '0';
+      let peso = parseFloat(pesoStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+
+      let puStr = precios_unitarios[i] || '0';
+      let precio_unitario = parseFloat(puStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+
+      let ptStr = precios_totales[i] || '0';
+      let precio_total = parseFloat(ptStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+
+      let bdStr = bodegas[i] || '1';
+      let bodega_id = parseInt(bdStr.replace(/\D/g, '')) || 1; 
+
+      productos.push({
+        codigo_producto: codigos[i] || "",
+        descripcion: descripciones[i] || "",
+        peso: peso,
+        bodega_id: bodega_id,
+        cantidad: cantidad,
+        unidad_medida: unidades[i] || "und",
+        precio_unitario: precio_unitario,
+        precio_total: precio_total
+      });
+    }
+
+    const parsedData = {
+      id_factura,
+      cliente,
+      nit_cliente,
+      telefono_cliente,
+      valor_factura,
+      productos
+    };
 
     return res.status(200).json(parsedData);
 
   } catch (error) {
-    console.error('Error procesando PDF:', error);
-    return res.status(500).json({ error: 'Error procesando el PDF con la IA: ' + error.message });
+    console.error('Error procesando PDF de forma nativa:', error);
+    return res.status(500).json({ error: 'Error procesando el PDF: ' + error.message });
   }
 };
 

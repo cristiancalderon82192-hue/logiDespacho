@@ -118,6 +118,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
     { path: '/zonas', icon: Map, label: 'Zonas', roles: ['admin'] },
     { path: '/destinos', icon: MapPin, label: 'Destinos', roles: ['admin'] },
     { path: '/tipos-documento', icon: FileStack, label: 'Tipos Doc.', roles: ['admin'] },
+    { path: '/plantillas-pdf', icon: FileStack, label: 'Plantillas PDF', roles: ['admin'] },
     // { path: '/whatsapp-config', icon: MessageCircle, label: 'WhatsApp Bot', roles: ['admin'] },
     { path: '/test-desempeno', icon: Activity, label: 'Test Desempeño', roles: ['admin'] }
   ];

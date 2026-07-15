@@ -18,6 +18,7 @@ import Zonas from './pages/Zonas';
 import Destinos from './pages/Destinos'; 
 import Flota from './pages/Flota';
 import TiposDocumento from './pages/TiposDocumentos'; 
+import PlantillasPDF from './pages/PlantillasPDF';
 
 // IMPORTACIONES DE REPORTES
 import ReporteProductividad from './pages/ReporteProductividad';
@@ -113,6 +114,7 @@ export default function App() {
           <Route path="/zonas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Zonas /></MainLayout></ProtectedRoute>} />
           <Route path="/destinos" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Destinos /></MainLayout></ProtectedRoute>} />
           <Route path="/tipos-documento" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><TiposDocumento /></MainLayout></ProtectedRoute>} />
+          <Route path="/plantillas-pdf" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><PlantillasPDF /></MainLayout></ProtectedRoute>} />
           <Route path="/usuarios/nuevo" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><RegisterUser /></MainLayout></ProtectedRoute>} />
           <Route path="/bodegas" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Bodegas /></MainLayout></ProtectedRoute>} />
           <Route path="/clientes" element={<ProtectedRoute allowedRoles={['admin', '1', 1]}><MainLayout><Clientes /></MainLayout></ProtectedRoute>} />
