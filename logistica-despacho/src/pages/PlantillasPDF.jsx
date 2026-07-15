@@ -10,6 +10,7 @@ export default function PlantillasPDF() {
   const [isEditing, setIsEditing] = useState(false);
   const [rawPdfText, setRawPdfText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+  const [activeField, setActiveField] = useState(null); // Para el Smart Highlighter
   
   const [formData, setFormData] = useState({
     id: null,
@@ -92,6 +93,7 @@ export default function PlantillasPDF() {
       regex_lista_pesos: '', regex_lista_precios_totales: ''
     });
     setIsEditing(false);
+    setActiveField(null);
   };
 
   const handleEdit = (plantilla) => {
@@ -156,7 +158,7 @@ export default function PlantillasPDF() {
     }
   };
 
-  // Live Tester Function
+  // Live Tester Text Function
   const testRegex = (regexStr, isList) => {
     if (!rawPdfText || !regexStr || regexStr.trim() === '') return null;
     try {
@@ -178,8 +180,74 @@ export default function PlantillasPDF() {
     }
   };
 
+  // Smart Highlighter Renderer
+  const renderHighlightedText = () => {
+    if (!rawPdfText) return null;
+    if (!activeField || !formData[activeField] || formData[activeField].trim() === '') {
+      return <pre className="text-[11px] font-mono leading-relaxed text-slate-300 whitespace-pre-wrap">{rawPdfText}</pre>;
+    }
+
+    try {
+      const isList = activeField.startsWith('regex_lista_');
+      const regexStr = formData[activeField];
+      const matches = [];
+      let match;
+      
+      if (isList) {
+        const globalRegex = new RegExp(regexStr, 'gim');
+        while ((match = globalRegex.exec(rawPdfText)) !== null) {
+          const fullMatch = match[0];
+          const capturedText = match[1] !== undefined ? match[1] : match[0];
+          const localIndex = fullMatch.indexOf(capturedText);
+          const absoluteIndex = match.index + (localIndex > -1 ? localIndex : 0);
+          
+          matches.push({ start: absoluteIndex, end: absoluteIndex + capturedText.length });
+          
+          if (globalRegex.lastIndex === match.index) {
+             globalRegex.lastIndex++;
+          }
+        }
+      } else {
+        const regex = new RegExp(regexStr, 'im');
+        match = rawPdfText.match(regex);
+        if (match) {
+          const fullMatch = match[0];
+          const capturedText = match[1] !== undefined ? match[1] : match[0];
+          const localIndex = fullMatch.indexOf(capturedText);
+          const absoluteIndex = match.index + (localIndex > -1 ? localIndex : 0);
+          matches.push({ start: absoluteIndex, end: absoluteIndex + capturedText.length });
+        }
+      }
+
+      if (matches.length === 0) {
+        return <pre className="text-[11px] font-mono leading-relaxed text-slate-300 whitespace-pre-wrap">{rawPdfText}</pre>;
+      }
+
+      // Build the highlighted string
+      let lastIndex = 0;
+      const nodes = [];
+      
+      matches.forEach((m, i) => {
+        if (m.start > lastIndex) {
+          nodes.push(<span key={`text-${i}`}>{rawPdfText.substring(lastIndex, m.start)}</span>);
+        }
+        nodes.push(<mark key={`mark-${i}`} className="bg-yellow-300 text-black px-0.5 rounded shadow-sm font-bold">{rawPdfText.substring(m.start, m.end)}</mark>);
+        lastIndex = m.end;
+      });
+      
+      if (lastIndex < rawPdfText.length) {
+        nodes.push(<span key={`text-end`}>{rawPdfText.substring(lastIndex)}</span>);
+      }
+
+      return <pre className="text-[11px] font-mono leading-relaxed text-slate-300 whitespace-pre-wrap">{nodes}</pre>;
+
+    } catch (e) {
+      return <pre className="text-[11px] font-mono leading-relaxed text-slate-300 whitespace-pre-wrap">{rawPdfText}</pre>;
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-[#47B3A8]/10 rounded-xl">
@@ -217,27 +285,27 @@ export default function PlantillasPDF() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 font-bold">ID Factura</label>
-                  <input name="regex_id_factura" value={formData.regex_id_factura} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_id_factura" value={formData.regex_id_factura} onChange={handleInputChange} onFocus={() => setActiveField('regex_id_factura')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_id_factura, false)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Cliente</label>
-                  <input name="regex_cliente" value={formData.regex_cliente} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_cliente" value={formData.regex_cliente} onChange={handleInputChange} onFocus={() => setActiveField('regex_cliente')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_cliente, false)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">NIT Cliente</label>
-                  <input name="regex_nit_cliente" value={formData.regex_nit_cliente} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_nit_cliente" value={formData.regex_nit_cliente} onChange={handleInputChange} onFocus={() => setActiveField('regex_nit_cliente')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_nit_cliente, false)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Teléfono Cliente</label>
-                  <input name="regex_telefono_cliente" value={formData.regex_telefono_cliente} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_telefono_cliente" value={formData.regex_telefono_cliente} onChange={handleInputChange} onFocus={() => setActiveField('regex_telefono_cliente')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_telefono_cliente, false)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Valor Factura</label>
-                  <input name="regex_valor_factura" value={formData.regex_valor_factura} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_valor_factura" value={formData.regex_valor_factura} onChange={handleInputChange} onFocus={() => setActiveField('regex_valor_factura')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_valor_factura, false)}</div>
                 </div>
               </div>
@@ -247,42 +315,42 @@ export default function PlantillasPDF() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Códigos</label>
-                  <input name="regex_lista_codigos" value={formData.regex_lista_codigos} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_codigos" value={formData.regex_lista_codigos} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_codigos')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_codigos, true)}</div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-500 font-bold">Descripciones</label>
-                  <input name="regex_lista_descripciones" value={formData.regex_lista_descripciones} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_descripciones" value={formData.regex_lista_descripciones} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_descripciones')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_descripciones, true)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Cantidades</label>
-                  <input name="regex_lista_cantidades" value={formData.regex_lista_cantidades} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_cantidades" value={formData.regex_lista_cantidades} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_cantidades')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_cantidades, true)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Unidades</label>
-                  <input name="regex_lista_unidades" value={formData.regex_lista_unidades} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_unidades" value={formData.regex_lista_unidades} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_unidades')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_unidades, true)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Bodegas</label>
-                  <input name="regex_lista_bodegas" value={formData.regex_lista_bodegas} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_bodegas" value={formData.regex_lista_bodegas} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_bodegas')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_bodegas, true)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">Pesos (kg)</label>
-                  <input name="regex_lista_pesos" value={formData.regex_lista_pesos} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_pesos" value={formData.regex_lista_pesos} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_pesos')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_pesos, true)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">V/Unitarios</label>
-                  <input name="regex_lista_precios_unitarios" value={formData.regex_lista_precios_unitarios} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_precios_unitarios" value={formData.regex_lista_precios_unitarios} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_precios_unitarios')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_precios_unitarios, true)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 font-bold">V/Totales</label>
-                  <input name="regex_lista_precios_totales" value={formData.regex_lista_precios_totales} onChange={handleInputChange} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50" />
+                  <input name="regex_lista_precios_totales" value={formData.regex_lista_precios_totales} onChange={handleInputChange} onFocus={() => setActiveField('regex_lista_precios_totales')} onBlur={() => setActiveField(null)} className="w-full mt-1 px-3 py-1.5 border rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-[#47B3A8] outline-none" />
                   <div className="text-[10px] mt-1 h-3">{testRegex(formData.regex_lista_precios_totales, true)}</div>
                 </div>
               </div>
@@ -328,12 +396,12 @@ export default function PlantillasPDF() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: PLAYGROUND */}
+        {/* COLUMNA DERECHA: PLAYGROUND INTERACTIVO */}
         <div className="lg:col-span-5 flex flex-col space-y-4">
-          <div className="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-4 text-white flex flex-col h-full min-h-[600px]">
+          <div className="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-4 text-white flex flex-col h-full min-h-[600px] sticky top-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="font-bold text-lg flex items-center gap-2">
-                <CheckCircle className="text-green-400" size={20} /> PDF de Muestra
+                <CheckCircle className="text-green-400" size={20} /> Smart Highlighter
               </h2>
               
               <label className="cursor-pointer bg-[#47B3A8] hover:bg-[#3d9c92] transition-colors text-white text-sm font-bold py-2 px-4 rounded-xl flex items-center gap-2">
@@ -347,12 +415,10 @@ export default function PlantillasPDF() {
               {!rawPdfText ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600 p-6 text-center">
                   <FileStack size={48} className="mb-4 opacity-20" />
-                  <p className="text-sm">Sube un PDF de muestra para ver cómo lo procesa el extractor y validar tus Regex en tiempo real.</p>
+                  <p className="text-sm">Sube un PDF y haz clic en cualquier campo para empezar a resaltar mágicamente la información.</p>
                 </div>
               ) : (
-                <pre className="text-[11px] font-mono leading-relaxed text-slate-300 whitespace-pre-wrap">
-                  {rawPdfText}
-                </pre>
+                renderHighlightedText()
               )}
             </div>
           </div>
