@@ -106,3 +106,19 @@ exports.deletePlantilla = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar plantilla' });
   }
 };
+
+const pdfParse = require('pdf-parse');
+
+exports.extraerTextoMuestra = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se ha subido ningún archivo PDF.' });
+    }
+    const dataBuffer = req.file.buffer;
+    const pdfData = await pdfParse(dataBuffer);
+    return res.status(200).json({ text: pdfData.text });
+  } catch (error) {
+    console.error('Error extrayendo texto del PDF de muestra:', error);
+    return res.status(500).json({ error: 'Error al leer el PDF de muestra' });
+  }
+};
