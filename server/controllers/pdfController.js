@@ -24,31 +24,53 @@ const extraerFactura = async (req, res) => {
       return res.status(404).json({ error: 'Formato desconocido: No existe una plantilla de extracción configurada para este formato de PDF.' });
     }
 
-    // 3. Función auxiliar para extraer campo simple
+    // 3. Funciones auxiliares para extraer
     const extractField = (regexStr, text) => {
       if (!regexStr || regexStr.trim() === '') return null;
       try {
-        const regex = new RegExp(regexStr, 'im'); // 'm' for multiline just in case
+        const regex = new RegExp(regexStr, 'im');
         const match = text.match(regex);
         return match ? (match[1] !== undefined ? match[1] : match[0]).trim() : null;
       } catch (e) {
-        console.error('Error evaluando regex simple:', regexStr, e);
         return null;
       }
     };
 
-    // Función auxiliar para extraer lista (vertical)
     const extractList = (regexStr, text) => {
       if (!regexStr || regexStr.trim() === '') return [];
       try {
         const regex = new RegExp(regexStr, 'gim');
         const matches = [...text.matchAll(regex)];
-        // Retornar el grupo de captura 1 si existe, si no, todo el match
         return matches.map(m => (m[1] !== undefined ? m[1] : m[0]).trim());
       } catch (e) {
-        console.error('Error evaluando regex de lista:', regexStr, e);
         return [];
       }
+    };
+
+    // Función inteligente para parsear números en formato americano (1,000.50) y colombiano (1.000,50)
+    const parseNumber = (numStr) => {
+      if (!numStr) return 0;
+      let str = String(numStr).trim();
+      const lastComma = str.lastIndexOf(',');
+      const lastPeriod = str.lastIndexOf('.');
+      
+      if (lastComma > lastPeriod) {
+        // Formato Colombiano: 1.234,50
+        str = str.replace(/\./g, '').replace(',', '.');
+      } else if (lastPeriod > lastComma) {
+        // Formato Americano: 1,234.50
+        // Ojo: si es 1.000 sin decimales, el código fallará si asume americano. 
+        // Validamos si el punto separa 3 ceros al final.
+        if (lastComma === -1 && str.length - lastPeriod - 1 === 3) {
+          str = str.replace(/\./g, ''); // Era un separador de miles colombiano
+        } else {
+          str = str.replace(/,/g, ''); // Americano
+        }
+      } else {
+        // Sin separadores de ambos tipos. Si tiene coma (ej: 1,000), asumimos que era separador de miles.
+        str = str.replace(/,/g, '');
+      }
+      return parseFloat(str) || 0;
     };
 
     // 4. Extraer campos principales
@@ -58,16 +80,7 @@ const extraerFactura = async (req, res) => {
     const telefono_cliente = extractField(plantilla.regex_telefono_cliente, pdfText) || null;
     const valor_factura_str = extractField(plantilla.regex_valor_factura, pdfText) || null;
     
-    // Limpieza de formato número
-    // Reemplaza posibles comas de miles y puntos decimales
-    let valor_factura = 0;
-    if (valor_factura_str) {
-      // Si tiene punto de miles y coma de decimales (1.000,50)
-      let cleanVal = valor_factura_str.replace(/\./g, '').replace(/,/g, '.');
-      // Si tiene coma de miles y punto decimal (1,000.50), arriba quedaría '1000.50' (pues quitó coma). 
-      // Por seguridad matemática básica en Colombia asumimos 1.000,50:
-      valor_factura = parseFloat(cleanVal) || 0;
-    }
+    let valor_factura = parseNumber(valor_factura_str);
 
     // 5. Extraer arreglos de productos
     const codigos = extractList(plantilla.regex_lista_codigos, pdfText);
@@ -79,24 +92,17 @@ const extraerFactura = async (req, res) => {
     const bodegas = extractList(plantilla.regex_lista_bodegas, pdfText);
     const precios_totales = extractList(plantilla.regex_lista_precios_totales, pdfText);
 
-    // 6. Armar el objeto JSON de productos (usando descripciones como eje, o el maximo)
+    // 6. Armar el objeto JSON de productos
     const productos = [];
     const maxLen = Math.max(
       descripciones.length, codigos.length, cantidades.length
     );
 
     for (let i = 0; i < maxLen; i++) {
-      let cantStr = cantidades[i] || '0';
-      let cantidad = parseFloat(cantStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
-
-      let pesoStr = pesos[i] || '0';
-      let peso = parseFloat(pesoStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
-
-      let puStr = precios_unitarios[i] || '0';
-      let precio_unitario = parseFloat(puStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
-
-      let ptStr = precios_totales[i] || '0';
-      let precio_total = parseFloat(ptStr.replace(/\./g, '').replace(/,/g, '.')) || 0;
+      let cantidad = parseNumber(cantidades[i]);
+      let peso = parseNumber(pesos[i]);
+      let precio_unitario = parseNumber(precios_unitarios[i]);
+      let precio_total = parseNumber(precios_totales[i]);
 
       let bdStr = bodegas[i] || '1';
       let bodega_id = parseInt(bdStr.replace(/\D/g, '')) || 1; 
