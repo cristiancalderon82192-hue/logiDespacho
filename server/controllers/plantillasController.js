@@ -2,6 +2,29 @@ const db = require('../db');
 
 exports.getPlantillas = async (req, res) => {
   try {
+    // AUTO-MIGRACIÓN: Si la base de datos de Render es distinta a la local, esto creará la tabla automáticamente
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS plantillas_pdf (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre_empresa VARCHAR(255) NOT NULL,
+        keyword_identificador VARCHAR(255) NOT NULL,
+        regex_id_factura TEXT,
+        regex_cliente TEXT,
+        regex_nit_cliente TEXT,
+        regex_telefono_cliente TEXT,
+        regex_valor_factura TEXT,
+        regex_lista_codigos TEXT,
+        regex_lista_descripciones TEXT,
+        regex_lista_cantidades TEXT,
+        regex_lista_unidades TEXT,
+        regex_lista_precios_unitarios TEXT,
+        regex_lista_bodegas TEXT,
+        regex_lista_pesos TEXT,
+        regex_lista_precios_totales TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const [rows] = await db.query('SELECT * FROM plantillas_pdf ORDER BY created_at DESC');
     res.json(rows);
   } catch (error) {
