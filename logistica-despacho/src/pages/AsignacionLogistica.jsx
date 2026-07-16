@@ -797,6 +797,7 @@ const AsignacionLogistica = () => {
                                           <td className="p-2">
                                             <input 
                                               type="number" 
+                                              step="0.01"
                                               min="0" 
                                               max={prod.cantidad} 
                                               value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} 
@@ -950,6 +951,7 @@ const AsignacionLogistica = () => {
                                   <td className="p-2">
                                     <input 
                                       type="number" 
+                                      step="0.01"
                                       min="0" 
                                       max={prod.cantidad} 
                                       value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} 
