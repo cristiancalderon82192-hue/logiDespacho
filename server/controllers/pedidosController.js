@@ -341,7 +341,8 @@ const actualizarPedido = async (req, res) => {
       UPDATE pedidos SET 
         id_factura=?, tipo_documento_id=?, prioridad=?, 
         valor_factura=?, fecha_facturacion=?, fecha_promesa=?, fecha_agendada=?, hora_registro=?, 
-        nota_manual=?, destino_id=?, cliente_id=?, estado_entrega=?
+        nota_manual=?, destino_id=?, cliente_id=?, estado_entrega=?,
+        deja_en_bodega=?, bodega_acopio_id=?, punto_venta_origen_id=?
       WHERE id=?
     `;
     
@@ -350,7 +351,11 @@ const actualizarPedido = async (req, res) => {
       data.valor_factura || 0, data.fecha_facturacion, data.fecha_promesa, 
       data.fecha_agendada || null, 
       data.hora_registro, data.nota_manual, 
-      destinoId, cliente_id, data.estado_entrega || estadoAntiguo, id
+      destinoId, cliente_id, data.estado_entrega || estadoAntiguo,
+      data.deja_en_bodega ? 1 : 0,
+      data.deja_en_bodega ? (data.bodega_acopio_id || 1) : null,
+      data.deja_en_bodega ? 1 : null, // Defaulting punto_venta_origen_id to 1 (Main branch)
+      id
     ]);
 
     await db.query("DELETE FROM pedidos_detalle WHERE pedido_id = ?", [id]);
