@@ -110,6 +110,7 @@ const AsignacionLogistica = () => {
           faltantes.push(`${p.cantidad - p.cantidad_despachada}x ${p.descripcion}`);
         }
       });
+      nuevoValor = parseFloat(nuevoValor.toFixed(2));
       
       const observaciones = faltantes.length > 0 ? `FALTAN: ${faltantes.join(', ')}` : '';
       
@@ -139,6 +140,7 @@ const AsignacionLogistica = () => {
           faltantes.push(`${p.cantidad - p.cantidad_despachada}x ${p.descripcion}`);
         }
       });
+      nuevoValor = parseFloat(nuevoValor.toFixed(2));
       
       const observaciones = faltantes.length > 0 ? `FALTAN: ${faltantes.join(', ')}` : '';
       
