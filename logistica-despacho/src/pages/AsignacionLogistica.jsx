@@ -885,7 +885,7 @@ const AsignacionLogistica = () => {
                     <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">VALOR A DESPACHAR</label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold pointer-events-none">$</span>
-                      <input type="number" step="0.01" min="0" max={pedidoIndividual.valor_factura || ''} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white" required />
+                      <input type="number" step="0.01" min="0" max={pedidoIndividual.valor_factura || ''} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} disabled={pedidoIndividual.estado_entrega === 'Asignado'} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white disabled:bg-slate-100 disabled:text-slate-500" required />
                     </div>
                   </div>
 
@@ -956,7 +956,8 @@ const AsignacionLogistica = () => {
                                       max={prod.cantidad} 
                                       value={prod.cantidad_despachada !== undefined ? prod.cantidad_despachada : prod.cantidad} 
                                       onChange={(e) => handleProductoIndividualChange(prod.id, e.target.value)} 
-                                      className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8]" 
+                                      disabled={pedidoIndividual.estado_entrega === 'Asignado'}
+                                      className="w-full border border-slate-300 rounded p-1 text-center font-bold text-blue-600 outline-none focus:border-[#47B3A8] disabled:bg-slate-100 disabled:text-slate-400" 
                                     />
                                   </td>
                                 </tr>
