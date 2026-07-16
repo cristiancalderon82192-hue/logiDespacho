@@ -940,8 +940,8 @@ const AsignacionLogistica = () => {
                                   <td className="p-2 text-center text-orange-600 font-bold">{prod.cantidad_retirada_cliente || 0}</td>
                                   <td className="p-2 text-center text-blue-600 font-bold">{prod.cantidad}</td>
                                   <td className="p-2 text-center text-slate-500">{prod.unidad_medida}</td>
-                                  <td className="p-2 text-right">${Number(prod.vr_unitario || 0).toLocaleString()}</td>
-                                  <td className="p-2 text-right font-medium">${Number(prod.vr_total || 0).toLocaleString()}</td>
+                                  <td className="p-2 text-right">${Number(prod.precio_unitario || 0).toLocaleString()}</td>
+                                  <td className="p-2 text-right font-medium">${Number(prod.precio_total || 0).toLocaleString()}</td>
                                   <td className="p-2 text-center whitespace-nowrap">
                                     <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
                                       {prod.bodega_nombre || (prod.bodega_id ? `B${prod.bodega_id}` : 'N/A')}
