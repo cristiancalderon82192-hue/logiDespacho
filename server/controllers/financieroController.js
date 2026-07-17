@@ -28,7 +28,14 @@ const getReporteFinanciero = async (req, res) => {
           (SELECT SUM(ppd.cantidad_retirada_cliente * ppd.precio_unitario) 
            FROM pedidos_productos_detalle ppd 
            WHERE ppd.pedido_id = p.id), 
-        0) AS valor_mostrador
+        0) AS valor_mostrador,
+
+        -- Documento mostrador generado
+        CASE 
+          WHEN COALESCE((SELECT SUM(ppd.cantidad_retirada_cliente * ppd.precio_unitario) FROM pedidos_productos_detalle ppd WHERE ppd.pedido_id = p.id), 0) > 0 
+          THEN CONCAT(COALESCE(p.id_factura, 'SM'), '-MOST-', p.id)
+          ELSE NULL 
+        END AS doc_mostrador
         
         -- Nota: El "saldo_pendiente" ya no lo calculamos aquí porque React lo 
         -- calcula automáticamente sumando los viajes de la misma factura.

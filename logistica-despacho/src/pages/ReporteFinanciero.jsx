@@ -82,6 +82,9 @@ const ReporteFinanciero = () => {
           }
 
           if (!facturasMap[idFacBase]) {
+            const asocs = new Set([idFacRaw]);
+            if (fila.doc_mostrador) asocs.add(fila.doc_mostrador);
+
             facturasMap[idFacBase] = {
               ...fila,
               id_factura_base: idFacBase,
@@ -90,7 +93,7 @@ const ReporteFinanciero = () => {
               valor_recaudado_cruzado: fila.valRec,
               viajes_count: 1,
               conductores_historial: new Set(fila.conductor ? [fila.conductor] : []),
-              facturas_asociadas: new Set([idFacRaw]) 
+              facturas_asociadas: asocs 
             };
           } else {
             if (fila.valFac > 0) {
@@ -104,6 +107,7 @@ const ReporteFinanciero = () => {
             
             if (fila.conductor) facturasMap[idFacBase].conductores_historial.add(fila.conductor);
             facturasMap[idFacBase].facturas_asociadas.add(idFacRaw);
+            if (fila.doc_mostrador) facturasMap[idFacBase].facturas_asociadas.add(fila.doc_mostrador);
           }
         });
 

@@ -155,8 +155,8 @@ const crearPedido = async (req, res) => {
       
       const [masterRes] = await db.query(`
         INSERT INTO bodega_pendientes 
-        (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, notas) 
-        VALUES (?, ?, ?, ?, ?, 'Inmediata', ?, ?)
+        (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, notas, usuario_id) 
+        VALUES (?, ?, ?, ?, ?, 'Inmediata', ?, ?, ?)
       `, [
         data.fecha_facturacion || new Date().toISOString().split('T')[0],
         facturaMostrador,
@@ -164,7 +164,8 @@ const crearPedido = async (req, res) => {
         cliente_id,
         data.fecha_promesa || new Date().toISOString().split('T')[0],
         valorRetirado,
-        notasBodega
+        notasBodega,
+        finalUsuarioId
       ]);
 
       const pendienteId = masterRes.insertId;
@@ -469,11 +470,12 @@ const actualizarPedido = async (req, res) => {
       // Calcular el valor total de lo retirado
       const valorRetirado = productosRetirados.reduce((acc, p) => acc + (p.cantidad_retirada * (p.precio_unitario || 0)), 0);
       const notasBodega = `Retiro en mostrador generado desde el domicilio ${data.id_factura}`;
+      let finalUsuarioId = data.usuario_id || 1;
       
       const [masterRes] = await db.query(`
         INSERT INTO bodega_pendientes 
-        (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, notas) 
-        VALUES (?, ?, ?, ?, ?, 'Inmediata', ?, ?)
+        (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, notas, usuario_id) 
+        VALUES (?, ?, ?, ?, ?, 'Inmediata', ?, ?, ?)
       `, [
         data.fecha_facturacion || new Date().toISOString().split('T')[0],
         facturaMostrador,
@@ -481,7 +483,8 @@ const actualizarPedido = async (req, res) => {
         cliente_id,
         data.fecha_promesa || new Date().toISOString().split('T')[0],
         valorRetirado,
-        notasBodega
+        notasBodega,
+        finalUsuarioId
       ]);
 
       const pendienteId = masterRes.insertId;
