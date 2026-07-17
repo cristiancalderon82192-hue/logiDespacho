@@ -36,7 +36,41 @@ const getReporteParciales = async (req, res) => {
     res.status(500).json({ message: "Error interno al generar el reporte" });
   }
 };
+const deleteGrupoParciales = async (req, res) => {
+  try {
+    const { facturaBase } = req.params;
+    
+    // Buscar todos los pendiente_id asociados a esta factura base y sus sufijos
+    const [rows] = await pool.query(
+      "SELECT pendiente_id FROM bodega_entregas_historial WHERE factura_num LIKE ?", 
+      [`${facturaBase}%`]
+    );
+    
+    const pendientesIds = rows.map(r => r.pendiente_id).filter(id => id !== null);
+
+    // Borrar de bodega_entregas_historial
+    await pool.query(
+      "DELETE FROM bodega_entregas_historial WHERE factura_num LIKE ?", 
+      [`${facturaBase}%`]
+    );
+
+    // Borrar de pendientes_detalle y pendientes
+    if (pendientesIds.length > 0) {
+      await pool.query("DELETE FROM bodega_pendientes_detalle WHERE pendiente_id IN (?)", [pendientesIds]);
+      await pool.query("DELETE FROM bodega_pendientes WHERE id IN (?)", [pendientesIds]);
+    }
+    
+    const io = req.app.get('socketio');
+    if (io) io.emit('actualizacion_bodega');
+
+    res.json({ message: "Grupo de facturas eliminado correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar grupo de parciales:", error);
+    res.status(500).json({ message: "Error interno al eliminar registros" });
+  }
+};
 
 module.exports = {
-  getReporteParciales
+  getReporteParciales,
+  deleteGrupoParciales
 };

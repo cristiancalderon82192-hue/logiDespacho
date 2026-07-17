@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Calendar, FileText, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import { Package, Search, Calendar, FileText, Link as LinkIcon, RefreshCw, Trash2 } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
+import { useAuth } from '../context/AuthContext';
 
 const ReporteBodegaParciales = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.rol === 'Super Admin' || user?.rol === 'Admin';
+
   const obtenerFechaLocal = () => {
     const fecha = new Date();
     const año = fecha.getFullYear();
@@ -43,6 +47,24 @@ const ReporteBodegaParciales = () => {
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         setCargando(false);
       }
+    }
+  };
+
+  const eliminarGrupo = async (facturaBase) => {
+    if (!window.confirm(`¿Estás seguro de eliminar TODO el historial de la factura ${facturaBase}? Esta acción borrará todas las entregas parciales y de mostrador asociadas y no se puede deshacer.`)) return;
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/reportes/parciales/${facturaBase}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setReporte(reporte.filter(r => r.factura_base !== facturaBase));
+      } else {
+        alert("Error al eliminar el grupo de facturas.");
+      }
+    } catch (error) {
+      console.error("Error eliminando grupo:", error);
+      alert("Error de red al intentar eliminar.");
     }
   };
 
@@ -107,16 +129,17 @@ const ReporteBodegaParciales = () => {
                 <th className="p-4">Factura Original</th>
                 <th className="p-4">Cliente y Origen</th>
                 <th className="p-4">Creado Por</th>
-                <th className="p-4 text-center">Total Entregas</th>
+                <th className="p-4">Total Entregas</th>
                 <th className="p-4">Traza de Facturas (Consecutivos)</th>
                 <th className="p-4">Última Entrega</th>
+                {isAdmin && <th className="p-4 text-center">Acciones</th>}
               </tr>
             </thead>
             <tbody className="text-sm text-slate-700">
               {cargando ? (
-                <tr><td colSpan="6" className="p-8 text-center text-slate-400">Cargando datos...</td></tr>
+                <tr><td colSpan={isAdmin ? "7" : "6"} className="p-8 text-center text-slate-400">Cargando datos...</td></tr>
               ) : reporteFiltrado.length === 0 ? (
-                <tr><td colSpan="6" className="p-8 text-center text-slate-400">No se encontraron registros vinculados.</td></tr>
+                <tr><td colSpan={isAdmin ? "7" : "6"} className="p-8 text-center text-slate-400">No se encontraron registros vinculados.</td></tr>
               ) : (
                 reporteFiltrado.map((r, idx) => (
                   <tr key={idx} className="border-b hover:bg-slate-50 transition-colors">
@@ -155,6 +178,13 @@ const ReporteBodegaParciales = () => {
                         {r.ultima_entrega ? new Date(r.ultima_entrega).toLocaleString() : 'N/A'}
                       </span>
                     </td>
+                    {isAdmin && (
+                      <td className="p-4 text-center">
+                        <button onClick={() => eliminarGrupo(r.factura_base)} className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 p-2 rounded-lg transition-colors shadow-sm inline-flex justify-center items-center" title="Eliminar todo el grupo">
+                          <Trash2 size={16}/>
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
