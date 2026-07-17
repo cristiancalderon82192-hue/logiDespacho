@@ -406,53 +406,62 @@ const actualizarPedido = async (req, res) => {
     }
 
     // 👇 INTEGRACIÓN BODEGA PENDIENTES (RETIRO MOSTRADOR) 👇
-    if (productosRetirados.length > 0) {
-      const facturaMostrador = `${data.id_factura}-MOST`;
-      const [existePendiente] = await db.query("SELECT id FROM bodega_pendientes WHERE factura_num = ?", [facturaMostrador]);
+    const facturaMostrador = `${data.id_factura}-MOST`;
+    const [existePendiente] = await db.query("SELECT id, estado FROM bodega_pendientes WHERE factura_num = ?", [facturaMostrador]);
+    
+    // Si ya existía un registro y sigue 'Pendiente', lo eliminamos para recrearlo limpio (o borrarlo del todo si cancelaron el retiro)
+    if (existePendiente.length > 0 && existePendiente[0].estado === 'Pendiente') {
+      await db.query("DELETE FROM bodega_pendientes_detalle WHERE pendiente_id = ?", [existePendiente[0].id]);
+      await db.query("DELETE FROM bodega_pendientes WHERE id = ?", [existePendiente[0].id]);
+    }
+
+    // Si hay productos retirados, y el registro fue eliminado o nunca existió (o ya estaba entregado y no pudimos borrarlo)
+    if (productosRetirados.length > 0 && (existePendiente.length === 0 || existePendiente[0].estado === 'Pendiente')) {
+      // Calcular el valor total de lo retirado
+      const valorRetirado = productosRetirados.reduce((acc, p) => acc + (p.cantidad_retirada * (p.precio_unitario || 0)), 0);
+      const notasBodega = `Retiro en mostrador generado desde el domicilio ${data.id_factura}`;
       
-      if (existePendiente.length === 0) {
-        // Calcular el valor total de lo retirado
-        const valorRetirado = productosRetirados.reduce((acc, p) => acc + (p.cantidad_retirada * (p.precio_unitario || 0)), 0);
-        const notasBodega = `Retiro en mostrador generado desde el domicilio ${data.id_factura}`;
-        
-        const [masterRes] = await db.query(`
-          INSERT INTO bodega_pendientes 
-          (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, notas) 
-          VALUES (?, ?, ?, ?, ?, 'Inmediata', ?, ?)
+      const [masterRes] = await db.query(`
+        INSERT INTO bodega_pendientes 
+        (fecha_factura, factura_num, punto_venta_id, cliente_id, fecha_promesa, tipo_entrega, valor_factura, notas) 
+        VALUES (?, ?, ?, ?, ?, 'Inmediata', ?, ?)
+      `, [
+        data.fecha_facturacion || new Date().toISOString().split('T')[0],
+        facturaMostrador,
+        1, // Por defecto bodega principal o puedes usar destino
+        cliente_id,
+        data.fecha_promesa || new Date().toISOString().split('T')[0],
+        valorRetirado,
+        notasBodega
+      ]);
+
+      const pendienteId = masterRes.insertId;
+
+      for (const p of productosRetirados) {
+        await db.query(`
+          INSERT INTO bodega_pendientes_detalle 
+          (pendiente_id, codigo_producto, nombre_producto, cantidad_pendiente, unidad_medida, bodega_id, precio_unitario, valor_total, peso_kg) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-          data.fecha_facturacion || new Date().toISOString().split('T')[0],
-          facturaMostrador,
-          1, // Por defecto bodega principal o puedes usar destino
-          cliente_id,
-          data.fecha_promesa || new Date().toISOString().split('T')[0],
-          valorRetirado,
-          notasBodega
+          pendienteId,
+          p.codigo_producto || null,
+          p.descripcion,
+          p.cantidad_retirada,
+          p.unidad_medida || 'und',
+          p.bodega_id || 1,
+          p.precio_unitario || 0,
+          p.cantidad_retirada * (p.precio_unitario || 0),
+          p.peso || 0
         ]);
-
-        const pendienteId = masterRes.insertId;
-
-        for (const p of productosRetirados) {
-          await db.query(`
-            INSERT INTO bodega_pendientes_detalle 
-            (pendiente_id, codigo_producto, nombre_producto, cantidad_pendiente, unidad_medida, bodega_id, precio_unitario, valor_total, peso_kg) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `, [
-            pendienteId,
-            p.codigo_producto || null,
-            p.descripcion,
-            p.cantidad_retirada,
-            p.unidad_medida || 'und',
-            p.bodega_id || 1,
-            p.precio_unitario || 0,
-            p.cantidad_retirada * (p.precio_unitario || 0),
-            p.peso || 0
-          ]);
-        }
-        
-        // Notificar a los sockets de bodega si existe
-        const io = req.app.get('socketio');
-        if (io) io.emit('actualizacion_bodega');
       }
+      
+      // Notificar a los sockets de bodega
+      const io = req.app.get('socketio');
+      if (io) io.emit('actualizacion_bodega');
+    } else if (productosRetirados.length === 0 && existePendiente.length > 0 && existePendiente[0].estado === 'Pendiente') {
+      // Si ya no hay productos retirados, y logramos eliminar el registro, solo notificamos
+      const io = req.app.get('socketio');
+      if (io) io.emit('actualizacion_bodega');
     }
 
     // 👇 INTEGRACIÓN WHATSAPP (SI CAMBIÓ A ENTREGADO) 👇
