@@ -52,19 +52,8 @@ const AsignacionLogistica = () => {
         const data = await resP.json();
         // El backend ahora devuelve total_peso y valor_factura descontando retiros.
         const procesados = data.map(p => {
-          let valor_retirado = 0;
-          if (p.productos && p.productos.length > 0) {
-            p.productos.forEach(prod => {
-              const retirada = Number(prod.cantidad_retirada_cliente || 0);
-              if (retirada > 0) {
-                valor_retirado += (retirada * Number(prod.precio_unitario || 0));
-              }
-            });
-          }
           return {
-            ...p,
-            valor_factura: Math.max(0, Number(p.valor_factura || 0) - valor_retirado)
-            // total_peso ya viene descontado correctamente desde el backend (SQL)
+            ...p
           };
         });
         setPedidos(procesados);
@@ -183,14 +172,11 @@ const AsignacionLogistica = () => {
         cantidad_despachada: prod.cantidad_despachada !== undefined && prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : cantidadReal
       };
     }) : [];
-        const valorRetiradoTotal = productosInit.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0);
-        const valorNeto = Math.max(0, Number(p.valor_factura || 0) - valorRetiradoTotal);
-        
         const matchMostrador = p.nota_manual ? p.nota_manual.match(/\\[Retiro en Mostrador:.*?\\]/) : null;
         const observacionInicial = matchMostrador ? matchMostrador[0] : '';
         
         valoresIniciales[p.id] = {
-          valor_despachar: valorNeto,
+          valor_despachar: p.valor_factura || 0,
           observacion: observacionInicial,
           productos: productosInit,
           expandido: false
@@ -214,14 +200,11 @@ const AsignacionLogistica = () => {
       const pedidoOriginal = pedidos.find(p => p.id === pId);
       const det = detallesLote[pId];
       
-      const valorRetiradoTotal = pedidoOriginal.productos ? pedidoOriginal.productos.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0) : 0;
-      const valorNetoMaximo = Math.max(0, Number(pedidoOriginal.valor_factura || 0) - valorRetiradoTotal);
-
-      if (Number(det.valor_despachar) > valorNetoMaximo) {
+      if (Number(det.valor_despachar) > Number(pedidoOriginal.valor_factura)) {
         return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor neto.`);
       }
 
-      if (Number(det.valor_despachar) < valorNetoMaximo) {
+      if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura)) {
         if (det.observacion.trim() === '') {
           return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación.`);
         }
@@ -291,16 +274,13 @@ const AsignacionLogistica = () => {
       };
     }) : [];
 
-    const valorRetiradoTotal = productosInit.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0);
-    const valorNeto = Math.max(0, Number(pedido.valor_factura || 0) - valorRetiradoTotal);
-
     const matchMostrador = pedido.nota_manual ? pedido.nota_manual.match(/\\[Retiro en Mostrador:.*?\\]/) : null;
     const observacionInicial = matchMostrador ? matchMostrador[0] : '';
 
     setAsignacionIndividual({ 
       conductor_id: pedido.conductor_id || '', 
       vehiculo_id: pedido.vehiculo_id || '',
-      total_despachado: pedido.total_despachado && Number(pedido.total_despachado) > 0 ? pedido.total_despachado : valorNeto,
+      total_despachado: pedido.total_despachado && Number(pedido.total_despachado) > 0 ? pedido.total_despachado : pedido.valor_factura,
       observaciones_entrega: pedido.observaciones_entrega || observacionInicial,
       productos_despachados: productosInit
     });
@@ -900,11 +880,11 @@ const AsignacionLogistica = () => {
                     <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">VALOR A DESPACHAR</label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold pointer-events-none">$</span>
-                      <input type="number" step="0.01" min="0" max={Math.max(0, Number(pedidoIndividual.valor_factura) - asignacionIndividual.productos_despachados.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0))} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} disabled={pedidoIndividual.estado_entrega === 'Asignado'} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white disabled:bg-slate-100 disabled:text-slate-500" required />
+                      <input type="number" step="0.01" min="0" max={pedidoIndividual.valor_factura || ''} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} disabled={pedidoIndividual.estado_entrega === 'Asignado'} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white disabled:bg-slate-100 disabled:text-slate-500" required />
                     </div>
                   </div>
 
-                  {Number(asignacionIndividual.total_despachado) < (Math.max(0, Number(pedidoIndividual.valor_factura) - asignacionIndividual.productos_despachados.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0))) && (
+                  {Number(asignacionIndividual.total_despachado) < Number(pedidoIndividual.valor_factura) && (
                     <div className="animate-fadeIn">
                       <textarea 
                         value={asignacionIndividual.observaciones_entrega} 
