@@ -841,7 +841,7 @@ const PedidosAdmin = () => {
                               <td className="p-1 border"><input type="number" step="0.01" value={prod.peso} onChange={(e) => handleProductoChange(index, 'peso', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-center outline-none font-bold text-blue-600 disabled:text-slate-500" /></td>
                               {habilitarRetiro && (
                                 <td className="p-1 border">
-                                  <input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400" placeholder="0" title="Cantidad retirada por el cliente en mostrador" />
+                                  <input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} disabled={formData.retiro_mostrador_entregado} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed" placeholder="0" title="Cantidad retirada por el cliente en mostrador" />
                                 </td>
                               )}
                               {!isReadOnly && (
