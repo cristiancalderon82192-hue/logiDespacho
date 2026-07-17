@@ -791,9 +791,18 @@ const PedidosAdmin = () => {
                       Detalle de Productos
                     </h3>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setHabilitarRetiro(!habilitarRetiro)} disabled={(formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || formData.conductor_id || formData.vehiculo_id || formData.numero_viaje || formData.retiro_mostrador_entregado} className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors ${((formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || formData.conductor_id || formData.vehiculo_id || formData.numero_viaje || formData.retiro_mostrador_entregado) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : (habilitarRetiro ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-orange-50 text-orange-600 hover:bg-orange-100')}`}>
-                        <Store size={14} /> {habilitarRetiro ? 'Ocultar Retiro' : 'Habilitar Retiro'}
-                      </button>
+                      {(() => {
+                        const tieneViajeAsignado = (formData.conductor_id && String(formData.conductor_id) !== '0') || 
+                                                  (formData.vehiculo_id && String(formData.vehiculo_id) !== '0') || 
+                                                  (formData.numero_viaje && String(formData.numero_viaje) !== '0');
+                        const retiroBloqueado = (formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || tieneViajeAsignado || formData.retiro_mostrador_entregado;
+                        
+                        return (
+                          <button type="button" onClick={() => setHabilitarRetiro(!habilitarRetiro)} disabled={retiroBloqueado} className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors ${retiroBloqueado ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : (habilitarRetiro ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-orange-50 text-orange-600 hover:bg-orange-100')}`}>
+                            <Store size={14} /> {habilitarRetiro ? 'Ocultar Retiro' : 'Habilitar Retiro'}
+                          </button>
+                        );
+                      })()}
                       {!isReadOnly && (
                         <>
                           <button type="button" onClick={agregarProducto} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors">
@@ -840,7 +849,17 @@ const PedidosAdmin = () => {
                               </td>
                               <td className="p-1 border"><input type="number" step="0.01" value={prod.peso} onChange={(e) => handleProductoChange(index, 'peso', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-center outline-none font-bold text-blue-600 disabled:text-slate-500" /></td>
                               {habilitarRetiro && (
-                                <td className="p-1 border"><input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} disabled={(formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || formData.conductor_id || formData.vehiculo_id || formData.numero_viaje || formData.retiro_mostrador_entregado || isReadOnly} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed" placeholder="0" title="Cantidad retirada por el cliente en mostrador" /></td>
+                                <td className="p-1 border">
+                                  {(() => {
+                                    const tieneViajeAsignado = (formData.conductor_id && String(formData.conductor_id) !== '0') || 
+                                                              (formData.vehiculo_id && String(formData.vehiculo_id) !== '0') || 
+                                                              (formData.numero_viaje && String(formData.numero_viaje) !== '0');
+                                    const retiroBloqueado = (formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || tieneViajeAsignado || formData.retiro_mostrador_entregado;
+                                    return (
+                                      <input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} disabled={retiroBloqueado || isReadOnly} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed" placeholder="0" title="Cantidad retirada por el cliente en mostrador" />
+                                    );
+                                  })()}
+                                </td>
                               )}
                               {!isReadOnly && (
                                 <td className="p-1 border text-center">
