@@ -186,9 +186,12 @@ const AsignacionLogistica = () => {
         const valorRetiradoTotal = productosInit.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0);
         const valorNeto = Math.max(0, Number(p.valor_factura || 0) - valorRetiradoTotal);
         
+        const matchMostrador = p.nota_manual ? p.nota_manual.match(/\\[Retiro en Mostrador:.*?\\]/) : null;
+        const observacionInicial = matchMostrador ? matchMostrador[0] : '';
+        
         valoresIniciales[p.id] = {
           valor_despachar: valorNeto,
-          observacion: '',
+          observacion: observacionInicial,
           productos: productosInit,
           expandido: false
         };
@@ -291,11 +294,14 @@ const AsignacionLogistica = () => {
     const valorRetiradoTotal = productosInit.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0);
     const valorNeto = Math.max(0, Number(pedido.valor_factura || 0) - valorRetiradoTotal);
 
+    const matchMostrador = pedido.nota_manual ? pedido.nota_manual.match(/\\[Retiro en Mostrador:.*?\\]/) : null;
+    const observacionInicial = matchMostrador ? matchMostrador[0] : '';
+
     setAsignacionIndividual({ 
       conductor_id: pedido.conductor_id || '', 
       vehiculo_id: pedido.vehiculo_id || '',
       total_despachado: pedido.total_despachado && Number(pedido.total_despachado) > 0 ? pedido.total_despachado : valorNeto,
-      observaciones_entrega: pedido.observaciones_entrega || '',
+      observaciones_entrega: pedido.observaciones_entrega || observacionInicial,
       productos_despachados: productosInit
     });
     setShowModalIndividual(true);
