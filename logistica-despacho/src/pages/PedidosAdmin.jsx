@@ -795,7 +795,7 @@ const PedidosAdmin = () => {
                         const tieneViajeAsignado = (formData.conductor_id && String(formData.conductor_id) !== '0') || 
                                                   (formData.vehiculo_id && String(formData.vehiculo_id) !== '0') || 
                                                   (formData.numero_viaje && String(formData.numero_viaje) !== '0');
-                        const retiroBloqueado = (formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || tieneViajeAsignado || formData.retiro_mostrador_entregado;
+                        const retiroBloqueado = (formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || tieneViajeAsignado;
                         
                         return (
                           <button type="button" onClick={() => setHabilitarRetiro(!habilitarRetiro)} disabled={retiroBloqueado} className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors ${retiroBloqueado ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : (habilitarRetiro ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-orange-50 text-orange-600 hover:bg-orange-100')}`}>
@@ -854,7 +854,7 @@ const PedidosAdmin = () => {
                                     const tieneViajeAsignado = (formData.conductor_id && String(formData.conductor_id) !== '0') || 
                                                               (formData.vehiculo_id && String(formData.vehiculo_id) !== '0') || 
                                                               (formData.numero_viaje && String(formData.numero_viaje) !== '0');
-                                    const retiroBloqueado = (formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || tieneViajeAsignado || formData.retiro_mostrador_entregado;
+                                    const retiroBloqueado = (formData.estado_entrega && formData.estado_entrega !== 'Pendiente') || tieneViajeAsignado;
                                     return (
                                       <input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} disabled={retiroBloqueado || isReadOnly} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed" placeholder="0" title="Cantidad retirada por el cliente en mostrador" />
                                     );
