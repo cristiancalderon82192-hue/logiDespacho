@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { socket } from '../utils/socket';
 import { useAuth } from '../context/AuthContext';
 import DateRangeSelector from '../components/DateRangeSelector';
+import { confirmarAccion, mostrarExito, mostrarError } from '../utils/alertas';
 
 const EntregadosBodega = () => {
   const { user } = useAuth();
@@ -40,7 +41,12 @@ const EntregadosBodega = () => {
                   (user?.rol_nombre && user?.rol_nombre.toLowerCase().includes('admin'));
 
   const eliminarRegistro = async (id) => {
-    if (!window.confirm("¿Estás seguro de eliminar este registro histórico? Esta acción no se puede deshacer.")) return;
+    const confirmado = await confirmarAccion(
+      "¿Eliminar registro?",
+      "Esta acción no se puede deshacer y borrará también todos los datos relacionados en otras tablas.",
+      "Sí, eliminar"
+    );
+    if (!confirmado) return;
     
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/entregados/${id}`, {
@@ -48,12 +54,13 @@ const EntregadosBodega = () => {
       });
       if (res.ok) {
         setHistorial(historial.filter(h => h.id !== id));
+        mostrarExito("Registro histórico eliminado correctamente");
       } else {
-        alert("Error al eliminar el registro.");
+        mostrarError("Error al eliminar el registro");
       }
     } catch (error) {
       console.error("Error eliminando registro:", error);
-      alert("Error de red al intentar eliminar.");
+      mostrarError("Error de red al intentar eliminar");
     }
   };
 

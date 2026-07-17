@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Search, Calendar, FileText, Link as LinkIcon, RefreshCw, Trash2 } from 'lucide-react';
 import DateRangeSelector from '../components/DateRangeSelector';
 import { useAuth } from '../context/AuthContext';
+import { confirmarAccion, mostrarExito, mostrarError } from '../utils/alertas';
 
 const ReporteBodegaParciales = () => {
   const { user } = useAuth();
@@ -52,7 +53,12 @@ const ReporteBodegaParciales = () => {
   };
 
   const eliminarGrupo = async (facturaBase) => {
-    if (!window.confirm(`¿Estás seguro de eliminar TODO el historial de la factura ${facturaBase}? Esta acción borrará todas las entregas parciales y de mostrador asociadas y no se puede deshacer.`)) return;
+    const confirmado = await confirmarAccion(
+      `¿Eliminar historial de ${facturaBase}?`,
+      "Esta acción borrará todas las entregas parciales y de mostrador asociadas a este grupo y no se puede deshacer.",
+      "Sí, eliminar todo"
+    );
+    if (!confirmado) return;
     
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/reportes/parciales/${facturaBase}`, {
@@ -60,12 +66,13 @@ const ReporteBodegaParciales = () => {
       });
       if (res.ok) {
         setReporte(reporte.filter(r => r.factura_base !== facturaBase));
+        mostrarExito(`Se eliminó el historial de la factura ${facturaBase}`);
       } else {
-        alert("Error al eliminar el grupo de facturas.");
+        mostrarError("Error al eliminar el grupo de facturas");
       }
     } catch (error) {
       console.error("Error eliminando grupo:", error);
-      alert("Error de red al intentar eliminar.");
+      mostrarError("Error de red al intentar eliminar");
     }
   };
 
