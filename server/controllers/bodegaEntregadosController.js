@@ -16,5 +16,27 @@ const getHistorial = async (req, res) => {
     res.status(500).json({ message: "Error al obtener historial" });
   }
 };
+const eliminarEntregado = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [row] = await pool.query("SELECT pendiente_id FROM bodega_entregas_historial WHERE id = ?", [id]);
+    const pendienteId = row.length > 0 ? row[0].pendiente_id : null;
 
-module.exports = { getHistorial };
+    await pool.query("DELETE FROM bodega_entregas_historial WHERE id = ?", [id]);
+    
+    if (pendienteId) {
+      await pool.query("DELETE FROM bodega_pendientes_detalle WHERE pendiente_id = ?", [pendienteId]);
+      await pool.query("DELETE FROM bodega_pendientes WHERE id = ?", [pendienteId]);
+    }
+    
+    const io = req.app.get('socketio');
+    if (io) io.emit('actualizacion_bodega');
+
+    res.json({ message: "Registro eliminado correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar registro de historial:", error);
+    res.status(500).json({ message: "Error al eliminar registro" });
+  }
+};
+
+module.exports = { getHistorial, eliminarEntregado };

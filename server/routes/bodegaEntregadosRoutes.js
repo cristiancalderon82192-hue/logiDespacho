@@ -3,4 +3,6 @@ const router = express.Router();
 const ctrl = require('../controllers/bodegaEntregadosController');
 
 router.get('/', ctrl.getHistorial);
+router.delete('/:id', ctrl.eliminarEntregado);
+
 module.exports = router;

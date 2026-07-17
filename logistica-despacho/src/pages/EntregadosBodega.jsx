@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCheck, Download, Calendar, User, Search, Camera } from 'lucide-react';
+import { FileCheck, Download, Calendar, User, Search, Camera, Trash2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { socket } from '../utils/socket';
@@ -36,6 +36,26 @@ const EntregadosBodega = () => {
     socket.on('actualizacion_bodega', cargarHistorial);
     return () => socket.off('actualizacion_bodega', cargarHistorial);
   }, []);
+
+  const isAdmin = user?.rol === 'Super Admin' || user?.rol === 'Admin';
+
+  const eliminarRegistro = async (id) => {
+    if (!window.confirm("¿Estás seguro de eliminar este registro histórico? Esta acción no se puede deshacer.")) return;
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/bodega/entregados/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setHistorial(historial.filter(h => h.id !== id));
+      } else {
+        alert("Error al eliminar el registro.");
+      }
+    } catch (error) {
+      console.error("Error eliminando registro:", error);
+      alert("Error de red al intentar eliminar.");
+    }
+  };
 
   const descargarPDFSupport = (entrega) => {
     try {
@@ -211,6 +231,11 @@ const EntregadosBodega = () => {
                             <Camera size={12}/> Foto
                           </button>
                         )}
+                        {isAdmin && (
+                          <button onClick={() => eliminarRegistro(h.id)} className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors shadow-sm" title="Eliminar registro">
+                            <Trash2 size={12}/>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -251,13 +276,18 @@ const EntregadosBodega = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2 justify-end mt-1">
-                  <button onClick={() => descargarPDFSupport(h)} className="flex-1 bg-slate-900 text-white hover:bg-slate-800 text-sm py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm font-bold">
-                    <Download size={16}/> Descargar PDF
+                <div className="flex gap-2 w-full mt-1">
+                  <button onClick={() => descargarPDFSupport(h)} className="flex-1 bg-slate-900 text-white py-2 rounded-xl text-xs font-bold flex justify-center items-center gap-1">
+                    <Download size={14}/> PDF
                   </button>
                   {h.firma_bodeguero && h.firma_bodeguero.length > 50 && (
-                    <button onClick={() => descargarEvidencia(h)} className="flex-1 bg-blue-600 text-white hover:bg-blue-700 text-sm py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm font-bold">
-                      <Camera size={16}/> Ver Foto
+                    <button onClick={() => descargarEvidencia(h)} className="flex-1 bg-blue-600 text-white py-2 rounded-xl text-xs font-bold flex justify-center items-center gap-1">
+                      <Camera size={14}/> Foto
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button onClick={() => eliminarRegistro(h.id)} className="bg-red-50 text-red-600 border border-red-200 px-3 rounded-xl flex items-center justify-center transition-colors hover:bg-red-600 hover:text-white">
+                      <Trash2 size={16}/>
                     </button>
                   )}
                 </div>
