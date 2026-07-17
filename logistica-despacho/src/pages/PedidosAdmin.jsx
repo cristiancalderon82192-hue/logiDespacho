@@ -791,7 +791,7 @@ const PedidosAdmin = () => {
                       Detalle de Productos
                     </h3>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setHabilitarRetiro(!habilitarRetiro)} disabled={isReadOnly} className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors ${isReadOnly ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : (habilitarRetiro ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-orange-50 text-orange-600 hover:bg-orange-100')}`}>
+                      <button type="button" onClick={() => setHabilitarRetiro(!habilitarRetiro)} className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1 transition-colors ${habilitarRetiro ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}>
                         <Store size={14} /> {habilitarRetiro ? 'Ocultar Retiro' : 'Habilitar Retiro'}
                       </button>
                       {!isReadOnly && (
@@ -841,7 +841,7 @@ const PedidosAdmin = () => {
                               <td className="p-1 border"><input type="number" step="0.01" value={prod.peso} onChange={(e) => handleProductoChange(index, 'peso', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-transparent text-center outline-none font-bold text-blue-600 disabled:text-slate-500" /></td>
                               {habilitarRetiro && (
                                 <td className="p-1 border">
-                                  <input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} disabled={isReadOnly} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed" placeholder="0" title="Cantidad retirada por el cliente en mostrador" />
+                                  <input type="number" step="0.01" min="0" max={prod.cantidad} value={prod.cantidad_retirada_cliente || ''} onChange={(e) => handleProductoChange(index, 'cantidad_retirada_cliente', e.target.value)} className="w-full p-1 bg-orange-50 border border-orange-200 rounded text-center outline-none font-bold text-orange-600 focus:border-orange-400" placeholder="0" title="Cantidad retirada por el cliente en mostrador" />
                                 </td>
                               )}
                               {!isReadOnly && (
