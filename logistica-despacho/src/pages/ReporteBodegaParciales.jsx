@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 
 const ReporteBodegaParciales = () => {
   const { user } = useAuth();
-  const isAdmin = user?.rol === 'Super Admin' || user?.rol === 'Admin';
+  const isAdmin = String(user?.role) === '1' || String(user?.role) === '6' || 
+                  (user?.rol_nombre && user?.rol_nombre.toLowerCase().includes('admin'));
 
   const obtenerFechaLocal = () => {
     const fecha = new Date();

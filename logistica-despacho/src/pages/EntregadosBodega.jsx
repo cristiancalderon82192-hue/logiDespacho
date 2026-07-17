@@ -36,8 +36,8 @@ const EntregadosBodega = () => {
     socket.on('actualizacion_bodega', cargarHistorial);
     return () => socket.off('actualizacion_bodega', cargarHistorial);
   }, []);
-
-  const isAdmin = user?.rol === 'Super Admin' || user?.rol === 'Admin';
+  const isAdmin = String(user?.role) === '1' || String(user?.role) === '6' || 
+                  (user?.rol_nombre && user?.rol_nombre.toLowerCase().includes('admin'));
 
   const eliminarRegistro = async (id) => {
     if (!window.confirm("¿Estás seguro de eliminar este registro histórico? Esta acción no se puede deshacer.")) return;
