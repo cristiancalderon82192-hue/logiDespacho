@@ -1,2 +1,9 @@
 # Ignorar archivos de área de trabajo de VS Code
 *.code-workspace
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
