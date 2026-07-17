@@ -183,8 +183,11 @@ const AsignacionLogistica = () => {
         cantidad_despachada: prod.cantidad_despachada !== undefined && prod.cantidad_despachada !== null ? Number(prod.cantidad_despachada) : cantidadReal
       };
     }) : [];
+        const valorRetiradoTotal = productosInit.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0);
+        const valorNeto = Math.max(0, Number(p.valor_factura || 0) - valorRetiradoTotal);
+        
         valoresIniciales[p.id] = {
-          valor_despachar: p.valor_factura || 0,
+          valor_despachar: valorNeto,
           observacion: '',
           productos: productosInit,
           expandido: false
@@ -208,11 +211,14 @@ const AsignacionLogistica = () => {
       const pedidoOriginal = pedidos.find(p => p.id === pId);
       const det = detallesLote[pId];
       
-      if (Number(det.valor_despachar) > Number(pedidoOriginal.valor_factura)) {
-        return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor de la factura original.`);
+      const valorRetiradoTotal = pedidoOriginal.productos ? pedidoOriginal.productos.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0) : 0;
+      const valorNetoMaximo = Math.max(0, Number(pedidoOriginal.valor_factura || 0) - valorRetiradoTotal);
+
+      if (Number(det.valor_despachar) > valorNetoMaximo) {
+        return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} no puede tener un despacho mayor al valor neto.`);
       }
 
-      if (Number(det.valor_despachar) < Number(pedidoOriginal.valor_factura)) {
+      if (Number(det.valor_despachar) < valorNetoMaximo) {
         if (det.observacion.trim() === '') {
           return mostrarError(`❌ ALERTA: La factura ${pedidoOriginal.id_factura} va incompleta. Es OBLIGATORIO escribir una observación.`);
         }
@@ -282,10 +288,13 @@ const AsignacionLogistica = () => {
       };
     }) : [];
 
+    const valorRetiradoTotal = productosInit.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0);
+    const valorNeto = Math.max(0, Number(pedido.valor_factura || 0) - valorRetiradoTotal);
+
     setAsignacionIndividual({ 
       conductor_id: pedido.conductor_id || '', 
       vehiculo_id: pedido.vehiculo_id || '',
-      total_despachado: pedido.total_despachado || pedido.valor_factura || '',
+      total_despachado: pedido.total_despachado && Number(pedido.total_despachado) > 0 ? pedido.total_despachado : valorNeto,
       observaciones_entrega: pedido.observaciones_entrega || '',
       productos_despachados: productosInit
     });
@@ -885,11 +894,11 @@ const AsignacionLogistica = () => {
                     <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-2">VALOR A DESPACHAR</label>
                     <div className="relative">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500 font-bold pointer-events-none">$</span>
-                      <input type="number" step="0.01" min="0" max={pedidoIndividual.valor_factura || ''} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} disabled={pedidoIndividual.estado_entrega === 'Asignado'} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white disabled:bg-slate-100 disabled:text-slate-500" required />
+                      <input type="number" step="0.01" min="0" max={Math.max(0, Number(pedidoIndividual.valor_factura) - asignacionIndividual.productos_despachados.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0))} value={asignacionIndividual.total_despachado} onChange={(e) => setAsignacionIndividual({...asignacionIndividual, total_despachado: e.target.value})} disabled={pedidoIndividual.estado_entrega === 'Asignado'} className="w-full pl-8 py-3 border border-slate-300 rounded-lg focus:border-[#47B3A8] outline-none text-slate-700 font-bold bg-white disabled:bg-slate-100 disabled:text-slate-500" required />
                     </div>
                   </div>
 
-                  {Number(asignacionIndividual.total_despachado) < Number(pedidoIndividual.valor_factura) && (
+                  {Number(asignacionIndividual.total_despachado) < (Math.max(0, Number(pedidoIndividual.valor_factura) - asignacionIndividual.productos_despachados.reduce((acc, p) => acc + (Number(p.cantidad_retirada_cliente || 0) * Number(p.precio_unitario || 0)), 0))) && (
                     <div className="animate-fadeIn">
                       <textarea 
                         value={asignacionIndividual.observaciones_entrega} 
