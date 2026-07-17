@@ -554,6 +554,14 @@ const eliminarPedido = async (req, res) => {
     const [pedidoRows] = await db.query("SELECT id_factura FROM pedidos WHERE id = ?", [id]);
     const idFactura = pedidoRows.length > 0 ? pedidoRows[0].id_factura : null;
 
+    // 1.5. Clean up any "MOST" (Mostrador) documents that were generated for this pedido
+    const mostDocumentName = `${idFactura || 'SM'}-MOST-${id}`;
+    
+    // Delete from historial and pendientes_detalle using the MOST document name
+    await db.query("DELETE FROM bodega_entregas_historial WHERE pendiente_id IN (SELECT id FROM bodega_pendientes WHERE factura_num = ?)", [mostDocumentName]);
+    await db.query("DELETE FROM bodega_pendientes_detalle WHERE pendiente_id IN (SELECT id FROM bodega_pendientes WHERE factura_num = ?)", [mostDocumentName]);
+    await db.query("DELETE FROM bodega_pendientes WHERE factura_num = ?", [mostDocumentName]);
+
     await db.query("DELETE FROM pedidos_detalle WHERE pedido_id = ?", [id]);
     await db.query("DELETE FROM pedidos WHERE id = ?", [id]);
 
