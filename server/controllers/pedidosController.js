@@ -291,6 +291,11 @@ const obtenerPedidoPorId = async (req, res) => {
     const [productos] = await db.query("SELECT * FROM pedidos_productos_detalle WHERE pedido_id = ?", [id]);
     pedido.productos = productos;
 
+    // VALIDAR SI EL RETIRO EN MOSTRADOR YA FUE ENTREGADO POR BODEGA
+    const facturaMostrador = `${pedido.id_factura}-MOST`;
+    const [mostradorRes] = await db.query("SELECT estado FROM bodega_pendientes WHERE factura_num = ?", [facturaMostrador]);
+    pedido.retiro_mostrador_entregado = mostradorRes.length > 0 && mostradorRes[0].estado !== 'Pendiente';
+
     res.json(pedido);
   } catch (error) {
     res.status(500).json({ error: "Error al cargar el pedido" });
