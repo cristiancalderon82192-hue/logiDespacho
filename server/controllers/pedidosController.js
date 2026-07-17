@@ -292,7 +292,7 @@ const obtenerPedidoPorId = async (req, res) => {
     pedido.productos = productos;
 
     // VALIDAR SI EL RETIRO EN MOSTRADOR YA FUE ENTREGADO POR BODEGA
-    const facturaMostrador = `${pedido.id_factura}-MOST`;
+    const facturaMostrador = `${pedido.id_factura || 'SM'}-MOST-${pedido.id}`;
     const [mostradorRes] = await db.query("SELECT estado FROM bodega_pendientes WHERE factura_num = ?", [facturaMostrador]);
     pedido.retiro_mostrador_entregado = mostradorRes.length > 0 && mostradorRes[0].estado !== 'Pendiente';
 
@@ -411,7 +411,7 @@ const actualizarPedido = async (req, res) => {
     }
 
     // 👇 INTEGRACIÓN BODEGA PENDIENTES (RETIRO MOSTRADOR) 👇
-    const facturaMostrador = `${data.id_factura}-MOST`;
+    const facturaMostrador = `${data.id_factura || 'SM'}-MOST-${id}`;
     const [existePendiente] = await db.query("SELECT id, estado FROM bodega_pendientes WHERE factura_num = ?", [facturaMostrador]);
     
     // Si ya existía un registro y sigue 'Pendiente', lo eliminamos para recrearlo limpio (o borrarlo del todo si cancelaron el retiro)
