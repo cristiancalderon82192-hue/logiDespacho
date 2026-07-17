@@ -21,7 +21,14 @@ const getReporteFinanciero = async (req, res) => {
         0) AS valor_factura,
         
         -- 👇 EL GRAN CAMBIO: Ahora sí leemos la plata real guardada en la base de datos 👇
-        COALESCE(p.valor_recaudado, 0) AS valor_recaudado
+        COALESCE(p.valor_recaudado, 0) AS valor_recaudado,
+        
+        -- Valor de productos retirados en mostrador
+        COALESCE(
+          (SELECT SUM(ppd.cantidad_retirada_cliente * ppd.precio_unitario) 
+           FROM pedidos_productos_detalle ppd 
+           WHERE ppd.pedido_id = p.id), 
+        0) AS valor_mostrador
         
         -- Nota: El "saldo_pendiente" ya no lo calculamos aquí porque React lo 
         -- calcula automáticamente sumando los viajes de la misma factura.

@@ -173,6 +173,7 @@ const ReporteFinanciero = () => {
       'Estado Consolidado': fila.estado_entrega,
       'Viajes Cruzados': fila.viajes_count || 1,
       'Valor Factura (Neto)': Number(fila.valor_factura),
+      'Retiro Mostrador': Number(fila.valor_mostrador || 0),
       'Total Recaudado': Number(fila.valor_recaudado),
       'Saldo Pendiente': Number(fila.saldo_pendiente)
     }));
@@ -240,7 +241,7 @@ const ReporteFinanciero = () => {
     doc.text(`${sinDatos ? '0' : (100 - pRecaudo)}% En deuda`, 202, startY + 30);
 
     // 3. TABLA DE DATOS (Mismo estilo que la UI web)
-    const columnas = ["Factura(s)", "Fecha", "Cliente", "Conductor", "Estado", "V. Factura", "Recaudado", "Saldo"];
+    const columnas = ["Factura(s)", "Fecha", "Cliente", "Conductor", "Estado", "V. Factura", "Mostrador", "Recaudado", "Saldo"];
     const filas = datos.map(fila => [
       fila.id_factura_display,
       fila.fecha,
@@ -248,6 +249,7 @@ const ReporteFinanciero = () => {
       fila.conductor || 'N/A',
       fila.estado_entrega,
       formatearMoneda(fila.valor_factura),
+      formatearMoneda(fila.valor_mostrador),
       formatearMoneda(fila.valor_recaudado),
       Number(fila.saldo_pendiente) < 0 ? `A Favor: ${formatearMoneda(Math.abs(fila.saldo_pendiente))}` : formatearMoneda(fila.saldo_pendiente)
     ]);
@@ -270,14 +272,18 @@ const ReporteFinanciero = () => {
           if (data.column.index === 5) {
             data.cell.styles.textColor = [71, 85, 105]; // slate-600
           }
-          // Recaudado (Verde)
+          // Mostrador (Naranja)
           if (data.column.index === 6) {
+            data.cell.styles.textColor = [234, 88, 12]; // orange-600
+          }
+          // Recaudado (Verde)
+          if (data.column.index === 7) {
             data.cell.styles.textColor = [21, 128, 61]; // green-700
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.fillColor = [240, 253, 244]; // green-50
           }
           // Saldo (Rojo o Verde)
-          if (data.column.index === 7) {
+          if (data.column.index === 8) {
              const saldoStr = data.cell.raw;
              if (saldoStr.includes('A Favor') || saldoStr === '$0' || saldoStr === 'Saldado') {
                 data.cell.styles.textColor = [37, 99, 235]; // blue-600 o verde, puse azul para saldos a favor
@@ -408,6 +414,7 @@ const ReporteFinanciero = () => {
                   <th className="p-4 font-semibold">Conductor(es)</th>
                   <th className="p-4 font-semibold text-center">Estado Consolidado</th>
                   <th className="p-4 font-semibold text-right">Valor Factura</th>
+                  <th className="p-4 font-semibold text-right text-orange-300">Retiro Mostrador</th>
                   <th className="p-4 font-semibold text-right text-green-300">Recaudado</th>
                   <th className="p-4 font-semibold text-right text-red-300 rounded-tr-lg">Saldo</th>
                 </tr>
@@ -425,6 +432,7 @@ const ReporteFinanciero = () => {
                       <td className="p-4 text-slate-600 flex items-center gap-2">{fila.conductor && fila.conductor !== 'Sin asignar' ? (<><div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">{fila.conductor.charAt(0)}</div> {fila.conductor}</>) : (<span className="text-slate-400 italic px-2 py-1 bg-slate-100 rounded text-xs">Sin asignar</span>)}</td>
                       <td className="p-4 text-center"><span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getColorEstado(fila.estado_entrega)}`}>{fila.estado_entrega}</span></td>
                       <td className="p-4 text-right text-slate-600 font-medium">{formatearMoneda(fila.valor_factura)}</td>
+                      <td className="p-4 text-right text-orange-600 font-medium">{formatearMoneda(fila.valor_mostrador)}</td>
                       <td className="p-4 text-right text-green-700 font-extrabold bg-green-50/30">{formatearMoneda(fila.valor_recaudado)}</td>
                       
                       <td className={`p-4 text-right font-extrabold ${Number(fila.saldo_pendiente) < 0 ? 'text-blue-600 bg-blue-50/30' : Number(fila.saldo_pendiente) > 0 ? 'text-red-600 bg-red-50/30' : 'text-green-600 bg-green-50/30'}`}>
