@@ -65,7 +65,7 @@ const AdminDashboard = () => {
       const dataFlota = await resFlota.json();
 
       // 1. CARGAR DATOS GENÉRICOS DEL DASHBOARD
-      setStats(dataDash);
+      setStats(prev => JSON.stringify(prev) === JSON.stringify(dataDash) ? prev : dataDash);
       if (dataDash.bodegas) {
         const bodegasArray = [
           { name: 'B1', peso: Number(dataDash.bodegas.b1 || 0) },
@@ -77,7 +77,7 @@ const AdminDashboard = () => {
           { name: 'B7', peso: Number(dataDash.bodegas.b7 || 0) },
           { name: 'B8', peso: Number(dataDash.bodegas.b8 || 0) },
         ];
-        setChartData(bodegasArray);
+        setChartData(prev => JSON.stringify(prev) === JSON.stringify(bodegasArray) ? prev : bodegasArray);
       }
 
       // 2. CÁLCULOS DE LOS 4 INDICADORES
@@ -338,7 +338,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* ================= GRÁFICA RESPONSIVA ================= */}
-          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6 transition-all duration-500">
+          <div className="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
               <BarIcon className="text-indigo-500" size={20}/> Distribución de Carga por Bodega
             </h3>
