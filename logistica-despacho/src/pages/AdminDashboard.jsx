@@ -343,10 +343,9 @@ const AdminDashboard = () => {
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
               <BarIcon className="text-indigo-500" size={20}/> Distribución de Carga por Bodega
             </h3>
-            <div className="h-64 md:h-80 w-full overflow-hidden">
-              <div className="w-full h-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
+            <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer>
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 'bold', fill: '#64748b'}} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={(value) => `${value}kg`} width={60} tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
@@ -356,7 +355,6 @@ const AdminDashboard = () => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
             </div>
           </div>
 
