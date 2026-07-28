@@ -350,7 +350,7 @@ const AdminDashboard = () => {
                     <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 'bold', fill: '#64748b'}} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={(value) => `${value}kg`} width={60} tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
                     <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                    <Bar dataKey="peso" radius={[6, 6, 0, 0]} barSize={45}>
+                    <Bar dataKey="peso" radius={[6, 6, 0, 0]} barSize={45} isAnimationActive={false}>
                       {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#4f46e5' : '#818cf8'} />))}
                     </Bar>
                   </BarChart>
