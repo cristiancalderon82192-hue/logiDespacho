@@ -26,7 +26,11 @@ const whatsappService = require('./services/whatsappService');
 const app = express();
 
 // 1. CONFIGURACIÓN DE SEGURIDAD (CORS)
-app.use(cors()); 
+app.use(cors({
+  origin: '*', // Permitir todas las conexiones (puedes limitarlo a tu dominio de Vercel en producción)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
 
 // 2. CONFIGURACIÓN DE DATOS (JSON)
 app.use(express.json({ limit: '50mb' }));

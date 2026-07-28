@@ -94,8 +94,12 @@ const RegisterUser = () => {
     if(!(await confirmarAccion("Confirmar", "¿Eliminar usuario?"))) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/usuarios/${id}`, { method: 'DELETE' });
-      if(res.ok) fetchData();
-      else mostrarError("No se pudo eliminar");
+      if (res.ok) {
+        fetchData();
+      } else {
+        const data = await res.json();
+        mostrarError(data.error || "No se pudo eliminar");
+      }
     } catch (error) { mostrarError("Error de conexión"); }
   };
 
