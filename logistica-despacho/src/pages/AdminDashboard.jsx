@@ -170,14 +170,15 @@ const AdminDashboard = () => {
         }
       }
 
-      setIndicadores({ otif: valOtif, prod: valProd, fin: valFin, flota: valFlota });
+      const nuevosIndicadores = { otif: valOtif, prod: valProd, fin: valFin, flota: valFlota };
+      setIndicadores(prev => JSON.stringify(prev) === JSON.stringify(nuevosIndicadores) ? prev : nuevosIndicadores);
 
       if (mostrarCarga) {
         setTimeout(() => {
-          setAnimVal({ otif: valOtif, prod: valProd, fin: valFin, flota: valFlota });
+          setAnimVal(prev => JSON.stringify(prev) === JSON.stringify(nuevosIndicadores) ? prev : nuevosIndicadores);
         }, 150);
       } else {
-        setAnimVal({ otif: valOtif, prod: valProd, fin: valFin, flota: valFlota });
+        setAnimVal(prev => JSON.stringify(prev) === JSON.stringify(nuevosIndicadores) ? prev : nuevosIndicadores);
       }
 
     } catch (err) {
@@ -342,8 +343,8 @@ const AdminDashboard = () => {
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
               <BarIcon className="text-indigo-500" size={20}/> Distribución de Carga por Bodega
             </h3>
-            <div className="h-64 md:h-80 w-full overflow-x-auto">
-              <div className="min-w-[500px] h-full">
+            <div className="h-64 md:h-80 w-full overflow-hidden">
+              <div className="w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
