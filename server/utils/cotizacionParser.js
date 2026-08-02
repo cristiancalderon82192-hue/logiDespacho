@@ -18,124 +18,76 @@ const parseCotizacion = (pdfText) => {
     return parseFloat(s) || 0;
   };
 
+  const regexFinProducto = /\n(B\d)\s*\n(mts2|Bul|Und|Caja|Cj|Par|Unds)\s+([\d\.,]+)\s+([\d\.,]+)/ig;
+  const matches = [...pdfText.matchAll(regexFinProducto)];
+  
+  if (matches.length === 0) return [];
+
   const productos = [];
-  const tableStart = pdfText.indexOf("Vlr Iva Inclu.");
-  if (tableStart === -1) return [];
-  
-  const tableText = pdfText.substring(tableStart);
-  const lines = tableText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  
-  let currentProduct = null;
-  const regexInicioProducto = /^([\d\.,]+)\s+(?:([A-Z0-9]{5,10})\s+)?(B\d)\s+(.*)/;
-  const regexUnidad = /\b(mts2|Bul|Und|Caja|Cj)\b/i;
-  
-  let preBuffer = [];
+  let lastIndex = pdfText.indexOf('Vlr Iva Inclu.');
+  if (lastIndex === -1) lastIndex = 0;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.startsWith("Total") || line.startsWith("Excluido") || line.startsWith("Continúa")) continue;
+  for (const match of matches) {
+    const chunkText = pdfText.substring(lastIndex, match.index);
+    lastIndex = match.index + match[0].length;
     
-    const match = line.match(regexInicioProducto);
-    
-    if (match) {
-      if (currentProduct) productos.push(currentProduct);
-      
-      currentProduct = {
-        peso: parseNum(match[1]),
-        codigo_producto: match[2] || "",
-        bodegaStr: match[3],
-        descripcion: match[4] || "",
+    let prod = {
+        bodega_id: parseInt(match[1].replace(/\D/g, '')) || 1,
+        unidad_medida: match[2].toLowerCase(),
+        peso: parseNum(match[3]),
+        precio_total: 0, // Lo extraeremos (Total Bruto o Neto, no importa, es el V/Total extraído del PDF)
         cantidad: 0,
-        unidad_medida: "und",
         precio_unitario: 0,
-        precio_total: 0,
-        _rawBuffer: [...preBuffer, line]
-      };
-      preBuffer = [];
-    } else {
-      if (currentProduct) {
-        currentProduct._rawBuffer.push(line);
-      } else {
-        preBuffer.push(line);
-      }
-    }
-  }
-  
-  if (currentProduct) productos.push(currentProduct);
-
-  productos.forEach((prod) => {
-    const textBlock = prod._rawBuffer.join(" ");
+        codigo_producto: "",
+        descripcion: ""
+    };
     
-    if (!prod.codigo_producto) {
-      const codeMatch = textBlock.match(/\b([A-Z0-9]{5,10})\b/);
-      if (codeMatch && codeMatch[1] !== "UNICO" && codeMatch[1] !== "PREMIUM") {
-         prod.codigo_producto = codeMatch[1];
-      }
-    }
-
-    const unidadMatch = textBlock.match(regexUnidad);
-    if (unidadMatch) {
-      prod.unidad_medida = unidadMatch[1].toLowerCase();
-    }
+    // El texto del chunk termina con la descripción (posiblemente pegada a la cantidad)
+    // Extraer todo el texto, dividiendo por la expresión de IVA+Codigo
     
-    const nums = [...textBlock.matchAll(/[\d\.,]+/g)].map(m => m[0]);
-    const parsedNums = nums.map(parseNum).filter(n => n > 0 && n !== prod.peso);
+    // Buscar el IVA + Codigo: ej. "19159562" o "19\nAC0099\n8"
+    const regexIvaCodigo = /\b(\d{1,2})(?:\n)?([A-Z0-9]{4,8})(?:\n([A-Z0-9]{1,3}))?\b/;
+    const codeMatch = chunkText.match(regexIvaCodigo);
     
-    if (parsedNums.length >= 3) {
-      let ivaIndex = parsedNums.lastIndexOf(19);
-      if (ivaIndex === -1) ivaIndex = parsedNums.lastIndexOf(5);
+    if (codeMatch) {
+      prod.codigo_producto = codeMatch[2] + (codeMatch[3] ? codeMatch[3] : "");
       
-      if (ivaIndex !== -1 && ivaIndex > 0) {
-        prod.precio_total = parsedNums[parsedNums.length - 1];
-        
-        let precioIndex = ivaIndex - 1;
-        while (precioIndex >= 0 && parsedNums[precioIndex] <= 100) {
-           precioIndex--;
-        }
-        
-        if (precioIndex >= 0) {
-           let precioBruto = parsedNums[precioIndex];
-           let iva = parsedNums[ivaIndex];
-           prod.precio_unitario = parseFloat((precioBruto / (1 + iva / 100)).toFixed(2));
-           prod.precio_total = parseFloat((prod.precio_total / (1 + iva / 100)).toFixed(2));
-        }
-        
-        let cantIndex = precioIndex - 1;
-        if (cantIndex >= 0) {
-           prod.cantidad = parsedNums[cantIndex];
-        }
-      } else {
-        prod.precio_total = parsedNums[parsedNums.length - 1];
-        if (parsedNums.length >= 2) {
-          prod.precio_unitario = parsedNums[parsedNums.length - 2];
-        }
-        if (parsedNums.length >= 3) {
-          prod.cantidad = parsedNums[parsedNums.length - 3];
-        }
+      const textBefore = chunkText.substring(0, codeMatch.index);
+      const textAfter = chunkText.substring(codeMatch.index + codeMatch[0].length);
+      
+      // En textBefore están el (Dcto)? y V/Unitario
+      const numsBefore = [...textBefore.matchAll(/[\d\.,]+/g)].map(m => parseNum(m[0]));
+      if (numsBefore.length > 0) {
+        prod.precio_unitario = numsBefore[numsBefore.length - 1]; // El último es V/Unitario
       }
+      
+      // En textAfter están el V/Total, Cantidad y Descripcion
+      const numsAfterMatches = [...textAfter.matchAll(/([\d\.,]+)/g)];
+      
+      if (numsAfterMatches.length >= 2) {
+        prod.precio_total = parseNum(numsAfterMatches[0][1]); // El primer número es V/Total
+        prod.cantidad = parseNum(numsAfterMatches[1][1]); // El segundo es Cantidad
+        
+        // La descripción es todo lo que sigue al segundo número
+        const cantEndIndex = numsAfterMatches[1].index + numsAfterMatches[1][0].length;
+        prod.descripcion = textAfter.substring(cantEndIndex).trim().replace(/\n/g, ' ');
+      }
+    } else {
+      // Fallback si no hay código pegado al IVA
+      // Simplemente extraer todos los números
+      const nums = [...chunkText.matchAll(/[\d\.,]+/g)].map(m => parseNum(m[0]));
+      if (nums.length >= 4) { // Dcto?, V/Und, Iva, V/Total, Cant
+        prod.cantidad = nums[nums.length - 1];
+        prod.precio_total = nums[nums.length - 2];
+        prod.precio_unitario = nums.length >= 5 ? nums[nums.length - 4] : nums[nums.length - 3];
+      }
+      
+      // Extraer descripción sacando los números
+      prod.descripcion = chunkText.replace(/[\d\.,]+/g, '').trim().replace(/\n/g, ' ');
     }
     
-    let desc = prod.descripcion;
-    const descParts = desc.split(regexUnidad);
-    if (descParts.length > 1) {
-       let textBeforeUnit = descParts[0].trim();
-       let textWords = textBeforeUnit.split(" ");
-       if (textWords.length > 0) {
-          let possibleCant = textWords.pop();
-          if (/[\d\.,]+/.test(possibleCant)) {
-             prod.cantidad = parseNum(possibleCant);
-             desc = textWords.join(" ");
-          } else {
-             desc = textBeforeUnit;
-          }
-       }
-    }
-    prod.descripcion = desc.substring(0, 80).trim();
-    prod.bodega_id = parseInt(prod.bodegaStr.replace(/\D/g, '')) || 1;
-    
-    delete prod._rawBuffer;
-    delete prod.bodegaStr;
-  });
+    productos.push(prod);
+  }
 
   return productos;
 };

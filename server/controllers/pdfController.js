@@ -77,22 +77,27 @@ const extraerFactura = async (req, res) => {
     let valor_factura = parseNumber(valor_factura_str);
 
     // 5. Extraer arreglos de productos
-    const codigos = extractList(plantilla.regex_lista_codigos, pdfText);
-    const descripciones = extractList(plantilla.regex_lista_descripciones, pdfText);
-    const pesos = extractList(plantilla.regex_lista_pesos, pdfText);
-    const cantidades = extractList(plantilla.regex_lista_cantidades, pdfText);
-    const unidades = extractList(plantilla.regex_lista_unidades, pdfText);
-    const precios_unitarios = extractList(plantilla.regex_lista_precios_unitarios, pdfText);
-    const bodegas = extractList(plantilla.regex_lista_bodegas, pdfText);
-    const precios_totales = extractList(plantilla.regex_lista_precios_totales, pdfText);
+    let productos = [];
 
-    // 6. Armar el objeto JSON de productos
-    const productos = [];
-    const maxLen = Math.max(
-      descripciones.length, codigos.length, cantidades.length
-    );
+    if (plantilla.keyword_identificador.includes('COTIZACION')) {
+      const cotizacionParser = require('../utils/cotizacionParser');
+      productos = cotizacionParser.parseCotizacion(pdfText);
+    } else {
+      const codigos = extractList(plantilla.regex_lista_codigos, pdfText);
+      const descripciones = extractList(plantilla.regex_lista_descripciones, pdfText);
+      const pesos = extractList(plantilla.regex_lista_pesos, pdfText);
+      const cantidades = extractList(plantilla.regex_lista_cantidades, pdfText);
+      const unidades = extractList(plantilla.regex_lista_unidades, pdfText);
+      const precios_unitarios = extractList(plantilla.regex_lista_precios_unitarios, pdfText);
+      const bodegas = extractList(plantilla.regex_lista_bodegas, pdfText);
+      const precios_totales = extractList(plantilla.regex_lista_precios_totales, pdfText);
 
-    for (let i = 0; i < maxLen; i++) {
+      // 6. Armar el objeto JSON de productos
+      const maxLen = Math.max(
+        descripciones.length, codigos.length, cantidades.length
+      );
+
+      for (let i = 0; i < maxLen; i++) {
       let cantidad = parseNumber(cantidades[i]);
       let peso = parseNumber(pesos[i]);
 
@@ -126,8 +131,9 @@ const extraerFactura = async (req, res) => {
         precio_total: precio_total
       });
     }
+  }
 
-    const parsedData = {
+  const parsedData = {
       id_factura,
       cliente,
       nit_cliente,
