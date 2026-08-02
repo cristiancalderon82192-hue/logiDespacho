@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import ChangePasswordModal from './ChangePasswordModal';
 import {
   LayoutDashboard, Package, UserPlus, Truck, LogOut,
   Building2, UsersRound, Map, MapPin, FileStack, AlertCircle, Menu, X,
-  DollarSign, BarChart2, CheckCircle, Clock, MessageCircle
+  DollarSign, BarChart2, CheckCircle, Clock, MessageCircle, Key
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logoEmpresa from '../assets/rodeo.png';
@@ -17,6 +18,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [activeModule, setActiveModule] = useState('general');
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const [parcialesCount, setParcialesCount] = useState(0);
 
@@ -291,6 +293,16 @@ const Sidebar = ({ userRole = 'guest' }) => {
               <span className="text-sm relative z-10">👑 Cambiar Rol</span>
             </button>
           )}
+          
+          <button
+            onClick={() => setIsPasswordModalOpen(true)}
+            className="relative w-full flex items-center justify-center space-x-2 p-3.5 text-slate-900 bg-white/20 hover:bg-teal-500 hover:text-white rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden"
+          >
+            <div className="absolute inset-0 w-0 bg-teal-600 transition-all duration-300 ease-out group-hover:w-full -z-10"></div>
+            <Key size={18} className="relative z-10 group-hover:-translate-x-1.5 transition-transform duration-300" />
+            <span className="text-sm relative z-10">Cambiar Contraseña</span>
+          </button>
+
           <button
             onClick={logout}
             className="relative w-full flex items-center justify-center space-x-2 p-3.5 text-slate-900 bg-white/20 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden"
@@ -301,6 +313,11 @@ const Sidebar = ({ userRole = 'guest' }) => {
           </button>
         </div>
       </div>
+
+      <ChangePasswordModal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)} 
+      />
 
       <style>{`
         @keyframes slideRightFade {
