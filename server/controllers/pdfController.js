@@ -76,59 +76,55 @@ const extraerFactura = async (req, res) => {
     
     let valor_factura = parseNumber(valor_factura_str);
 
-    let productos = [];
+    // 5. Extraer arreglos de productos
+    const codigos = extractList(plantilla.regex_lista_codigos, pdfText);
+    const descripciones = extractList(plantilla.regex_lista_descripciones, pdfText);
+    const pesos = extractList(plantilla.regex_lista_pesos, pdfText);
+    const cantidades = extractList(plantilla.regex_lista_cantidades, pdfText);
+    const unidades = extractList(plantilla.regex_lista_unidades, pdfText);
+    const precios_unitarios = extractList(plantilla.regex_lista_precios_unitarios, pdfText);
+    const bodegas = extractList(plantilla.regex_lista_bodegas, pdfText);
+    const precios_totales = extractList(plantilla.regex_lista_precios_totales, pdfText);
 
-    if (plantilla.keyword_identificador.includes('COTIZACION')) {
-      const cotizacionParser = require('../utils/cotizacionParser');
-      productos = cotizacionParser.parseCotizacion(pdfText);
-    } else {
-      const codigos = extractList(plantilla.regex_lista_codigos, pdfText);
-      const descripciones = extractList(plantilla.regex_lista_descripciones, pdfText);
-      const pesos = extractList(plantilla.regex_lista_pesos, pdfText);
-      const cantidades = extractList(plantilla.regex_lista_cantidades, pdfText);
-      const unidades = extractList(plantilla.regex_lista_unidades, pdfText);
-      const precios_unitarios = extractList(plantilla.regex_lista_precios_unitarios, pdfText);
-      const bodegas = extractList(plantilla.regex_lista_bodegas, pdfText);
-      const precios_totales = extractList(plantilla.regex_lista_precios_totales, pdfText);
+    // 6. Armar el objeto JSON de productos
+    const productos = [];
+    const maxLen = Math.max(
+      descripciones.length, codigos.length, cantidades.length
+    );
 
-      const maxLen = Math.max(
-        descripciones.length, codigos.length, cantidades.length
-      );
+    for (let i = 0; i < maxLen; i++) {
+      let cantidad = parseNumber(cantidades[i]);
+      let peso = parseNumber(pesos[i]);
 
-      for (let i = 0; i < maxLen; i++) {
-        let cantidad = parseNumber(cantidades[i]);
-        let peso = parseNumber(pesos[i]);
+      let bdStr = bodegas[i] || '1';
+      let bodega_id = parseInt(bdStr.replace(/\D/g, '')) || 1; 
 
-        let bdStr = bodegas[i] || '1';
-        let bodega_id = parseInt(bdStr.replace(/\D/g, '')) || 1; 
-
-        let iva = 0;
-        if (precios_unitarios[i] && precios_unitarios[i].includes(' ')) {
-          const parts = precios_unitarios[i].trim().split(/\s+/);
-          if (parts.length > 1) {
-            iva = parseFloat(parts[parts.length - 1]);
-          }
+      let iva = 0;
+      if (precios_unitarios[i] && precios_unitarios[i].includes(' ')) {
+        const parts = precios_unitarios[i].trim().split(/\s+/);
+        if (parts.length > 1) {
+          iva = parseFloat(parts[parts.length - 1]);
         }
-
-        let precio_unitario = parseNumber(precios_unitarios[i]);
-        let precio_total = parseNumber(precios_totales[i]);
-
-        if (iva > 0) {
-          precio_unitario = parseFloat((precio_unitario / (1 + iva / 100)).toFixed(2));
-          precio_total = parseFloat((precio_total / (1 + iva / 100)).toFixed(2));
-        }
-
-        productos.push({
-          codigo_producto: codigos[i] || "",
-          descripcion: descripciones[i] || "",
-          peso: peso,
-          bodega_id: bodega_id,
-          cantidad: cantidad,
-          unidad_medida: unidades[i] || "und",
-          precio_unitario: precio_unitario,
-          precio_total: precio_total
-        });
       }
+
+      let precio_unitario = parseNumber(precios_unitarios[i]);
+      let precio_total = parseNumber(precios_totales[i]);
+
+      if (iva > 0) {
+        precio_unitario = parseFloat((precio_unitario / (1 + iva / 100)).toFixed(2));
+        precio_total = parseFloat((precio_total / (1 + iva / 100)).toFixed(2));
+      }
+
+      productos.push({
+        codigo_producto: codigos[i] || "",
+        descripcion: descripciones[i] || "",
+        peso: peso,
+        bodega_id: bodega_id,
+        cantidad: cantidad,
+        unidad_medida: unidades[i] || "und",
+        precio_unitario: precio_unitario,
+        precio_total: precio_total
+      });
     }
 
     const parsedData = {
