@@ -46,8 +46,12 @@ const parseCotizacion = (pdfText) => {
     // Extraer todo el texto, dividiendo por la expresión de IVA+Codigo
     
     // Buscar el IVA + Codigo: ej. "19159562" o "19\nAC0099\n8"
-    const regexIvaCodigo = /\b(\d{1,2})(?:\n)?([A-Z0-9]{4,8})(?:\n([A-Z0-9]{1,3}))?\b/;
-    const codeMatch = chunkText.match(regexIvaCodigo);
+    // El IVA suele ser 19, 5 o 0.
+    const regexIvaCodigo = /\b(19|5|0)(?:\n)?([A-Z0-9]{4,8})(?:\n([A-Z0-9]{1,3}))?\b/g;
+    const codeMatches = [...chunkText.matchAll(regexIvaCodigo)];
+    
+    // Tomar el último match válido (evitar números de teléfono o fechas en el header)
+    const codeMatch = codeMatches.length > 0 ? codeMatches[codeMatches.length - 1] : null;
     
     if (codeMatch) {
       prod.codigo_producto = codeMatch[2] + (codeMatch[3] ? codeMatch[3] : "");
