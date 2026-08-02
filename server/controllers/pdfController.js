@@ -17,7 +17,7 @@ const extraerFactura = async (req, res) => {
     }
 
     // 2. Buscar plantilla aplicable en la BD
-    const [plantillas] = await db.query('SELECT * FROM plantillas_pdf');
+    const [plantillas] = await db.query('SELECT * FROM plantillas_pdf ORDER BY LENGTH(keyword_identificador) DESC');
     const plantilla = plantillas.find(p => pdfText.includes(p.keyword_identificador));
 
     if (!plantilla) {
