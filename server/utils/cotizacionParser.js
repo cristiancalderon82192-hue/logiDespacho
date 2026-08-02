@@ -46,24 +46,19 @@ const parseCotizacion = (pdfText) => {
     // Extraer todo el texto, dividiendo por la expresión de IVA+Codigo
     
     // Buscar el IVA + Codigo: ej. "19159562" o "19\nAC0099\n8"
-    // El IVA suele ser 19, 5 o 0.
-    const regexIvaCodigo = /\b(19|5|0)(?:\n)?([A-Z0-9]{4,8})(?:\n([A-Z0-9]{1,3}))?\b/g;
+    // Debe estar precedido por el V/Unitario (un número) y un espacio.
+    const regexIvaCodigo = /([\d\.,]+)\s+(19|5|0)(?:\n)?([A-Z0-9]{4,8})(?:\n([A-Z0-9]{1,3}))?(?=\s)/g;
     const codeMatches = [...chunkText.matchAll(regexIvaCodigo)];
     
     // Tomar el último match válido (evitar números de teléfono o fechas en el header)
     const codeMatch = codeMatches.length > 0 ? codeMatches[codeMatches.length - 1] : null;
     
     if (codeMatch) {
-      prod.codigo_producto = codeMatch[2] + (codeMatch[3] ? codeMatch[3] : "");
+      // codeMatch[0] incluye el precio unitario, así que ajustamos
+      prod.codigo_producto = codeMatch[3] + (codeMatch[4] ? codeMatch[4] : "");
+      prod.precio_unitario = parseNum(codeMatch[1]);
       
-      const textBefore = chunkText.substring(0, codeMatch.index);
       const textAfter = chunkText.substring(codeMatch.index + codeMatch[0].length);
-      
-      // En textBefore están el (Dcto)? y V/Unitario
-      const numsBefore = [...textBefore.matchAll(/[\d\.,]+/g)].map(m => parseNum(m[0]));
-      if (numsBefore.length > 0) {
-        prod.precio_unitario = numsBefore[numsBefore.length - 1]; // El último es V/Unitario
-      }
       
       // En textAfter están el V/Total, Cantidad y Descripcion
       const numsAfterMatches = [...textAfter.matchAll(/([\d\.,]+)/g)];
