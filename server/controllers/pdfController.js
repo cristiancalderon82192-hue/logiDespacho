@@ -101,11 +101,25 @@ const extraerFactura = async (req, res) => {
     for (let i = 0; i < maxLen; i++) {
       let cantidad = parseNumber(cantidades[i]);
       let peso = parseNumber(pesos[i]);
-      let precio_unitario = parseNumber(precios_unitarios[i]);
-      let precio_total = parseNumber(precios_totales[i]);
 
       let bdStr = bodegas[i] || '1';
       let bodega_id = parseInt(bdStr.replace(/\D/g, '')) || 1; 
+
+      let iva = 0;
+      if (precios_unitarios[i] && precios_unitarios[i].includes(' ')) {
+        const parts = precios_unitarios[i].trim().split(/\s+/);
+        if (parts.length > 1) {
+          iva = parseFloat(parts[parts.length - 1]);
+        }
+      }
+
+      let precio_unitario = parseNumber(precios_unitarios[i]);
+      let precio_total = parseNumber(precios_totales[i]);
+
+      if (iva > 0) {
+        precio_unitario = parseFloat((precio_unitario / (1 + iva / 100)).toFixed(2));
+        precio_total = parseFloat((precio_total / (1 + iva / 100)).toFixed(2));
+      }
 
       productos.push({
         codigo_producto: codigos[i] || "",
