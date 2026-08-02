@@ -143,10 +143,10 @@ const Sidebar = ({ userRole = 'guest' }) => {
             relative flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 mb-1 font-medium group overflow-hidden
             ${mounted ? 'animate-slide-right-fade' : 'opacity-0'}
             ${isActive
-              ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 translate-x-1'
-              : 'text-slate-800 hover:bg-white/40 hover:text-slate-900 hover:translate-x-2'
+              ? (activeModule === 'bodega' ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/20 translate-x-1' : 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 translate-x-1')
+              : (activeModule === 'bodega' ? 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-2' : 'text-slate-800 hover:bg-white/40 hover:text-slate-900 hover:translate-x-2')
             }
-            ${item.badge > 0 && !isActive ? 'bg-red-500/10' : ''} 
+            ${item.badge > 0 && !isActive ? (activeModule === 'bodega' ? 'bg-red-500/20' : 'bg-red-500/10') : ''} 
           `}
           style={{ animationDelay, animationFillMode: 'forwards' }}
         >
@@ -158,7 +158,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
           <Icon size={20} className={`relative z-10 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-3'} ${item.badge > 0 && !isActive ? 'text-red-600' : ''}`} />
 
-          <span className={`text-sm relative z-10 flex-1 ${item.badge > 0 && !isActive ? 'text-red-900 font-bold' : ''}`}>{item.label}</span>
+          <span className={`text-sm relative z-10 flex-1 transition-colors ${item.badge > 0 && !isActive ? (activeModule === 'bodega' ? 'text-red-400 font-bold' : 'text-red-900 font-bold') : ''}`}>{item.label}</span>
 
           {item.badge !== undefined && item.badge > 0 && (
             <div className="relative z-10 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md animate-pulse border border-red-400 min-w-[20px] text-center">
@@ -174,7 +174,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 left-4 z-[60] bg-[#47B3A8] text-slate-900 p-2 rounded-lg shadow-lg border border-white/20 active:scale-90 transition-transform"
+        className={`lg:hidden fixed top-4 left-4 z-[60] p-2 rounded-lg shadow-lg border border-white/20 active:scale-90 transition-transform ${activeModule === 'bodega' ? 'bg-[#192242] text-white' : 'bg-[#47B3A8] text-slate-900'}`}
       >
         {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
@@ -187,11 +187,12 @@ const Sidebar = ({ userRole = 'guest' }) => {
       )}
 
       <div className={`
-        h-screen w-64 bg-[#47B3A8] flex flex-col fixed left-0 top-0 z-50 shadow-2xl border-r border-slate-900/5 transition-transform duration-300 ease-in-out
+        h-screen w-64 flex flex-col fixed left-0 top-0 z-50 shadow-2xl border-r transition-colors duration-500 ease-in-out
+        ${activeModule === 'bodega' ? 'bg-[#192242] border-white/10' : 'bg-[#47B3A8] border-slate-900/5'}
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
 
-        <div className="p-6 border-b border-slate-900/10 flex flex-col items-center group cursor-pointer">
+        <div className={`p-6 border-b flex flex-col items-center group cursor-pointer transition-colors duration-500 ${activeModule === 'bodega' ? 'border-white/10' : 'border-slate-900/10'}`}>
           <div className="relative">
             <div className="absolute -inset-4 bg-white/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <img
@@ -213,8 +214,8 @@ const Sidebar = ({ userRole = 'guest' }) => {
           )}
           {user?.nombre_completo && (
             <div className="mt-3 text-center">
-              <p className="text-xs text-slate-800 font-medium">Bienvenido,</p>
-              <p className="text-sm text-slate-900 font-black truncate w-48 mx-auto" title={user.nombre_completo}>
+              <p className={`text-xs font-medium transition-colors ${activeModule === 'bodega' ? 'text-slate-400' : 'text-slate-800'}`}>Bienvenido,</p>
+              <p className={`text-sm font-black truncate w-48 mx-auto transition-colors ${activeModule === 'bodega' ? 'text-white' : 'text-slate-900'}`} title={user.nombre_completo}>
                 {user.nombre_completo}
               </p>
             </div>
@@ -225,7 +226,11 @@ const Sidebar = ({ userRole = 'guest' }) => {
               <select 
                 value={activeModule}
                 onChange={(e) => setActiveModule(e.target.value)}
-                className="w-full bg-slate-900/10 border border-slate-900/20 text-slate-900 text-xs font-bold rounded-lg px-2 py-2.5 outline-none focus:ring-2 focus:ring-slate-900/30 cursor-pointer shadow-inner appearance-none text-center"
+                className={`w-full text-xs font-bold rounded-lg px-2 py-2.5 outline-none focus:ring-2 cursor-pointer shadow-inner appearance-none text-center transition-colors duration-500
+                  ${activeModule === 'bodega' 
+                    ? 'bg-white/10 border border-white/20 text-white focus:ring-white/30' 
+                    : 'bg-slate-900/10 border border-slate-900/20 text-slate-900 focus:ring-slate-900/30'
+                  }`}
                 style={{ textAlignLast: 'center' }}
               >
                 <option value="general">🚛 LOGISTICA DE DESPACHO</option>
@@ -239,7 +244,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
           {(!['admin', 'logistica', 'lider_sala'].includes(currentRole) || activeModule === 'general') && (
             <div className="animate-fade-in">
               <div className="space-y-1">
-                <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>
+                <p className={`px-3 text-[10px] font-extrabold uppercase mb-3 tracking-widest opacity-0 transition-colors duration-500 ${mounted ? 'animate-fade-in' : ''} ${activeModule === 'bodega' ? 'text-slate-400' : 'text-slate-700'}`} style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>
                   Operaciones
                 </p>
                 {renderLinks(mainItems, 0)}
@@ -247,7 +252,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
               {(currentRole === 'admin' || currentRole === 'logistica') && (
                 <div className="mt-8 space-y-1">
-                  <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
+                  <p className={`px-3 text-[10px] font-extrabold uppercase mb-3 tracking-widest opacity-0 transition-colors duration-500 ${mounted ? 'animate-fade-in' : ''} ${activeModule === 'bodega' ? 'text-slate-400' : 'text-slate-700'}`} style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
                     Reportes
                   </p>
                   {renderLinks(reportItems, 10)}
@@ -256,7 +261,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
               {currentRole === 'admin' && (
                 <div className="mt-8 space-y-1">
-                  <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}>
+                  <p className={`px-3 text-[10px] font-extrabold uppercase mb-3 tracking-widest opacity-0 transition-colors duration-500 ${mounted ? 'animate-fade-in' : ''} ${activeModule === 'bodega' ? 'text-slate-400' : 'text-slate-700'}`} style={{ animationDelay: '0.7s', animationFillMode: 'forwards' }}>
                     Sistema
                   </p>
                   {renderLinks(configItems, 20)}
@@ -269,7 +274,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
             <div className="animate-fade-in">
               {(currentRole === 'admin' || currentRole === 'logistica' || currentRole === 'lider_sala' || currentRole === 'bodeguero') && (
                 <div className={`${activeModule === 'bodega' ? 'mt-0' : 'mt-8'} space-y-1`}>
-                  <p className={`px-3 text-[10px] font-extrabold text-slate-700 uppercase mb-3 tracking-widest opacity-0 ${mounted ? 'animate-fade-in' : ''}`} style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
+                  <p className={`px-3 text-[10px] font-extrabold uppercase mb-3 tracking-widest opacity-0 transition-colors duration-500 ${mounted ? 'animate-fade-in' : ''} ${activeModule === 'bodega' ? 'text-slate-400' : 'text-slate-700'}`} style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
                     Módulo Materiales Pendientes
                   </p>
                   {renderLinks(bodegaItems, 5)}
@@ -279,7 +284,7 @@ const Sidebar = ({ userRole = 'guest' }) => {
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-900/10 bg-[#47B3A8] z-20 space-y-2">
+        <div className={`p-4 border-t z-20 space-y-2 transition-colors duration-500 ${activeModule === 'bodega' ? 'bg-[#192242] border-white/10' : 'bg-[#47B3A8] border-slate-900/10'}`}>
           {user?.realRole === 'super_admin' && (
             <button
               onClick={() => {
@@ -296,7 +301,8 @@ const Sidebar = ({ userRole = 'guest' }) => {
           
           <button
             onClick={() => setIsPasswordModalOpen(true)}
-            className="relative w-full flex items-center justify-center space-x-2 p-3.5 text-slate-900 bg-white/20 hover:bg-teal-500 hover:text-white rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden"
+            className={`relative w-full flex items-center justify-center space-x-2 p-3.5 rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden
+              ${activeModule === 'bodega' ? 'text-white bg-white/10 hover:bg-teal-500' : 'text-slate-900 bg-white/20 hover:bg-teal-500 hover:text-white'}`}
           >
             <div className="absolute inset-0 w-0 bg-teal-600 transition-all duration-300 ease-out group-hover:w-full -z-10"></div>
             <Key size={18} className="relative z-10 group-hover:-translate-x-1.5 transition-transform duration-300" />
@@ -305,7 +311,8 @@ const Sidebar = ({ userRole = 'guest' }) => {
 
           <button
             onClick={logout}
-            className="relative w-full flex items-center justify-center space-x-2 p-3.5 text-slate-900 bg-white/20 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden"
+            className={`relative w-full flex items-center justify-center space-x-2 p-3.5 rounded-xl transition-all duration-300 group shadow-sm font-bold overflow-hidden
+              ${activeModule === 'bodega' ? 'text-white bg-white/10 hover:bg-red-500' : 'text-slate-900 bg-white/20 hover:bg-red-500 hover:text-white'}`}
           >
             <div className="absolute inset-0 w-0 bg-red-600 transition-all duration-300 ease-out group-hover:w-full -z-10"></div>
             <LogOut size={18} className="relative z-10 group-hover:-translate-x-1.5 transition-transform duration-300" />
