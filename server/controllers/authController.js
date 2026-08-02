@@ -141,7 +141,7 @@ const changePassword = async (req, res) => {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    await db.query("UPDATE usuarios SET password_hash = ? WHERE id = ?", [hashedPassword, userId]);
+    await db.query("UPDATE usuarios SET password_hash = ?, session_token = NULL WHERE id = ?", [hashedPassword, userId]);
 
     res.json({ message: "Contraseña actualizada exitosamente" });
   } catch (error) {

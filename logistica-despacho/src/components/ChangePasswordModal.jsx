@@ -3,7 +3,7 @@ import { X, Lock, Key, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ChangePasswordModal = ({ isOpen, onClose }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,10 +57,11 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
       setNewPassword('');
       setConfirmPassword('');
       
-      // Auto close after 2 seconds on success
+      // Auto close and logout after 2 seconds on success
       setTimeout(() => {
         onClose();
         setSuccess(false);
+        logout(); // Force login with new password and clear local session
       }, 2000);
 
     } catch (err) {
