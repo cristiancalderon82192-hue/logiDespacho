@@ -233,14 +233,14 @@ const Sidebar = ({ userRole = 'guest' }) => {
                   }`}
                 style={{ textAlignLast: 'center' }}
               >
-                <option value="general">🚛 LOGISTICA DE DESPACHO</option>
-                <option value="bodega">📦 MATERIAL PENDIENTE</option>
+                <option value="general" className="text-slate-900 bg-white">🚛 LOGISTICA DE DESPACHO</option>
+                <option value="bodega" className="text-slate-900 bg-white">📦 MATERIAL PENDIENTE</option>
               </select>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar pb-20">
+        <nav className={`flex-1 p-4 overflow-y-auto pb-20 ${activeModule === 'bodega' ? 'custom-scrollbar-dark' : 'custom-scrollbar'}`}>
           {(!['admin', 'logistica', 'lider_sala'].includes(currentRole) || activeModule === 'general') && (
             <div className="animate-fade-in">
               <div className="space-y-1">
@@ -359,6 +359,20 @@ const Sidebar = ({ userRole = 'guest' }) => {
         }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb {
           background-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .custom-scrollbar-dark::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar-dark::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar-dark::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.2);
+          border-radius: 20px;
+        }
+        .custom-scrollbar-dark:hover::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.3);
         }
       `}</style>
     </>
