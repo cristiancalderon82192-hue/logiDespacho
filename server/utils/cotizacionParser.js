@@ -50,8 +50,8 @@ const parseCotizacion = (pdfText) => {
     const regexIvaCodigo = /([\d\.,]+)\s+(19|5|0)(?:\n)?([A-Z0-9]{4,8})(?:\n([A-Z0-9]{1,3}))?(?=\s)/g;
     const codeMatches = [...chunkText.matchAll(regexIvaCodigo)];
     
-    // Tomar el último match válido (evitar números de teléfono o fechas en el header)
-    const codeMatch = codeMatches.length > 0 ? codeMatches[codeMatches.length - 1] : null;
+    // Tomar el primer match válido (así evitamos falsos positivos al final de la descripción como "5CONCOLOR")
+    const codeMatch = codeMatches.length > 0 ? codeMatches[0] : null;
     
     if (codeMatch) {
       // codeMatch[0] incluye el precio unitario, así que ajustamos
